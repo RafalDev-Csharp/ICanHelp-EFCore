@@ -1,39 +1,24 @@
-﻿using ICanHelp.Core.Entities.Liked;
+using ICanHelp.Core.Entities.Liked;
 using ICanHelp.Core.Repositories;
 using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 
-namespace ICanHelp.Infrastructure.DAL.Repositories
+namespace ICanHelp.Infrastructure.DAL.Repositories;
+
+internal sealed class LikedUserRepository : ILikedUserRepository
 {
-    internal class LikedUserRepository : ILikedUserRepository
+    private readonly ICanHelpDbContext _db;
+
+    public LikedUserRepository(ICanHelpDbContext db)
     {
-        public Task AddLikedUserAsync(LikedUser likedUser)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task DeleteLikedUserAsync(LikedUser likedUser)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IEnumerable<LikedUser>> GetAllLikedUsersAsync()
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<LikedUser?> GetLikedUserByIdAsync(Id likedUserId)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task UpdateLikedUserAsync(LikedUser likedUser)
-        {
-            throw new NotImplementedException();
-        }
+        _db = db;
     }
+
+    public Task<LikedUser?> GetAsync(UserId likerId, UserId likedId, CancellationToken cancellationToken = default)
+        => _db.LikedUsers.SingleOrDefaultAsync(l => l.LikerId == likerId && l.LikedId == likedId, cancellationToken);
+
+    public async Task AddAsync(LikedUser likedUser, CancellationToken cancellationToken = default)
+        => await _db.LikedUsers.AddAsync(likedUser, cancellationToken);
+
+    public void Remove(LikedUser likedUser) => _db.LikedUsers.Remove(likedUser);
 }

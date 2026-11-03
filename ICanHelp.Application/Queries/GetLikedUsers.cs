@@ -1,15 +1,9 @@
-﻿using ICanHelp.Application.Abstractions;
+using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.DTO;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace ICanHelp.Application.Queries
+namespace ICanHelp.Application.Queries;
+
+public sealed class GetLikedUsers : IQuery<IReadOnlyList<LikedUserDto>>
 {
-    public class GetLikedUsers : IQuery<IEnumerable<UserDto>>
-    {
-        public Guid UserId { get; set; }
-    }
+    public Guid UserId { get; init; }
 }

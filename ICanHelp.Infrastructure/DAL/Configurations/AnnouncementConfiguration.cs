@@ -1,74 +1,76 @@
-﻿using ICanHelp.Core.Entities;
+using ICanHelp.Core.Entities;
 using ICanHelp.Core.Entities.Negotiations;
-using ICanHelp.Core.ValueObjects;
+using ICanHelp.Core.Entities.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Microsoft.Identity.Client;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-//Gotchas to check
-//•	Does Category actually expose a ICollection<Announcement> Announcements property? If not, WithMany(x => x.Announcements) will not compile — use WithMany() (no lambda) or add the collection navigation to Category.
-//•	CategoryId is a value object type (Id wrapping a Guid). EF Core needs either a value converter or a global mapping for that type. If you don't have a converter for Id, EF will not know how to persist it. Ensure you have configured a ValueConverter<Id, Guid> somewhere (or configure CategoryId explicitly).
-//•	If you want Category deletions to be prevented when announcements exist, set .OnDelete(DeleteBehavior.Restrict).
-//•	If you want the relationship to be optional, make CategoryId nullable (e.g., Id?) or call .IsRequired(false).
+namespace ICanHelp.Infrastructure.DAL.Configurations;
 
-namespace ICanHelp.Infrastructure.DAL.Configurations
+internal sealed class AnnouncementConfiguration : IEntityTypeConfiguration<Announcement>
 {
-    internal class AnnouncementConfiguration : IEntityTypeConfiguration<Announcement>
+    public void Configure(EntityTypeBuilder<Announcement> builder)
     {
-        public void Configure(EntityTypeBuilder<Announcement> builder)
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).ValueGeneratedNever();
+
+        builder.Property(x => x.Title).IsRequired();
+        builder.Property(x => x.Description).IsRequired();
+        builder.Property(x => x.Difficulty).IsRequired();
+        builder.Property(x => x.Status).IsRequired();
+        builder.Property(x => x.CreatedAt).IsRequired();
+
+        // Value objects with more than one field are stored in the same table (columns BudgetAmount, BudgetCurrency...).
+        builder.ComplexProperty(x => x.Budget, budget =>
         {
-            builder.HasKey(x => x.Id);
+            budget.Property(p => p.Amount).HasColumnName("BudgetAmount").HasPrecision(18, 2);
+            budget.Property(p => p.Currency).HasColumnName("BudgetCurrency").HasMaxLength(3);
+        });
 
-            builder.HasOne(x => x.Category)
-                .WithMany(x => x.Announcements)
-                .HasForeignKey(x => x.CategoryId);
-            builder.HasOne(x => x.Subcategory)
-                .WithMany()
-                .HasForeignKey(x => x.SubcategoryId);
-            builder.HasOne(x => x.DifficultLevel)
-                .WithMany(x => x.Announcements)
-                .HasForeignKey(x => x.DifficultLevelId);
-            builder.HasOne(x => x.User)
-                .WithMany(x => x.Announcements)
-                .HasForeignKey(x => x.OwnerId);
-            builder.Property(x => x.Title)
-                .HasConversion(x => x.Value, x => new StringObject(x))
-                .IsRequired()
-                .HasMaxLength(100);
-            builder.Property(x => x.CreatedAt)
-                .IsRequired();
-            builder.HasOne(x => x.Location)
-                .WithOne(x => x.Announcement)
-                .HasForeignKey<Location>(x => x.AnnouncementId)
-                .IsRequired();
-            builder.Property(x => x.Description)
-                .HasConversion(x => x.Value, x => new Description(x))
-                .IsRequired()
-                .HasMaxLength(1000);
+        builder.ComplexProperty(x => x.Location, location =>
+        {
+            location.Property(l => l.Latitude).HasColumnName("Latitude");
+            location.Property(l => l.Longitude).HasColumnName("Longitude");
+        });
 
-            builder.Property(x => x.Price)
-                .IsRequired();
+        // References to other aggregates: only the foreign key, no navigation property.
+        // Restrict = you cannot delete a user/category that still has announcements.
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(x => x.OwnerId)
+            .OnDelete(DeleteBehavior.Restrict);
 
-            builder.Property(x => x.IsAvailable)
-                .IsRequired();
-            builder.Property(x => x.IsFinished)
-                .IsRequired();
-            builder.HasOne(x => x.ClientOffer)
-                .WithOne(x => x.Announcement)
-                .HasForeignKey<ClientOffer>(x => x.AnnouncementId);
-            builder.HasMany(x => x.HelperOffers)
-                .WithOne(x => x.Announcement)
-                .HasForeignKey(x => x.AnnouncementId);
-            builder.HasMany(x => x.Images)
-                .WithOne(x => x.Announcement)
-                .HasForeignKey(x => x.AnnouncementId);
+        builder.HasOne<Category>()
+            .WithMany()
+            .HasForeignKey(x => x.CategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne<Subcategory>()
+            .WithMany()
+            .HasForeignKey(x => x.SubcategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
 
-        }
+        // Parts of the aggregate: deleted together with the announcement.
+        builder.HasMany(x => x.Offers)
+            .WithOne()
+            .HasForeignKey(o => o.AnnouncementId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(x => x.Offers).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.HasMany(x => x.Images)
+            .WithOne()
+            .HasForeignKey(i => i.AnnouncementId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(x => x.Images).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // The accepted offer. NoAction, because offers are already removed by the cascade above.
+        builder.HasOne<Offer>()
+            .WithMany()
+            .HasForeignKey(x => x.AcceptedOfferId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        // Typical list query: open announcements, newest first.
+        builder.HasIndex(x => new { x.Status, x.CreatedAt });
+        builder.HasIndex(x => x.OwnerId);
     }
 }

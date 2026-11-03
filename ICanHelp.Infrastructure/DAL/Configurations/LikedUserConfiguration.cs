@@ -1,30 +1,29 @@
-﻿using ICanHelp.Core.Entities.Liked;
+using ICanHelp.Core.Entities.Liked;
+using ICanHelp.Core.Entities.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace ICanHelp.Infrastructure.DAL.Configurations
+namespace ICanHelp.Infrastructure.DAL.Configurations;
+
+internal sealed class LikedUserConfiguration : IEntityTypeConfiguration<LikedUser>
 {
-    internal class LikedUserConfiguration : IEntityTypeConfiguration<LikedUser>
+    public void Configure(EntityTypeBuilder<LikedUser> builder)
     {
-        public void Configure(EntityTypeBuilder<LikedUser> builder)
-        {
-            builder.HasKey(x => x.Id);
-            builder.HasOne(x => x.UserLiker)
-                .WithMany(x => x.LikedUsers)
-                .HasForeignKey(x => x.UserLikerId)
-                .OnDelete(DeleteBehavior.Cascade);
-            builder.Property(x => x.IsLiked)
-                .IsRequired();
-            builder.HasOne(x => x.UserLiked)
-                .WithMany(x => x.LikedUsers)
-                .HasForeignKey(x => x.UserLikedId)
-                .OnDelete(DeleteBehavior.Cascade);
+        builder.HasKey(x => new { x.LikerId, x.LikedId });
 
-        }
+        builder.Property(x => x.LikedAt).IsRequired();
+
+        // Both keys point to Users. Only one of them may cascade (SQL Server: no multiple cascade paths).
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(x => x.LikerId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(x => x.LikedId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => x.LikedId);
     }
 }

@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+namespace ICanHelp.Application.Abstractions;
 
-namespace ICanHelp.Application.Abstractions
+/// <summary>Marker for a request that only reads data and returns <typeparamref name="TResult"/>.</summary>
+public interface IQuery<TResult>
 {
-    public interface IQuery<TResult>
-    {
-    }
 }

@@ -1,15 +1,17 @@
-﻿using ICanHelp.Application.Abstractions;
+using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.DTO;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using ICanHelp.Core.Enums;
 
-namespace ICanHelp.Application.Queries
+namespace ICanHelp.Application.Queries;
+
+/// <summary>A page of announcements, newest first. Every filter is optional.</summary>
+public sealed class GetAnnouncements : IQuery<IReadOnlyList<AnnouncementDto>>
 {
-    public class GetAnnouncements : IQuery<IEnumerable<AnnouncementDto>>
-    {
-        public Guid UserId { get; set; }
-    }
+    public Guid? OwnerId { get; init; }
+    public Guid? CategoryId { get; init; }
+    public Guid? SubcategoryId { get; init; }
+    public AnnouncementStatus? Status { get; init; }
+
+    public int Page { get; init; } = 1;
+    public int PageSize { get; init; } = 20;
 }

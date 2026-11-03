@@ -1,15 +1,9 @@
-﻿using ICanHelp.Application.Abstractions;
+using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.DTO;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace ICanHelp.Application.Queries
+namespace ICanHelp.Application.Queries;
+
+public sealed class GetAnnouncementById : IQuery<AnnouncementDetailsDto?>
 {
-    public class GetAnnouncementById : IQuery<AnnouncementDto>
-    {
-        public Guid AnnouncementId { get; set; }
-    }
+    public Guid AnnouncementId { get; init; }
 }
