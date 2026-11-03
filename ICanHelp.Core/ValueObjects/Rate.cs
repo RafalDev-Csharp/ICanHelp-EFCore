@@ -1,36 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using ICanHelp.Core.Exceptions;
 
-namespace ICanHelp.Core.ValueObjects
+namespace ICanHelp.Core.ValueObjects;
+
+/// <summary>A whole-number rating from 1 to 5.</summary>
+public sealed record Rate
 {
+    public int Value { get; }
 
-        public sealed class Rate
+    public Rate(int value)
+    {
+        if (value is < 1 or > 5)
         {
-            public double Value { get; }
-
-            public Rate(double value)
-            {
-                if (value < 1 || value > 5)
-                    throw new ArgumentOutOfRangeException(nameof(value), "Rating must be between 1 and 5.");
-
-                Value = value;
-            }
-
-            public static Rate Create(double value)
-            {
-                return new Rate(value);
-            }
-
-            public override string ToString() => $"{Value} star{(Value > 1 ? "s" : "")}";
-
-            // Optional: Equality logic
-            public override bool Equals(object obj) =>
-                obj is Rate other && Value.Equals(other.Value);
-
-        public override int GetHashCode() => Value.GetHashCode();
+            throw new DomainRuleException("Rate must be between 1 and 5.");
         }
 
+        Value = value;
+    }
+
+    public static implicit operator int(Rate rate) => rate.Value;
+    public override string ToString() => Value.ToString();
 }

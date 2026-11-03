@@ -1,15 +1,16 @@
-﻿using ICanHelp.Core.Entities;
+using ICanHelp.Core.Entities;
 using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace ICanHelp.Core.Repositories
+namespace ICanHelp.Core.Repositories;
+
+public interface ICategoryRepository
 {
-    public interface ICategoryRepository : IRepository<Category>
-    {
-        void Update(Category category);
-    }
+    /// <summary>Loads the category together with its subcategories.</summary>
+    Task<Category?> GetByIdAsync(Id id, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Category>> GetAllAsync(CancellationToken cancellationToken = default);
+
+    Task AddAsync(Category category, CancellationToken cancellationToken = default);
+
+    void Remove(Category category);
 }

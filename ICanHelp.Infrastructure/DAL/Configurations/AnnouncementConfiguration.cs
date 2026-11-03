@@ -44,7 +44,7 @@ namespace ICanHelp.Infrastructure.DAL.Configurations
                 .IsRequired();
             builder.HasOne(x => x.Location)
                 .WithOne(x => x.Announcement)
-                .HasForeignKey<Location>(x => x.Id)
+                .HasForeignKey<Location>(x => x.AnnouncementId)
                 .IsRequired();
             builder.Property(x => x.Description)
                 .HasConversion(x => x.Value, x => new Description(x))

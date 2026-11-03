@@ -1,15 +1,13 @@
-﻿using ICanHelp.Core.Entities.Liked;
+using ICanHelp.Core.Entities.Liked;
 using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace ICanHelp.Core.Repositories
+namespace ICanHelp.Core.Repositories;
+
+public interface ILikedAnnouncementRepository
 {
-    public interface ILikedAnnouncementRepository : IRepository<LikedAnnouncement>
-    {
-        void Update(LikedAnnouncement likedAnnouncement);
-    }
+    Task<LikedAnnouncement?> GetAsync(UserId userId, Id announcementId, CancellationToken cancellationToken = default);
+
+    Task AddAsync(LikedAnnouncement likedAnnouncement, CancellationToken cancellationToken = default);
+
+    void Remove(LikedAnnouncement likedAnnouncement);
 }

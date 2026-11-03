@@ -1,27 +1,22 @@
-﻿using ICanHelp.Core.Exceptions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using ICanHelp.Core.Exceptions;
 
-namespace ICanHelp.Core.ValueObjects
+namespace ICanHelp.Core.ValueObjects;
+
+public sealed record FullName
 {
-    public sealed record FullName
-    {
-        public string Value { get; }
-        public FullName(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value) || value.Length is > 100 or < 3)
-            {
-                throw new InvalidFullNameException(value);
-            }
+    public string Value { get; }
 
-            Value = value;
+    public FullName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length is > 100 or < 3)
+        {
+            throw new InvalidFullNameException(value);
         }
 
-        public static implicit operator FullName(string value) => value is null ? null : new(value);
-        public static implicit operator string(FullName fullName) => fullName?.Value;
-        public override string ToString() => Value;
+        Value = value;
     }
+
+    public static implicit operator FullName(string value) => new(value);
+    public static implicit operator string(FullName fullName) => fullName.Value;
+    public override string ToString() => Value;
 }

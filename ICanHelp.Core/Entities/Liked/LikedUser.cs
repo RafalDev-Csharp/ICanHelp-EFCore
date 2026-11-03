@@ -1,27 +1,32 @@
-﻿using ICanHelp.Core.Entities.Users;
+using ICanHelp.Core.Exceptions;
 using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace ICanHelp.Core.Entities.Liked
+namespace ICanHelp.Core.Entities.Liked;
+
+/// <summary>
+/// "User likes another user" (e.g. a helper worth coming back to). Unliking means deleting the row.
+/// The key is (LikerId, LikedId).
+/// </summary>
+public class LikedUser
 {
-    public class LikedUser : Liked
+    public UserId LikerId { get; private set; }
+    public UserId LikedId { get; private set; }
+    public DateTime LikedAt { get; private set; }
+
+    // Required by EF Core.
+    private LikedUser()
     {
-        public UserId UserLikedId { get; set; }
-        public User UserLiked { get; set; }
+    }
 
-        public LikedUser(Id id, bool isLiked, UserId userLikerId, User userLiker, UserId userLikedId, User userLiked) : base(id, isLiked, userLikerId, userLiker)
+    public LikedUser(UserId likerId, UserId likedId, DateTime likedAtUtc)
+    {
+        if (likerId == likedId)
         {
-            UserLikedId = userLikedId;
-            UserLiked = userLiked;
+            throw new DomainRuleException("A user cannot like himself.");
         }
 
-        public void UpdateIsUserLiked(bool isLiked)
-        {
-            IsLiked = isLiked;
-        }
+        LikerId = likerId;
+        LikedId = likedId;
+        LikedAt = likedAtUtc;
     }
 }

@@ -1,27 +1,22 @@
-﻿using ICanHelp.Core.Exceptions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using ICanHelp.Core.Exceptions;
 
-namespace ICanHelp.Core.ValueObjects
+namespace ICanHelp.Core.ValueObjects;
+
+public sealed record Description
 {
-    public sealed record Description
-    {
-        public string Value { get; }
-        public Description(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value) || value.Length is > 500 or < 2)
-            {
-                throw new InvalidDescriptionException(value);
-            }
+    public string Value { get; }
 
-            Value = value;
+    public Description(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length is > 500 or < 2)
+        {
+            throw new InvalidDescriptionException(value);
         }
 
-        public static implicit operator Description(string value) => new(value);
-        public static implicit operator string(Description username) => username.Value;
-        public override string ToString() => Value;
+        Value = value;
     }
+
+    public static implicit operator Description(string value) => new(value);
+    public static implicit operator string(Description description) => description.Value;
+    public override string ToString() => Value;
 }

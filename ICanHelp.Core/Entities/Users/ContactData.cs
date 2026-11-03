@@ -1,44 +1,14 @@
-﻿using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using ICanHelp.Core.ValueObjects;
 
-namespace ICanHelp.Core.Entities.Users
-{
-    public class ContactData
-    {
-        public Id Id { get; private set; }
-        public Email Email { get; set; }
+namespace ICanHelp.Core.Entities.Users;
 
-        public User User { get; set; }
-        public UserId UserId { get; set; }
-
-        public PhoneNumber PhoneNumber { get; set; }
-        public StringObject Country { get; set; }
-        public StringObject City { get; set; }
-        public StringObject PostalCode { get; set; }
-
-        public ContactData(Id id, Email email, PhoneNumber phoneNumber, User user, UserId userId, StringObject country, StringObject city, StringObject postalCode)
-        {
-            Id = id;
-            Email = email;
-            PhoneNumber = phoneNumber;
-            User = user;
-            UserId = userId;
-            Country = country;
-            City = city;
-            PostalCode = postalCode;
-        }
-
-        public void UpdateContactData(Email email, PhoneNumber phoneNumber, StringObject country, StringObject city, StringObject postalCode)
-        {
-            Email = email;
-            PhoneNumber = phoneNumber;
-            Country = country;
-            City = city;
-            PostalCode = postalCode;
-        }
-    }
-}
+/// <summary>
+/// Contact details of a user. It has no identity of its own: it lives inside <see cref="User"/>
+/// (stored in the same table) and is compared by value.
+/// </summary>
+public sealed record ContactData(
+    Email Email,
+    PhoneNumber PhoneNumber,
+    StringObject Country,
+    StringObject City,
+    StringObject PostalCode);
