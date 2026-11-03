@@ -20,8 +20,8 @@ The solution is divided into separate projects:
 * **ICanHelp.Core** — core of the application and domain-related elements
 * **ICanHelp.Application** — application logic and use-case related code
 * **ICanHelp.Infrastructure** — infrastructure concerns, including database access
-
-A UI/application host is planned as the project develops further.
+* **ICanHelp.Api** — ASP.NET Core Web API (controllers, Swagger, errors as ProblemDetails)
+* **ICanHelp.Core.Tests** — unit tests of the domain (xUnit + Shouldly)
 
 ## Technologies
 
@@ -50,7 +50,9 @@ The project is mainly focused on improving practical knowledge of:
 ICanHelpApp
 ├── ICanHelp.Core
 ├── ICanHelp.Application
-└── ICanHelp.Infrastructure
+├── ICanHelp.Infrastructure
+├── ICanHelp.Api
+└── ICanHelp.Core.Tests
 ```
 
 ## Development

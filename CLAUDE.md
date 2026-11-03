@@ -13,7 +13,7 @@ Jeden użytkownik może być raz klientem, raz pomocnikiem (rola w transakcji, n
 
 ## Stack
 - .NET 9, C# (Nullable enabled), EF Core 9 + SQL Server
-- Clean Architecture: `Core` (domena) ← `Application` (CQRS: komendy/zapytania, DTO) ← `Infrastructure` (EF, repozytoria) ← `Api` (do utworzenia)
+- Clean Architecture: `Core` (domena) ← `Application` (CQRS: komendy/zapytania, DTO) ← `Infrastructure` (EF, repozytoria) ← `Api` (ASP.NET Core, kontrolery)
 - Testy: xUnit + Shouldly (`ICanHelp.Core.Tests` jest; do utworzenia: `ICanHelp.Application.Tests`).
   Nie FluentAssertions 8+ – ma płatną licencję komercyjną.
 
@@ -62,6 +62,8 @@ Core            Entities, ValueObjects, Enums, Exceptions, Repositories (interfe
 Application     Abstractions (ICommand/IQuery + handlery), DTO, Queries, (Commands – Krok 6), Extensions.AddApplication()
 Infrastructure  DAL/ICanHelpDbContext, DAL/Converters, DAL/Configurations, DAL/Repositories,
                 DAL/Handlers (query handlery + mapowanie AsDto), SqlUnitOfWork, DbInitializer, Extensions.AddInfrastructure()
+Api             Program.cs, Controllers (Announcements, Categories, Users), ErrorHandling/DomainExceptionHandler,
+                appsettings*.json, Properties/launchSettings.json, ICanHelp.Api.http (przykładowe żądania)
 ```
 Zapytania (`GetX`) definiuje Application, a ich handlery są w Infrastructure, bo czytają prosto z DbContext.
 Handlery komend będą w Application i będą używać repozytoriów + `IUnitOfWork`. Rejestracja handlerów: Scrutor.
@@ -75,11 +77,25 @@ Handlery komend będą w Application i będą używać repozytoriów + `IUnitOfW
 - `DbInitializer` (IHostedService) – przy starcie: migracje + seed kategorii (nic nie robi, dopóki nie ma żadnej migracji).
 - Connection string: `ConnectionStrings:DefaultConnection` (w appsettings projektu Api).
 
+## Api (jak jest zbudowane)
+- Kontrolery `[ApiController]`, trasy `api/<zasób>`. Handler wstrzykiwany do akcji przez `[FromServices] IQueryHandler<TQuery, TResult>`
+  (bez mediatora). Zapytanie z filtrami bindowane `[FromQuery]` prosto do klasy z Application (`GetAnnouncements`, `GetUsers`).
+  `null` z handlera → `NotFound()`. Na razie tylko GET – komendy (POST/PUT) w Kroku 6.
+- Błędy zawsze jako ProblemDetails: `AddProblemDetails` + `UseExceptionHandler` + `UseStatusCodePages`.
+  `DomainExceptionHandler`: `OfferNotFoundException` → 404, `DomainRuleException` → 409, inne `CustomExceptions` → 400
+  (pole `errorCode` = nazwa wyjątku bez „Exception”), reszta → 500 bez szczegółów. Każda odpowiedź ma `traceId`.
+- Enumy w JSON jako string (`JsonStringEnumConverter`). Swagger (Swashbuckle) tylko w Development, z komentarzy `///`.
+- `GET /health` – health check (bez sprawdzania bazy). Porty: http 5080, https 7080. W Development `/` → `/swagger`,
+  `UseHttpsRedirection` tylko poza Development.
+- Connection string domyślnie LocalDB (`appsettings.json`) – Krok 4 zamieni na SQL Server z Dockera.
+- `public partial class Program` – pod `WebApplicationFactory` w testach integracyjnych.
+
 ## Komendy
 ```bash
 dotnet build
 dotnet test
-# komendy ef zadziałają po utworzeniu projektu Api (Krok 3), migracja Init w Kroku 4
+dotnet run --project ICanHelp.Api   # Swagger: http://localhost:5080/swagger
+# migracja Init w Kroku 4
 dotnet ef migrations add <Name> -p ICanHelp.Infrastructure -s ICanHelp.Api
 dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
 ```
@@ -88,11 +104,12 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
 - [x] Szkielet: Core, Application (DTO, Queries), Infrastructure
 - [x] Przebudowa domeny (Core) – model powyżej
 - [x] Krok 1 – Infrastructure + Application dopasowane do nowego Core (konfiguracje EF, repozytoria, query handlery)
-- [ ] Krok 1b – `dotnet build` zielony u autora, usunięcie plików z komentarzem `// OBSOLETE`
+- [ ] Krok 1b – ~~`dotnet build` zielony u autora~~ (zrobione), zostało: usunąć `DAL/Configurations/LocationConfiguration.cs` (`// OBSOLETE`)
 - [x] Krok 2 – projekt `ICanHelp.Core.Tests` (xUnit + Shouldly): testy `Announcement` (oferty, kontroferty, akceptacja, statusy)
   – `Entities/AnnouncementTests.cs` (tworzenie, edycja, zdjęcia, cykl życia), `Entities/AnnouncementOfferTests.cs` (negocjacje),
   `Entities/AnnouncementTestData.cs` (stały czas `Now`, użytkownicy, `InStatus(...)`). `dotnet test`: 77/77 zielone.
-- [ ] Krok 3 – projekt `ICanHelp.Api` (Controllers), Swagger, obsługa wyjątków (ProblemDetails), appsettings
+- [x] Krok 3 – projekt `ICanHelp.Api`: kontrolery GET dla wszystkich zapytań, Swagger, ProblemDetails (`DomainExceptionHandler`),
+  appsettings, launchSettings, `/health`. `dotnet build` zielony u autora (3.11.2026).
 - [ ] Krok 4 – pierwsza migracja `Init` + Docker Compose z SQL Server
 - [ ] Krok 5 – rejestracja/logowanie (JWT, hash hasła)
 - [ ] Krok 6 – use-case'y: dodaj ogłoszenie, złóż ofertę, kontroferta, akceptacja, zakończenie, ocena
