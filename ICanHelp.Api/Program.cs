@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using ICanHelp.Api.ErrorHandling;
 using ICanHelp.Application;
 using ICanHelp.Infrastructure;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +33,23 @@ builder.Services.AddSwaggerGen(o =>
 
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     o.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFile));
+
+    // Przycisk "Authorize" w Swaggerze: wklej accessToken z POST /api/users/sign-in (bez słowa "Bearer").
+    o.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "JWT z POST /api/users/sign-in"
+    });
+    o.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecurityScheme
+        {
+            Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+        }] = Array.Empty<string>()
+    });
 });
 
 var app = builder.Build();
@@ -53,6 +71,10 @@ else
     // W Development profil "http" nie ma portu https – przekierowanie tylko logowałoby ostrzeżenie.
     app.UseHttpsRedirection();
 }
+
+// Najpierw "kim jesteś" (JWT z nagłówka Authorization), potem "czy możesz" ([Authorize]).
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 app.MapHealthChecks("/health");

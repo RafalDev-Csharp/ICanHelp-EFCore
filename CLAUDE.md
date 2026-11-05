@@ -14,7 +14,7 @@ Jeden użytkownik może być raz klientem, raz pomocnikiem (rola w transakcji, n
 ## Stack
 - .NET 9, C# (Nullable enabled), EF Core 9 + SQL Server
 - Clean Architecture: `Core` (domena) ← `Application` (CQRS: komendy/zapytania, DTO) ← `Infrastructure` (EF, repozytoria) ← `Api` (ASP.NET Core, kontrolery)
-- Testy: xUnit + Shouldly (`ICanHelp.Core.Tests` jest; do utworzenia: `ICanHelp.Application.Tests`).
+- Testy: xUnit + Shouldly (`ICanHelp.Core.Tests`, `ICanHelp.Application.Tests` – handlery z ręcznymi fake'ami w `Fakes/`).
   Nie FluentAssertions 8+ – ma płatną licencję komercyjną.
 
 ## Zasady w kodzie (stosuj zawsze)
@@ -27,7 +27,7 @@ Jeden użytkownik może być raz klientem, raz pomocnikiem (rola w transakcji, n
 5. Value objects jako `sealed record`, walidacja w konstruktorze. Wyjątki są public i dziedziczą po `CustomExceptions`;
    łamanie reguły biznesowej → `DomainRuleException`. Identyfikatory to VO `Id` i `UserId` (Guid, nie może być pusty).
 6. Daty: `DateTime` UTC. Domena **nie woła** `DateTime.UtcNow` – czas dostaje parametrem (`createdAtUtc`), co ułatwia testy.
-   W Application czas da `IClock` (do dodania w Kroku 6). Nie waliduj „przeszłości” w VO – waliduj w metodzie domenowej.
+   W Application czas daje `IClock` (`Application/Time`, implementacja `Infrastructure/Time/Clock`). Nie waliduj „przeszłości” w VO – waliduj w metodzie domenowej.
 7. Status zamiast wielu booli (`AnnouncementStatus`, `OfferStatus`).
 8. Konfiguracja EF: każdą relację konfiguruj **raz** (relacje wewnątrz agregatu – w konfiguracji korzenia agregatu).
    Konwertery VO globalnie w `ConfigureConventions`. VO z kilkoma polami jako `ComplexProperty`/`OwnsOne`.
@@ -59,9 +59,11 @@ Oferty przyjmowane tylko w statusie `Open`. Po akceptacji pozostałe `Pending` �
 ## Gdzie co leży
 ```
 Core            Entities, ValueObjects, Enums, Exceptions, Repositories (interfejsy + IUnitOfWork)
-Application     Abstractions (ICommand/IQuery + handlery), DTO, Queries, (Commands – Krok 6), Extensions.AddApplication()
+Application     Abstractions (ICommand/IQuery + handlery), DTO, Queries, Commands (+ Commands/Handlers), Exceptions,
+                Security (IPasswordManager, IAuthenticator, ITokenStorage), Time (IClock), Extensions.AddApplication()
 Infrastructure  DAL/ICanHelpDbContext, DAL/Converters, DAL/Configurations, DAL/Repositories,
-                DAL/Handlers (query handlery + mapowanie AsDto), SqlUnitOfWork, DbInitializer, Extensions.AddInfrastructure()
+                DAL/Handlers (query handlery + mapowanie AsDto), SqlUnitOfWork, DbInitializer, Security (JWT, hasła), Time,
+                Extensions.AddInfrastructure()
 Api             Program.cs, Controllers (Announcements, Categories, Users), ErrorHandling/DomainExceptionHandler,
                 appsettings*.json, Properties/launchSettings.json, ICanHelp.Api.http (przykładowe żądania)
 ```
@@ -78,12 +80,24 @@ Handlery komend będą w Application i będą używać repozytoriów + `IUnitOfW
 - Connection string: `ConnectionStrings:DefaultConnection` (w appsettings projektu Api).
 - Migracje w `ICanHelp.Infrastructure/DAL/Migrations`. `dotnet-ef` jako lokalne narzędzie (`.config/dotnet-tools.json`, 9.0.11).
 
+## Uwierzytelnianie (Krok 5)
+- `POST api/users/sign-up` (komenda `SignUp`, 201 + Location; rola zawsze `User`), `POST api/users/sign-in` (`SignIn` e-mail+hasło
+  → `JwtDto`), `GET api/users/me` (`[Authorize]`). Komendy nic nie zwracają: `SignInHandler` odkłada token do `ITokenStorage` (scoped),
+  kontroler go odczytuje.
+- Hasła: `PasswordManager` = `PasswordHasher<User>` z ASP.NET Core Identity (PBKDF2). Plain hasło tylko w VO `Password` (walidacja).
+- JWT: `Authenticator` (`JsonWebTokenHandler`, HS256), claimy `sub`/`unique_name`/`role`/`jti` – nazwy w `Security/AuthClaims`,
+  `MapInboundClaims = false`. Konfiguracja `Auth` (Issuer, Audience, Expiry, SigningKey ≥ 32 bajty, `ValidateOnStart`).
+  Dev-klucz w `appsettings.Development.json`; poza Development **trzeba** ustawić `Auth__SigningKey`, inaczej API nie wstanie.
+- Błędy: `UserNameAlreadyInUse`/`EmailAlreadyInUse` → 409, `InvalidCredentials` → 401 (bez zdradzania, czy konto istnieje),
+  `UserLocked` → 403 (dopiero po poprawnym haśle). Infrastructure ma `FrameworkReference Microsoft.AspNetCore.App` + pakiet JwtBearer.
+- Swagger: przycisk Authorize (Bearer). Przykłady w `ICanHelp.Api.http`.
+
 ## Api (jak jest zbudowane)
 - Kontrolery `[ApiController]`, trasy `api/<zasób>`. Handler wstrzykiwany do akcji przez `[FromServices] IQueryHandler<TQuery, TResult>`
   (bez mediatora). Zapytanie z filtrami bindowane `[FromQuery]` prosto do klasy z Application (`GetAnnouncements`, `GetUsers`).
-  `null` z handlera → `NotFound()`. Na razie tylko GET – komendy (POST/PUT) w Kroku 6.
+  `null` z handlera → `NotFound()`. Komendy: `[FromBody]` + `[FromServices] ICommandHandler<T>`. GET-y są publiczne (do decyzji w Kroku 6).
 - Błędy zawsze jako ProblemDetails: `AddProblemDetails` + `UseExceptionHandler` + `UseStatusCodePages`.
-  `DomainExceptionHandler`: `OfferNotFoundException` → 404, `DomainRuleException` → 409, inne `CustomExceptions` → 400
+  `DomainExceptionHandler`: `OfferNotFoundException` → 404, `DomainRuleException` → 409, wyjątki auth (wyżej), inne `CustomExceptions` → 400
   (pole `errorCode` = nazwa wyjątku bez „Exception”), reszta → 500 bez szczegółów. Każda odpowiedź ma `traceId`.
 - Enumy w JSON jako string (`JsonStringEnumConverter`). Swagger (Swashbuckle) tylko w Development, z komentarzy `///`.
 - `GET /health` – health check (bez sprawdzania bazy). Porty: http 5080, https 7080. W Development `/` → `/swagger`,
@@ -115,7 +129,8 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
   appsettings, launchSettings, `/health`. `dotnet build` zielony u autora (3.11.2026).
 - [x] Krok 4 – `docker-compose.yml` (SQL Server 2022), connection string, manifest `dotnet-ef`,
   migracja `Init` w `DAL/Migrations` (20261105141305). API startuje, `DbInitializer` migruje i seeduje kategorie.
-- [ ] Krok 5 – rejestracja/logowanie (JWT, hash hasła)
+- [x] Krok 5 – rejestracja/logowanie (JWT, hash hasła): opis w sekcji „Uwierzytelnianie”, projekt `ICanHelp.Application.Tests`
+  (14 testów `SignUpHandler`/`SignInHandler`). Bez nowej migracji (schemat Users bez zmian). **Do sprawdzenia u autora: `dotnet build` + `dotnet test`.**
 - [ ] Krok 6 – use-case'y: dodaj ogłoszenie, złóż ofertę, kontroferta, akceptacja, zakończenie, ocena
 - [ ] Krok 7 – wyszukiwanie po odległości (NetTopologySuite / geography). Paginacja i filtry listy już są (`GetAnnouncements`).
 - [ ] Krok 8 – testy integracyjne (Testcontainers), GitHub Actions CI, README z diagramem

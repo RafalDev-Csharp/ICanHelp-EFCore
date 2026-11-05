@@ -1,3 +1,4 @@
+using ICanHelp.Application.Exceptions;
 using ICanHelp.Core.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -8,7 +9,8 @@ namespace ICanHelp.Api.ErrorHandling;
 /// Zamienia wyjątki domeny na odpowiedzi ProblemDetails:
 /// <list type="bullet">
 /// <item><see cref="OfferNotFoundException"/> → 404</item>
-/// <item><see cref="DomainRuleException"/> (złamana reguła biznesowa) → 409</item>
+/// <item><see cref="DomainRuleException"/> (złamana reguła biznesowa), zajęta nazwa/e-mail → 409</item>
+/// <item><see cref="InvalidCredentialsException"/> → 401, <see cref="UserLockedException"/> → 403</item>
 /// <item>pozostałe <see cref="CustomExceptions"/> (błędne dane, np. e-mail) → 400</item>
 /// </list>
 /// Inne wyjątki nie są tu obsługiwane – middleware zwróci 500 bez szczegółów.
@@ -36,6 +38,10 @@ internal sealed class DomainExceptionHandler : IExceptionHandler
         {
             OfferNotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),
             DomainRuleException => (StatusCodes.Status409Conflict, "Business rule violated"),
+            UserNameAlreadyInUseException or EmailAlreadyInUseException
+                => (StatusCodes.Status409Conflict, "Resource already exists"),
+            InvalidCredentialsException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
+            UserLockedException => (StatusCodes.Status403Forbidden, "Forbidden"),
             _ => (StatusCodes.Status400BadRequest, "Invalid data")
         };
 

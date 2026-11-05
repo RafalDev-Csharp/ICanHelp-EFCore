@@ -11,6 +11,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Handlery komend są internal – testy jednostkowe muszą je widzieć. -->
+    <InternalsVisibleTo Include="ICanHelp.Application.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\ICanHelp.Core\ICanHelp.Core.csproj" />
   </ItemGroup>
 

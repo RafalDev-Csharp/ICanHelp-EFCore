@@ -20,6 +20,9 @@ internal sealed class UserRepository : IUserRepository
     public Task<User?> GetByUserNameAsync(UserName userName, CancellationToken cancellationToken = default)
         => _db.Users.SingleOrDefaultAsync(u => u.UserName == userName, cancellationToken);
 
+    public Task<User?> GetByEmailAsync(Email email, CancellationToken cancellationToken = default)
+        => _db.Users.SingleOrDefaultAsync(u => u.ContactData.Email == email, cancellationToken);
+
     public Task<bool> ExistsByUserNameAsync(UserName userName, CancellationToken cancellationToken = default)
         => _db.Users.AnyAsync(u => u.UserName == userName, cancellationToken);
 

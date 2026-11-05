@@ -15,3 +15,36 @@ GET {{baseUrl}}/api/announcements/3fa85f64-5717-4562-b3fc-2c963f66afa6
 ###
 # 400 jako ProblemDetails (InvalidIdentityException – pusty Guid)
 GET {{baseUrl}}/api/announcements/00000000-0000-0000-0000-000000000000
+
+###
+# Rejestracja -> 201 + nagłówek Location
+POST {{baseUrl}}/api/users/sign-up
+Content-Type: application/json
+
+{
+  "userName": "jan.kowalski",
+  "fullName": "Jan Kowalski",
+  "email": "jan@example.com",
+  "password": "Haslo123!",
+  "phoneNumber": "+48600100200",
+  "country": "Polska",
+  "city": "Kraków",
+  "postalCode": "30-001",
+  "description": "Złota rączka, wracam z pracy przez Podgórze."
+}
+
+###
+# Logowanie -> { accessToken, expiresAtUtc }
+# @name signIn
+POST {{baseUrl}}/api/users/sign-in
+Content-Type: application/json
+
+{
+  "email": "jan@example.com",
+  "password": "Haslo123!"
+}
+
+###
+# Profil zalogowanego (bez tokenu -> 401)
+GET {{baseUrl}}/api/users/me
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
