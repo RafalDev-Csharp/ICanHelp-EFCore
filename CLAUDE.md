@@ -14,7 +14,8 @@ Jeden użytkownik może być raz klientem, raz pomocnikiem (rola w transakcji, n
 ## Stack
 - .NET 9, C# (Nullable enabled), EF Core 9 + SQL Server
 - Clean Architecture: `Core` (domena) ← `Application` (CQRS: komendy/zapytania, DTO) ← `Infrastructure` (EF, repozytoria) ← `Api` (ASP.NET Core, kontrolery)
-- Testy: xUnit + Shouldly (`ICanHelp.Core.Tests`, `ICanHelp.Application.Tests` – handlery z ręcznymi fake'ami w `Fakes/`).
+- Testy: xUnit + Shouldly (`ICanHelp.Core.Tests`, `ICanHelp.Application.Tests` – handlery z ręcznymi fake'ami w `Fakes/`,
+  `ICanHelp.Api.Tests` – integracyjne: `WebApplicationFactory` + SQL Server z Testcontainers, `[Trait("Category","Integration")]`).
   Nie FluentAssertions 8+ – ma płatną licencję komercyjną.
 
 ## Zasady w kodzie (stosuj zawsze)
@@ -69,7 +70,12 @@ Infrastructure  DAL/ICanHelpDbContext, DAL/Converters, DAL/Configurations, DAL/R
                 Extensions.AddInfrastructure()
 Api             Program.cs, Controllers (Announcements, Categories, Users), ErrorHandling/DomainExceptionHandler,
                 appsettings*.json, Properties/launchSettings.json, ICanHelp.Api.http (przykładowe żądania)
+Api.Tests       Infrastructure/ApiFactory (kontener + ApiCollection), Infrastructure/TestApi (CreateUserAsync, ShouldBeProblemAsync…),
+                testy per obszar: ApiBasics, Users, AnnouncementFlow, DistanceSearch
+.github/workflows/ci.yml   build + testy jednostkowe + integracyjne (ubuntu-latest, Docker)
 ```
+Testy integracyjne: jeden kontener i baza `ICanHelpTests` na cały przebieg, środowisko `Testing`, config przez `UseSetting`.
+Bazy nie czyścimy – każdy test tworzy własnych użytkowników (unikalny e-mail) i filtruje po swoich danych (`ownerId`).
 Zapytania (`GetX`) definiuje Application, a ich handlery są w Infrastructure, bo czytają prosto z DbContext.
 Handlery komend są w Application (`Commands/Handlers`), używają repozytoriów + `IUnitOfWork`. Rejestracja handlerów: Scrutor.
 Wspólne: `RepositoryExtensions` (`GetOrThrowAsync` → `AnnouncementNotFound`, `GetActiveOrThrowAsync` → `UserNotFound`/`UserLocked`),
@@ -129,7 +135,8 @@ Wspólne: `RepositoryExtensions` (`GetOrThrowAsync` → `AnnouncementNotFound`, 
 ## Komendy
 ```bash
 dotnet build
-dotnet test
+dotnet test                                   # integracyjne wymagają działającego Dockera
+dotnet test --filter "Category!=Integration"  # tylko jednostkowe
 docker compose up -d                # SQL Server w Dockerze
 dotnet tool restore                 # instaluje dotnet-ef z manifestu
 dotnet run --project ICanHelp.Api   # Swagger: http://localhost:5080/swagger; przy starcie DbInitializer robi migracje + seed
@@ -147,14 +154,14 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
   appsettings, launchSettings, `/health`. `dotnet build` zielony u autora (3.11.2026).
 - [x] Krok 4 – `docker-compose.yml` (SQL Server 2022), manifest `dotnet-ef`, migracja `Init` (20261105141305), seed kategorii.
 - [x] Krok 5 – rejestracja/logowanie (JWT, hash hasła): opis w sekcji „Uwierzytelnianie”, projekt `ICanHelp.Application.Tests`
-  (14 testów `SignUpHandler`/`SignInHandler`). Bez nowej migracji (schemat Users bez zmian). **Do sprawdzenia u autora: `dotnet build` + `dotnet test`.**
+  (14 testów `SignUpHandler`/`SignInHandler`). Bez nowej migracji (schemat Users bez zmian).
 - [x] Krok 6 – komendy ogłoszeń/ofert/oceny (`Commands/AnnouncementCommands.cs`, `OfferCommands.cs`) + endpointy + kontakt po akceptacji.
-  Testy: `Core.Tests/.../AnnouncementParticipantsTests.cs`, `Application.Tests/Commands/AnnouncementHandlersTests.cs`. Bez migracji.
-  **Do sprawdzenia u autora: `dotnet build` + `dotnet test` (pisane bez kompilatora).**
+  Testy: `Core.Tests/.../AnnouncementParticipantsTests.cs`, `Application.Tests/Commands/AnnouncementHandlersTests.cs`. Bez migracji.
 - [x] Krok 7 – wyszukiwanie po odległości (opis w sekcji „Infrastructure”), migracja `AnnouncementGeoPoint` (20261105190000,
-  pisana ręcznie), testy `Application.Tests/Queries/GetAnnouncementsDistanceFilterTests.cs`.
-  **Do sprawdzenia u autora: `dotnet build` + `dotnet test` + start API (migracja) + żądanie z `ICanHelp.Api.http` (pisane bez kompilatora).**
-- [ ] Krok 8 – testy integracyjne (Testcontainers), GitHub Actions CI, README z diagramem
+  pisana ręcznie), testy `Application.Tests/Queries/GetAnnouncementsDistanceFilterTests.cs`.
+- [x] Krok 8 – `ICanHelp.Api.Tests` (Testcontainers.MsSql 4.4.0, Mvc.Testing 9.0.11; ~30 testów: auth, prywatność, cały przepływ
+  negocjacji, wyszukiwanie po odległości, ProblemDetails), CI `.github/workflows/ci.yml`, README z diagramami Mermaid.
+  Zweryfikowane u autora 5.11.2026: `dotnet test` – 172/172 zielone (potwierdza też Kroki 5–7). **Zostało: push + zielony build w Actions.**
 
 ## Jak pracować z AI (oszczędnie)
 - Jedna sesja = jeden krok z listy. Na start: „Przeczytaj CLAUDE.md, zrób Krok N”.

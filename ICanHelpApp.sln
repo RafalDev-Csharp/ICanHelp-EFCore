@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ICanHelp.Core.Tests", "ICan
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ICanHelp.Application.Tests", "ICanHelp.Application.Tests\ICanHelp.Application.Tests.csproj", "{7E4D1A2B-5C3F-4A8E-9B6D-2C1F0E3A4D58}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ICanHelp.Api.Tests", "ICanHelp.Api.Tests\ICanHelp.Api.Tests.csproj", "{C5A9E2F1-6B3D-4E8A-A7C4-9D2B1E0F3A67}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -49,6 +51,10 @@ Global
 		{7E4D1A2B-5C3F-4A8E-9B6D-2C1F0E3A4D58}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7E4D1A2B-5C3F-4A8E-9B6D-2C1F0E3A4D58}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7E4D1A2B-5C3F-4A8E-9B6D-2C1F0E3A4D58}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C5A9E2F1-6B3D-4E8A-A7C4-9D2B1E0F3A67}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C5A9E2F1-6B3D-4E8A-A7C4-9D2B1E0F3A67}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C5A9E2F1-6B3D-4E8A-A7C4-9D2B1E0F3A67}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C5A9E2F1-6B3D-4E8A-A7C4-9D2B1E0F3A67}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -60,6 +66,7 @@ Global
 		{D0E8EC3F-6500-4645-AFD4-D7FD7E2E84D8} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{3B7C2E4A-9D1F-4C6B-8E2A-5F0D7A1C9B34} = {A6E1D2C3-4B5F-4E7A-9C8D-1F2E3A4B5C6D}
 		{7E4D1A2B-5C3F-4A8E-9B6D-2C1F0E3A4D58} = {A6E1D2C3-4B5F-4E7A-9C8D-1F2E3A4B5C6D}
+		{C5A9E2F1-6B3D-4E8A-A7C4-9D2B1E0F3A67} = {A6E1D2C3-4B5F-4E7A-9C8D-1F2E3A4B5C6D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {48DC3073-5A22-4428-8FF1-A256CC1DF8AF}

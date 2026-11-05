@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <!-- Cała aplikacja w pamięci (TestServer) – prawdziwe kontrolery, middleware, JWT, EF. -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.11" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="Shouldly" Version="4.2.1" />
+    <!-- Prawdziwy SQL Server w Dockerze na czas testów (wymaga działającego Dockera). -->
+    <PackageReference Include="Testcontainers.MsSql" Version="4.4.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Shouldly" />
+    <Using Include="System.Net" />
+    <Using Include="System.Net.Http.Json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ICanHelp.Api\ICanHelp.Api.csproj" />
+  </ItemGroup>
+
+</Project>
