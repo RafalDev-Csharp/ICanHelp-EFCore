@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ICanHelp.Core.Exceptions
 {
-    internal class InvalidEmailException : CustomExceptions
+    public class InvalidEmailException : CustomExceptions
     {
         public string Email { get; }
         public InvalidEmailException(string email) : base($"Email: {email} is invalid.")

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -8,6 +8,11 @@
 
   <ItemGroup>
     <PackageReference Include="Scrutor" Version="6.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Handlery komend są internal – testy jednostkowe muszą je widzieć. -->
+    <InternalsVisibleTo Include="ICanHelp.Application.Tests" />
   </ItemGroup>
 
   <ItemGroup>

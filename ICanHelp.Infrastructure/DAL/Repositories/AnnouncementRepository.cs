@@ -1,39 +1,29 @@
-﻿using ICanHelp.Core.Entities;
+using ICanHelp.Core.Entities;
 using ICanHelp.Core.Repositories;
 using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 
-namespace ICanHelp.Infrastructure.DAL.Repositories
+namespace ICanHelp.Infrastructure.DAL.Repositories;
+
+internal sealed class AnnouncementRepository : IAnnouncementRepository
 {
-    internal class AnnouncementRepository : Repository<Announcement>, IAnnouncementRepository
+    private readonly ICanHelpDbContext _db;
+
+    public AnnouncementRepository(ICanHelpDbContext db)
     {
-        public Task AddAnnouncementAsync(Announcement announcement)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task DeleteAnnouncementAsync(Announcement announcement)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IEnumerable<Announcement>> GetAllAnnouncementsAsync()
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<Announcement?> GetAnnouncementByIdAsync(Id announcementId)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task UpdateAnnouncementAsync(Announcement announcement)
-        {
-            throw new NotImplementedException();
-        }
+        _db = db;
     }
+
+    // The whole aggregate is loaded (offers + images), so its rules can be checked in memory.
+    public Task<Announcement?> GetByIdAsync(Id id, CancellationToken cancellationToken = default)
+        => _db.Announcements
+            .Include(a => a.Offers)
+            .Include(a => a.Images)
+            .AsSplitQuery()
+            .SingleOrDefaultAsync(a => a.Id == id, cancellationToken);
+
+    public async Task AddAsync(Announcement announcement, CancellationToken cancellationToken = default)
+        => await _db.Announcements.AddAsync(announcement, cancellationToken);
+
+    public void Remove(Announcement announcement) => _db.Announcements.Remove(announcement);
 }

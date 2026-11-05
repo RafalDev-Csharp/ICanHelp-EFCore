@@ -1,20 +1,8 @@
-﻿using ICanHelp.Core.Entities;
-using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+namespace ICanHelp.Application.DTO;
 
-namespace ICanHelp.Application.DTO
+public sealed record CategoryDto
 {
-    public class CategoryDto
-    {
-        public Guid Id { get; set; }
-
-        public string CategoryName { get; set; }
-
-        public IEnumerable<AnnouncementDto> Announcements { get; set; }
-        public IEnumerable<SubcategoryDto> Subcategories { get; set; }
-    }
+    public Guid Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public IReadOnlyList<SubcategoryDto> Subcategories { get; init; } = [];
 }

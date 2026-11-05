@@ -1,39 +1,25 @@
-﻿using ICanHelp.Core.Entities.Liked;
+using ICanHelp.Core.Entities.Liked;
 using ICanHelp.Core.Repositories;
 using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 
-namespace ICanHelp.Infrastructure.DAL.Repositories
+namespace ICanHelp.Infrastructure.DAL.Repositories;
+
+internal sealed class LikedAnnouncementRepository : ILikedAnnouncementRepository
 {
-    internal class LikedAnnouncementRepository : ILikedAnnouncementRepository
+    private readonly ICanHelpDbContext _db;
+
+    public LikedAnnouncementRepository(ICanHelpDbContext db)
     {
-        public Task AddLikedAnnouncementAsync(LikedAnnouncement likedAnnouncement)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task DeleteLikedAnnouncementAsync(LikedAnnouncement likedAnnouncement)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IEnumerable<LikedAnnouncement>> GetAllLikedAnnouncementsAsync()
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<LikedAnnouncement?> GetLikedAnnouncementByIdAsync(Id likedAnnouncementId)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task UpdateLikedAnnouncementAsync(LikedAnnouncement likedAnnouncement)
-        {
-            throw new NotImplementedException();
-        }
+        _db = db;
     }
+
+    public Task<LikedAnnouncement?> GetAsync(UserId userId, Id announcementId, CancellationToken cancellationToken = default)
+        => _db.LikedAnnouncements.SingleOrDefaultAsync(
+            l => l.UserId == userId && l.AnnouncementId == announcementId, cancellationToken);
+
+    public async Task AddAsync(LikedAnnouncement likedAnnouncement, CancellationToken cancellationToken = default)
+        => await _db.LikedAnnouncements.AddAsync(likedAnnouncement, cancellationToken);
+
+    public void Remove(LikedAnnouncement likedAnnouncement) => _db.LikedAnnouncements.Remove(likedAnnouncement);
 }

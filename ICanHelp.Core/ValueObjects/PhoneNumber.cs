@@ -1,40 +1,26 @@
-﻿using ICanHelp.Core.Exceptions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using ICanHelp.Core.Exceptions;
 
-namespace ICanHelp.Core.ValueObjects
+namespace ICanHelp.Core.ValueObjects;
+
+public sealed record PhoneNumber
 {
-    public record PhoneNumber
+    // Optional '+', then 8-15 digits (E.164), so the value is at most 16 characters long.
+    private static readonly Regex PhoneRegex = new(@"^\+?[1-9][0-9]{7,14}$", RegexOptions.Compiled);
+
+    public string Value { get; }
+
+    public PhoneNumber(string value)
     {
-        private readonly Regex Regex = new(@"^\+?[1-9][0-9]{7,14}$");
-        public string Value { get; }
-
-        public PhoneNumber(string value)
+        if (string.IsNullOrWhiteSpace(value) || !PhoneRegex.IsMatch(value))
         {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                throw new InvalidPhoneNumberException(value);
-            }
-
-            if (value.Length is > 25 or < 6)
-            {
-                throw new InvalidPhoneNumberException(value);
-            }
-
-            if (!Regex.IsMatch(value))
-            {
-                throw new InvalidPhoneNumberException(value);
-            }
-
-            Value = value;
+            throw new InvalidPhoneNumberException(value);
         }
 
-        public static implicit operator string(PhoneNumber phoneNumber) => phoneNumber.Value;
-        public static implicit operator PhoneNumber(string phoneNumber) => new(phoneNumber);
-        public override string ToString() => Value;
+        Value = value;
     }
+
+    public static implicit operator string(PhoneNumber phoneNumber) => phoneNumber.Value;
+    public static implicit operator PhoneNumber(string phoneNumber) => new(phoneNumber);
+    public override string ToString() => Value;
 }

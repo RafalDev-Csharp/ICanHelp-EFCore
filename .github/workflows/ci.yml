@@ -1,0 +1,64 @@
+# Build + testy przy każdym pushu i pull requeście.
+# Testy integracyjne (ICanHelp.Api.Tests) same stawiają SQL Server przez Testcontainers –
+# runner ubuntu-latest ma Dockera, więc nie potrzeba sekcji "services".
+name: CI
+
+on:
+  push:
+    branches: [main, dev, development]
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore ICanHelpApp.sln
+
+      - name: Build
+        run: dotnet build ICanHelpApp.sln -c Release --no-restore
+
+      - name: Unit tests (Core, Application)
+        run: >
+          dotnet test ICanHelpApp.sln -c Release --no-build
+          --filter "Category!=Integration"
+          --logger "trx;LogFilePrefix=unit" --results-directory TestResults
+
+      - name: Integration tests (API + SQL Server in Testcontainers)
+        run: >
+          dotnet test ICanHelp.Api.Tests/ICanHelp.Api.Tests.csproj -c Release --no-build
+          --logger "trx;LogFilePrefix=integration" --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults
+          if-no-files-found: ignore

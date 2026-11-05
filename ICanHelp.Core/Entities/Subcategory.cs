@@ -1,33 +1,25 @@
-﻿using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using ICanHelp.Core.ValueObjects;
 
-namespace ICanHelp.Core.Entities
+namespace ICanHelp.Core.Entities;
+
+/// <summary>A part of a <see cref="Category"/>. Created only through <see cref="Category.AddSubcategory"/>.</summary>
+public class Subcategory
 {
-    public class Subcategory
+    public Id Id { get; private set; }
+    public Id CategoryId { get; private set; }
+    public StringObject SubcategoryName { get; private set; }
+
+    // Required by EF Core.
+    private Subcategory()
     {
-        public Id Id { get; set; }
-
-        public StringObject SubcategoryName { get; set; }
-
-        public Id CategoryId { get; set; }
-        public Category Category { get; set; }
-
-
-        public Subcategory(Id id, StringObject subcategoryName, Id categoryId)
-        {
-            Id = id;
-            SubcategoryName = subcategoryName;
-            CategoryId = categoryId;
-        }
-
-        public void UpdateSubcategory(StringObject subcategoryName, Id categoryId)
-        {
-            SubcategoryName = subcategoryName;
-            CategoryId = categoryId;
-        }
     }
+
+    internal Subcategory(Id id, Id categoryId, StringObject subcategoryName)
+    {
+        Id = id;
+        CategoryId = categoryId;
+        SubcategoryName = subcategoryName;
+    }
+
+    internal void Rename(StringObject subcategoryName) => SubcategoryName = subcategoryName;
 }

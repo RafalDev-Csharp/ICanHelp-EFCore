@@ -1,15 +1,19 @@
-﻿using ICanHelp.Core.Entities.Offers;
+using ICanHelp.Core.Entities.Users;
 using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace ICanHelp.Core.Repositories
+namespace ICanHelp.Core.Repositories;
+
+public interface IUserRepository
 {
-    public interface IUserRepository : IRepository<User>
-    {
-        void Update(User user);
-    }
+    Task<User?> GetByIdAsync(UserId id, CancellationToken cancellationToken = default);
+
+    Task<User?> GetByUserNameAsync(UserName userName, CancellationToken cancellationToken = default);
+
+    Task<User?> GetByEmailAsync(Email email, CancellationToken cancellationToken = default);
+
+    Task<bool> ExistsByUserNameAsync(UserName userName, CancellationToken cancellationToken = default);
+
+    Task<bool> ExistsByEmailAsync(Email email, CancellationToken cancellationToken = default);
+
+    Task AddAsync(User user, CancellationToken cancellationToken = default);
 }

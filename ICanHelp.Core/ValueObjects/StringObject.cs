@@ -1,28 +1,23 @@
-﻿using ICanHelp.Core.Exceptions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.AccessControl;
-using System.Text;
-using System.Threading.Tasks;
+using ICanHelp.Core.Exceptions;
 
-namespace ICanHelp.Core.ValueObjects
+namespace ICanHelp.Core.ValueObjects;
+
+/// <summary>A short, required text (names, titles, file names). Compared by value.</summary>
+public sealed record StringObject
 {
-    public class StringObject
-    {
-        public string Value { get; }
-        public StringObject(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value) || value.Length is > 100 or < 1)
-            {
-                throw new InvalidStringObjectException(value);
-            }
+    public string Value { get; }
 
-            Value = value;
+    public StringObject(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 100)
+        {
+            throw new InvalidStringObjectException(value);
         }
 
-        public static implicit operator StringObject(string value) => value is null ? null : new(value);
-        public static implicit operator string(StringObject customName) => customName?.Value;
-        public override string ToString() => Value;
+        Value = value;
     }
+
+    public static implicit operator StringObject(string value) => new(value);
+    public static implicit operator string(StringObject stringObject) => stringObject.Value;
+    public override string ToString() => Value;
 }

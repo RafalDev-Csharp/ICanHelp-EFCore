@@ -1,36 +1,30 @@
-﻿using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using ICanHelp.Core.Repositories;
 
-namespace ICanHelp.Infrastructure.DAL
+namespace ICanHelp.Infrastructure.DAL;
+
+internal sealed class SqlUnitOfWork : IUnitOfWork
 {
-    internal sealed class SqlUnitOfWork : IUnitOfWork
+    private readonly ICanHelpDbContext _dbContext;
+
+    public SqlUnitOfWork(ICanHelpDbContext dbContext)
     {
-        private readonly ICanHelpDbContext _dbContext;
+        _dbContext = dbContext;
+    }
 
-        public SqlUnitOfWork(ICanHelpDbContext dbContext)
+    public async Task ExecuteAsync(Func<Task> action, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        try
         {
-            _dbContext = dbContext;
+            await action();
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
-
-        public async Task ExecuteAsync(Func<Task> action)
+        catch
         {
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync();
-
-            try
-            {
-                await action();
-                await _dbContext.SaveChangesAsync();
-                await transaction.CommitAsync();
-            }
-            catch (Exception)
-            {
-                await transaction.RollbackAsync();
-                throw;
-            }
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
         }
     }
 }

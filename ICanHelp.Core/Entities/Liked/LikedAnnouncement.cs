@@ -1,28 +1,26 @@
-﻿using ICanHelp.Core.Entities.Users;
 using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace ICanHelp.Core.Entities.Liked
+namespace ICanHelp.Core.Entities.Liked;
+
+/// <summary>
+/// "User likes announcement". The row exists while the like exists, so unliking means deleting it.
+/// The key is (UserId, AnnouncementId).
+/// </summary>
+public class LikedAnnouncement
 {
-    public class LikedAnnouncement : Liked
+    public UserId UserId { get; private set; }
+    public Id AnnouncementId { get; private set; }
+    public DateTime LikedAt { get; private set; }
+
+    // Required by EF Core.
+    private LikedAnnouncement()
     {
-        public Id AnnouncementId { get; set; }      
-        public Announcement Announcement { get; set; }
-
-        public LikedAnnouncement(Id id, bool isLiked, UserId userLikerId, User userLiker, Id announcementId, Announcement announcement) : base(id, isLiked, userLikerId, userLiker)
-        {
-            AnnouncementId = announcementId;
-            AnnouncementId = announcementId;
-        }
-
-        public void UpdateIsAnnouncementLiked(bool isLiked)
-        {
-            IsLiked = isLiked;
-        }
     }
 
+    public LikedAnnouncement(UserId userId, Id announcementId, DateTime likedAtUtc)
+    {
+        UserId = userId;
+        AnnouncementId = announcementId;
+        LikedAt = likedAtUtc;
+    }
 }

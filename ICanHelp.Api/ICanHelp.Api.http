@@ -1,0 +1,163 @@
+@baseUrl = http://localhost:5080
+
+GET {{baseUrl}}/health
+
+###
+GET {{baseUrl}}/api/categories
+
+###
+GET {{baseUrl}}/api/announcements?status=Open&page=1&pageSize=10
+
+###
+# Krok 7: ogłoszenia w promieniu 5 km od centrum Warszawy, od najbliższych (pole distanceKm)
+GET {{baseUrl}}/api/announcements?latitude=52.2297&longitude=21.0122&radiusKm=5&status=Open
+
+###
+# 400 (InvalidDistanceFilter) – sama szerokość bez długości
+GET {{baseUrl}}/api/announcements?latitude=52.2297
+
+###
+# 404 jako ProblemDetails
+GET {{baseUrl}}/api/announcements/3fa85f64-5717-4562-b3fc-2c963f66afa6
+
+###
+# 400 jako ProblemDetails (InvalidIdentityException – pusty Guid)
+GET {{baseUrl}}/api/announcements/00000000-0000-0000-0000-000000000000
+
+###
+# Rejestracja -> 201 + nagłówek Location
+POST {{baseUrl}}/api/users/sign-up
+Content-Type: application/json
+
+{
+  "userName": "jan.kowalski",
+  "fullName": "Jan Kowalski",
+  "email": "jan@example.com",
+  "password": "Haslo123!",
+  "phoneNumber": "+48600100200",
+  "country": "Polska",
+  "city": "Kraków",
+  "postalCode": "30-001",
+  "description": "Złota rączka, wracam z pracy przez Podgórze."
+}
+
+###
+# Logowanie -> { accessToken, expiresAtUtc }
+# @name signIn
+POST {{baseUrl}}/api/users/sign-in
+Content-Type: application/json
+
+{
+  "email": "jan@example.com",
+  "password": "Haslo123!"
+}
+
+###
+# Profil zalogowanego (bez tokenu -> 401)
+GET {{baseUrl}}/api/users/me
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+###
+# Publiczny profil – bez danych kontaktowych (podmień id na swoje z nagłówka Location po sign-up)
+GET {{baseUrl}}/api/users/3fa85f64-5717-4562-b3fc-2c963f66afa6
+
+###
+# Lista kont – tylko Admin (zwykły użytkownik -> 403, bez tokenu -> 401)
+GET {{baseUrl}}/api/users
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+### ======== Krok 6: przepływ ogłoszenia ========
+# Potrzebne dwa konta: właściciel (signIn powyżej) i pomocnik (signInHelper poniżej). Pomocnika zarejestruj tak samo
+# jak Jana, z innym userName/e-mailem (np. anna.nowak / anna@example.com).
+# @name signInHelper
+POST {{baseUrl}}/api/users/sign-in
+Content-Type: application/json
+
+{
+  "email": "anna@example.com",
+  "password": "Haslo123!"
+}
+
+###
+# Id kategorii/podkategorii weź z GET /api/categories
+@categoryId = 3fa85f64-5717-4562-b3fc-2c963f66afa6
+@subcategoryId = 3fa85f64-5717-4562-b3fc-2c963f66afa6
+
+# Dodanie ogłoszenia -> 201 { id } + Location
+# @name createAnnouncement
+POST {{baseUrl}}/api/announcements
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "categoryId": "{{categoryId}}",
+  "subcategoryId": "{{subcategoryId}}",
+  "difficulty": "Easy",
+  "title": "Cieknący kran w kuchni",
+  "description": "Kran cieknie od tygodnia, mam nową uszczelkę.",
+  "budget": { "amount": 150, "currency": "PLN" },
+  "location": { "latitude": 50.0614, "longitude": 19.9366 }
+}
+
+###
+@announcementId = {{createAnnouncement.response.body.$.id}}
+
+# Oferta pomocnika -> 201 { id }
+# @name makeOffer
+POST {{baseUrl}}/api/announcements/{{announcementId}}/offers
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "price": { "amount": 120, "currency": "PLN" },
+  "proposedStart": "2026-12-01T16:00:00Z",
+  "proposedEnd": "2026-12-01T18:00:00Z",
+  "message": "Mogę wpaść po pracy."
+}
+
+###
+# Kontroferta właściciela -> 201 { id nowej oferty }
+# @name counterOffer
+POST {{baseUrl}}/api/announcements/{{announcementId}}/offers/{{makeOffer.response.body.$.id}}/counter
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "price": { "amount": 100, "currency": "PLN" },
+  "proposedStart": "2026-12-02T16:00:00Z",
+  "proposedEnd": "2026-12-02T18:00:00Z"
+}
+
+###
+# Pomocnik akceptuje kontrofertę -> 204
+POST {{baseUrl}}/api/announcements/{{announcementId}}/offers/{{counterOffer.response.body.$.id}}/accept
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# Kontakt do drugiej strony (dopiero po akceptacji; przed nią / dla obcych -> 404)
+GET {{baseUrl}}/api/announcements/{{announcementId}}/contact
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# Start (pomocnik albo właściciel) -> 204
+POST {{baseUrl}}/api/announcements/{{announcementId}}/start
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# Zakończenie (tylko właściciel) -> 204
+POST {{baseUrl}}/api/announcements/{{announcementId}}/complete
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+###
+# Ocena pomocnika przez właściciela -> 201 (drugi raz -> 409 AlreadyRated)
+POST {{baseUrl}}/api/announcements/{{announcementId}}/ratings
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "rate": 5,
+  "comment": "Szybko i porządnie, polecam."
+}
+
+###
+GET {{baseUrl}}/api/announcements/{{announcementId}}/ratings

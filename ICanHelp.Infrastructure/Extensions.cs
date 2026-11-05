@@ -1,69 +1,30 @@
-﻿using ICanHelp.Application.Abstractions;
+using ICanHelp.Application.Abstractions;
+using ICanHelp.Application.Time;
 using ICanHelp.Infrastructure.DAL;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.EntityFrameworkCore;
+using ICanHelp.Infrastructure.Security;
+using ICanHelp.Infrastructure.Time;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.OpenApi.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace ICanHelp.Infrastructure
+namespace ICanHelp.Infrastructure;
+
+public static class Extensions
 {
-    public static class Extensions
+    /// <summary>Registers the database, repositories, query handlers, clock and security (JWT). Called from the Api project.</summary>
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        public static IServiceCollection AddICanHelpSettings(this IServiceCollection services, IConfiguration configuration)
-        {
-            var section = configuration.GetSection(AppOptions.SectionName);
-            services.Configure<AppOptions>(section);
-            //services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
+        services.AddSql(configuration);
+        services.AddSecurity(configuration);
+        services.AddSingleton<IClock, Clock>();
 
-            services.AddDbContext<ICanHelpDbContext>(option =>
-                option.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
+        // Query handlers live here because they read straight from the DbContext.
+        services.Scan(s => s.FromAssemblies(typeof(Extensions).Assembly)
+            .AddClasses(c => c.AssignableTo(typeof(IQueryHandler<,>)), publicOnly: false)
+            .AsImplementedInterfaces()
+            .WithScopedLifetime());
 
-            var infrastructureAssembly = typeof(AppOptions).Assembly;
+        services.AddHostedService<DbInitializer>();
 
-            services.Scan(s => s.FromAssemblies(infrastructureAssembly)
-                .AddClasses(c => c.AssignableTo(typeof(IQueryHandler<,>)), false)
-                .AsImplementedInterfaces()
-                .WithScopedLifetime());
-
-            services.AddEndpointsApiExplorer();
-            services.AddSwaggerGen(swagger =>
-            {
-                var appTitle = section.GetSection("name").Value;
-                swagger.EnableAnnotations();
-                swagger.SwaggerDoc("v1", new OpenApiInfo
-                {
-                    Title = appTitle,
-                    Version = "v1"
-                });
-            });
-
-            return services;
-        }
-
-
-
-        public static WebApplication UseICanHelpSettings(this WebApplication app)
-        {
-            app.UseSwagger();
-            //app.UseSwaggerUI();
-            app.UseReDoc(reDoc =>
-            {
-                var appTitle = new AppOptions().SettingName ?? "ICanHelp API";
-                reDoc.RoutePrefix = "docs";
-                reDoc.DocumentTitle = appTitle;
-                reDoc.SpecUrl("/swagger/v1/swagger.json");
-            });
-            app.UseAuthentication();
-            app.UseAuthorization();
-            //app.UseAntiforgery();
-
-            return app;
-        }
+        return services;
     }
 }

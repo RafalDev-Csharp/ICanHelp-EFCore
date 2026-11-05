@@ -1,0 +1,2556 @@
+diff --git a/ICanHelp.Core/Entities/Announcement.cs b/ICanHelp.Core/Entities/Announcement.cs
+index 4dd949d..98cae98 100644
+--- a/ICanHelp.Core/Entities/Announcement.cs
++++ b/ICanHelp.Core/Entities/Announcement.cs
+@@ -1,96 +1,277 @@
+-﻿using ICanHelp.Core.Entities.Liked;
+ using ICanHelp.Core.Entities.Negotiations;
+-using ICanHelp.Core.Entities.Users;
++using ICanHelp.Core.Enums;
++using ICanHelp.Core.Exceptions;
+ using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+ 
+-namespace ICanHelp.Core.Entities
++namespace ICanHelp.Core.Entities;
++
++/// <summary>
++/// Aggregate root: a problem published by a user together with the negotiation (offers) about it.
++/// All changes of offers go through this class, so the rules are enforced in one place.
++/// Other aggregates (user, category) are referenced by id only.
++/// </summary>
++public class Announcement
+ {
+-    public class Announcement
++    public const int MaxImages = 5;
++
++    private readonly List<Offer> _offers = new();
++    private readonly List<Image> _images = new();
++
++    public Id Id { get; private set; }
++    public UserId OwnerId { get; private set; }
++
++    public Id CategoryId { get; private set; }
++    public Id SubcategoryId { get; private set; }
++    public DifficultyLevel Difficulty { get; private set; }
++
++    public StringObject Title { get; private set; }
++    public Description Description { get; private set; }
++
++    /// <summary>How much the owner is ready to pay.</summary>
++    public Price Budget { get; private set; }
++    public Location Location { get; private set; }
++
++    public AnnouncementStatus Status { get; private set; }
++    public DateTime CreatedAt { get; private set; }
++
++    /// <summary>The offer chosen by the owner (null until an offer is accepted).</summary>
++    public Id? AcceptedOfferId { get; private set; }
++
++    public IReadOnlyCollection<Offer> Offers => _offers.AsReadOnly();
++    public IReadOnlyCollection<Image> Images => _images.AsReadOnly();
++
++    // Required by EF Core.
++    private Announcement()
++    {
++    }
++
++    public Announcement(Id id, UserId ownerId, Id categoryId, Id subcategoryId, DifficultyLevel difficulty,
++        StringObject title, Description description, Price budget, Location location, DateTime createdAtUtc)
++    {
++        EnsureBudget(budget);
++
++        Id = id;
++        OwnerId = ownerId;
++        CategoryId = categoryId;
++        SubcategoryId = subcategoryId;
++        Difficulty = difficulty;
++        Title = title;
++        Description = description;
++        Budget = budget;
++        Location = location;
++        CreatedAt = createdAtUtc;
++        Status = AnnouncementStatus.Open;
++    }
++
++    public void Update(Id categoryId, Id subcategoryId, DifficultyLevel difficulty, StringObject title,
++        Description description, Price budget, Location location)
++    {
++        EnsureStatus(AnnouncementStatus.Open, "be edited");
++        EnsureBudget(budget);
++
++        CategoryId = categoryId;
++        SubcategoryId = subcategoryId;
++        Difficulty = difficulty;
++        Title = title;
++        Description = description;
++        Budget = budget;
++        Location = location;
++    }
++
++    // ---------- images ----------
++
++    public Image AddImage(Id imageId, StringObject fileName, StringObject fileExtension, StringObject filePath)
++    {
++        if (_images.Count >= MaxImages)
++        {
++            throw new DomainRuleException($"An announcement cannot have more than {MaxImages} images.");
++        }
++
++        var image = new Image(imageId, Id, fileName, fileExtension, filePath);
++        _images.Add(image);
++        return image;
++    }
++
++    public void RemoveImage(Id imageId)
+     {
+-        public Id Id { get; set; }
++        var image = _images.FirstOrDefault(i => i.Id == imageId)
++            ?? throw new DomainRuleException($"Image with id: {imageId} does not belong to this announcement.");
+ 
+-        public Id CategoryId { get; set; }
+-        public Category Category { get; set; }
++        _images.Remove(image);
++    }
+ 
+-        public Id SubcategoryId { get; set; }
+-        public Subcategory Subcategory { get; set; }
++    // ---------- negotiation ----------
+ 
+-        public Id DifficultLevelId { get; set; }
+-        public DifficultLevel DifficultLevel { get; set; }
++    /// <summary>A helper proposes to solve the problem for a given price and time.</summary>
++    public Offer AddOffer(Id offerId, UserId helperId, Price price, DateTime proposedStart, DateTime proposedEnd,
++        Description? message, DateTime createdAtUtc)
++    {
++        EnsureStatus(AnnouncementStatus.Open, "receive offers");
+ 
+-        public UserId OwnerId { get; set; }
+-        public User User { get; set; }
++        if (helperId == OwnerId)
++        {
++            throw new DomainRuleException("The owner cannot make an offer on his own announcement.");
++        }
+ 
+-        public StringObject Title { get; set; }
+-        public CustomDateTime CreatedAt { get; set; }
++        if (_offers.Any(o => o.HelperId == helperId && o.Status == OfferStatus.Pending))
++        {
++            throw new DomainRuleException("This helper already has a pending offer. Counter or withdraw it instead.");
++        }
+ 
+-        public Id LocationId { get; set; }
+-        public Location Location { get; set; }
++        var offer = new Offer(offerId, Id, helperId, OfferParty.Helper, price, proposedStart, proposedEnd,
++            message, createdAtUtc, parentOfferId: null);
+ 
+-        public Description Description { get; set; }
+-        public Price Price { get; set; }
+-        public bool IsAvailable { get; set; }
+-        public bool IsFinished { get; set; }
++        _offers.Add(offer);
++        return offer;
++    }
+ 
++    /// <summary>The other side answers an offer with different terms (price, dates).</summary>
++    public Offer CounterOffer(Id offerId, Id newOfferId, UserId actorId, Price price, DateTime proposedStart,
++        DateTime proposedEnd, Description? message, DateTime createdAtUtc)
++    {
++        EnsureStatus(AnnouncementStatus.Open, "receive counter-offers");
+ 
+-        public Id ClientOfferId { get; set; }
+-        public ClientOffer ClientOffer { get; set; }
++        var original = GetPendingOffer(offerId);
++        var party = ResolveParty(original, actorId);
+ 
+-        public IEnumerable<HelperOffer> HelperOffers { get; set; }
++        if (party == original.ProposedBy)
++        {
++            throw new DomainRuleException("You cannot counter your own offer.");
++        }
+ 
+-        public IEnumerable<Image> Images { get; set; }
+-        public IEnumerable<Rating> Ratings { get; set; }
++        // The new offer is created first: if its data is invalid, the original stays untouched.
++        var counter = new Offer(newOfferId, Id, original.HelperId, party, price, proposedStart, proposedEnd,
++            message, createdAtUtc, original.Id);
+ 
+-        public Id LikedAnnouncementId { get; set; }
+-        public LikedAnnouncement LikedAnnouncement { get; set; }
++        original.MarkAsCountered();
++        _offers.Add(counter);
++        return counter;
++    }
++
++    /// <summary>The side that did not propose the offer accepts it; all other pending offers are rejected.</summary>
++    public void AcceptOffer(Id offerId, UserId actorId)
++    {
++        EnsureStatus(AnnouncementStatus.Open, "accept an offer");
+ 
++        var offer = GetPendingOffer(offerId);
++        var party = ResolveParty(offer, actorId);
++
++        if (party == offer.ProposedBy)
++        {
++            throw new DomainRuleException("You cannot accept your own offer.");
++        }
+ 
++        offer.Accept();
+ 
+-        public Announcement(Id id, Category category, Id categoryId, Subcategory subcategory, Id subcategoryId, DifficultLevel difficultLevel, Id difficultLevelId, UserId ownerId, StringObject title, CustomDateTime createdAt,
+-            Location location, Description description, Price price, bool isAvailable, bool isFinished,
+-            ClientOffer clientOffer, IEnumerable<HelperOffer> helperOffers, IEnumerable<Image> images, IEnumerable<Rating> ratings, Id likedAnnouncementId, LikedAnnouncement likedAnnouncement)
++        foreach (var other in _offers.Where(o => o.Id != offer.Id && o.Status == OfferStatus.Pending))
+         {
+-            Id = id;
+-            Category = category;
+-            CategoryId = categoryId;
+-            Subcategory = subcategory;
+-            SubcategoryId = subcategoryId;
+-            DifficultLevel = difficultLevel;
+-            DifficultLevelId = difficultLevelId;
+-            OwnerId = ownerId;
+-            Title = title;
+-            CreatedAt = createdAt;
+-            Location = location;
+-            Description = description;
+-            Price = price;
+-            IsAvailable = isAvailable;
+-            IsFinished = isFinished;
+-            ClientOffer = clientOffer;
+-            HelperOffers = helperOffers;
+-            Images = images;
+-            Ratings = ratings;
+-            LikedAnnouncementId = likedAnnouncementId;
+-            LikedAnnouncement = likedAnnouncement;
++            other.Reject();
+         }
+ 
+-        public void UpdateAnnouncement(Category category, Subcategory subcategory,
+-            DifficultLevel difficultLevel, StringObject title, Location location,
+-            Description description, Price price, bool isAvailable, bool isFinished)
++        AcceptedOfferId = offer.Id;
++        Status = AnnouncementStatus.Accepted;
++    }
++
++    public void RejectOffer(Id offerId, UserId actorId)
++    {
++        EnsureStatus(AnnouncementStatus.Open, "reject an offer");
++
++        var offer = GetPendingOffer(offerId);
++        var party = ResolveParty(offer, actorId);
++
++        if (party == offer.ProposedBy)
++        {
++            throw new DomainRuleException("You cannot reject your own offer. Withdraw it instead.");
++        }
++
++        offer.Reject();
++    }
++
++    public void WithdrawOffer(Id offerId, UserId actorId)
++    {
++        EnsureStatus(AnnouncementStatus.Open, "have an offer withdrawn");
++
++        var offer = GetPendingOffer(offerId);
++        var party = ResolveParty(offer, actorId);
++
++        if (party != offer.ProposedBy)
++        {
++            throw new DomainRuleException("Only the author of an offer can withdraw it.");
++        }
++
++        offer.Withdraw();
++    }
++
++    // ---------- lifecycle ----------
++
++    public void Start()
++    {
++        EnsureStatus(AnnouncementStatus.Accepted, "be started");
++        Status = AnnouncementStatus.InProgress;
++    }
++
++    public void Complete()
++    {
++        EnsureStatus(AnnouncementStatus.InProgress, "be completed");
++        Status = AnnouncementStatus.Completed;
++    }
++
++    public void Cancel()
++    {
++        if (Status is not (AnnouncementStatus.Open or AnnouncementStatus.Accepted))
++        {
++            throw new DomainRuleException($"Announcement in status {Status} cannot be cancelled.");
++        }
++
++        Status = AnnouncementStatus.Cancelled;
++    }
++
++    // ---------- helpers ----------
++
++    private Offer GetOffer(Id offerId)
++        => _offers.FirstOrDefault(o => o.Id == offerId) ?? throw new OfferNotFoundException(offerId);
++
++    private Offer GetPendingOffer(Id offerId)
++    {
++        var offer = GetOffer(offerId);
++
++        if (offer.Status != OfferStatus.Pending)
++        {
++            throw new DomainRuleException($"Offer in status {offer.Status} cannot be changed.");
++        }
++
++        return offer;
++    }
++
++    // Decides on whose side the user acts in the negotiation: the owner is the client, the offer's helper is the helper.
++    private OfferParty ResolveParty(Offer offer, UserId actorId)
++    {
++        if (actorId == OwnerId)
++        {
++            return OfferParty.Client;
++        }
++
++        if (actorId == offer.HelperId)
++        {
++            return OfferParty.Helper;
++        }
++
++        throw new DomainRuleException("The user is not a participant of this negotiation.");
++    }
++
++    private void EnsureStatus(AnnouncementStatus expected, string action)
++    {
++        if (Status != expected)
++        {
++            throw new DomainRuleException($"Announcement in status {Status} cannot {action}.");
++        }
++    }
++
++    private static void EnsureBudget(Price budget)
++    {
++        if (budget.Amount <= 0)
+         {
+-            Category = category;
+-            Subcategory = subcategory;
+-            DifficultLevel = difficultLevel;
+-            Title = title;
+-            Location = location;
+-            Description = description;
+-            Price = price;
+-            IsAvailable = isAvailable;
+-            IsFinished = isFinished;
++            throw new DomainRuleException("Budget must be greater than zero.");
+         }
+     }
+ }
+diff --git a/ICanHelp.Core/Entities/AppUserRole.cs b/ICanHelp.Core/Entities/AppUserRole.cs
+deleted file mode 100644
+index 824c06a..0000000
+--- a/ICanHelp.Core/Entities/AppUserRole.cs
++++ /dev/null
+@@ -1,36 +0,0 @@
+-﻿using ICanHelp.Core.Entities.Negotiations;
+-using ICanHelp.Core.Entities.Users;
+-using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Entities
+-{
+-    public class AppUserRole
+-    {
+-        public Id Id { get; set; }
+-        public StringObject UserRoleName { get; set; }
+-
+-        public UserId UserId { get; set; }
+-        public User User { get; set; }
+-
+-        public IEnumerable<ClientOffer> ClientOffers { get; set; }
+-        public IEnumerable<HelperOffer> HelperOffers { get; set; }
+-
+-        public AppUserRole(Id id, StringObject userRoleName, IEnumerable<ClientOffer> clientOffers, IEnumerable<HelperOffer> helperOffers)
+-        {
+-            Id = id;
+-            UserRoleName = userRoleName;
+-            ClientOffers = clientOffers;
+-            HelperOffers = helperOffers;
+-        }
+-
+-        public void UpdateAppUserRole(StringObject userRoleName)
+-        {
+-            UserRoleName = userRoleName;
+-        }
+-    }
+-}
+diff --git a/ICanHelp.Core/Entities/Category.cs b/ICanHelp.Core/Entities/Category.cs
+index 27ee4d9..873189c 100644
+--- a/ICanHelp.Core/Entities/Category.cs
++++ b/ICanHelp.Core/Entities/Category.cs
+@@ -1,30 +1,64 @@
+-﻿using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Entities
++using ICanHelp.Core.Exceptions;
++using ICanHelp.Core.ValueObjects;
++
++namespace ICanHelp.Core.Entities;
++
++/// <summary>Aggregate root: a category of problems (e.g. "Plumbing") with its subcategories.</summary>
++public class Category
+ {
+-    public class Category
++    private readonly List<Subcategory> _subcategories = new();
++
++    public Id Id { get; private set; }
++    public StringObject CategoryName { get; private set; }
++
++    public IReadOnlyCollection<Subcategory> Subcategories => _subcategories.AsReadOnly();
++
++    // Required by EF Core.
++    private Category()
+     {
+-        public Id Id { get; set; }
++    }
+ 
+-        public StringObject CategoryName { get; set; }
++    public Category(Id id, StringObject categoryName)
++    {
++        Id = id;
++        CategoryName = categoryName;
++    }
+ 
+-        public IEnumerable<Announcement> Announcements { get; set; }
+-        public IEnumerable<Subcategory> Subcategories { get; set; }
++    public void Rename(StringObject categoryName) => CategoryName = categoryName;
+ 
+-        public Category(Id id, StringObject categoryName)
++    public Subcategory AddSubcategory(Id subcategoryId, StringObject subcategoryName)
++    {
++        if (FindByName(subcategoryName) is not null)
+         {
+-            Id = id;
+-            CategoryName = categoryName;
++            throw new DomainRuleException($"Subcategory: {subcategoryName} already exists in this category.");
+         }
+ 
+-        public void UpdateCategory(StringObject categoryName)
++        var subcategory = new Subcategory(subcategoryId, Id, subcategoryName);
++        _subcategories.Add(subcategory);
++        return subcategory;
++    }
++
++    public void RenameSubcategory(Id subcategoryId, StringObject subcategoryName)
++    {
++        var subcategory = GetSubcategory(subcategoryId);
++        var sameName = FindByName(subcategoryName);
++
++        if (sameName is not null && sameName.Id != subcategoryId)
+         {
+-            CategoryName = categoryName;
++            throw new DomainRuleException($"Subcategory: {subcategoryName} already exists in this category.");
+         }
++
++        subcategory.Rename(subcategoryName);
+     }
++
++    public void RemoveSubcategory(Id subcategoryId)
++        => _subcategories.Remove(GetSubcategory(subcategoryId));
++
++    private Subcategory GetSubcategory(Id subcategoryId)
++        => _subcategories.FirstOrDefault(s => s.Id == subcategoryId)
++            ?? throw new DomainRuleException($"Subcategory with id: {subcategoryId} does not belong to this category.");
++
++    private Subcategory? FindByName(StringObject name)
++        => _subcategories.FirstOrDefault(s =>
++            string.Equals(s.SubcategoryName.Value, name.Value, StringComparison.OrdinalIgnoreCase));
+ }
+diff --git a/ICanHelp.Core/Entities/DifficultLevel.cs b/ICanHelp.Core/Entities/DifficultLevel.cs
+deleted file mode 100644
+index 65e1efc..0000000
+--- a/ICanHelp.Core/Entities/DifficultLevel.cs
++++ /dev/null
+@@ -1,29 +0,0 @@
+-﻿using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Entities
+-{
+-    public class DifficultLevel
+-    {
+-        public Id Id { get; set; }
+-
+-        public StringObject DifficultLevelName { get; set; }
+-        public IEnumerable<Announcement> Announcements { get; set; }
+-
+-        public DifficultLevel(Id id, StringObject difficultLevelName, IEnumerable<Announcement> announcements)
+-        {
+-            Id = id;
+-            DifficultLevelName = difficultLevelName;
+-            Announcements = announcements;
+-        }
+-
+-        public void UpdateDifficultLevel(StringObject difficultLevelName)
+-        {
+-            DifficultLevelName = difficultLevelName;
+-        }
+-    }
+-}
+diff --git a/ICanHelp.Core/Entities/Image.cs b/ICanHelp.Core/Entities/Image.cs
+index 7da3582..0e88d1c 100644
+--- a/ICanHelp.Core/Entities/Image.cs
++++ b/ICanHelp.Core/Entities/Image.cs
+@@ -1,37 +1,28 @@
+-﻿using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
++using ICanHelp.Core.ValueObjects;
+ 
+-namespace ICanHelp.Core.Entities
+-{
+-    public class Image
+-    {
+-        public Id Id { get; set; }
++namespace ICanHelp.Core.Entities;
+ 
+-        public StringObject FileName{ get; set; }
+-        public StringObject FileExtension{ get; set; }
+-        public StringObject FilePath{ get; set; }
++/// <summary>A photo attached to an announcement. Created only through <see cref="Announcement.AddImage"/>.</summary>
++public class Image
++{
++    public Id Id { get; private set; }
++    public Id AnnouncementId { get; private set; }
+ 
+-        public Announcement Announcement { get; set; }
+-        public Id AnnouncementId { get; set; }
++    public StringObject FileName { get; private set; }
++    public StringObject FileExtension { get; private set; }
++    public StringObject FilePath { get; private set; }
+ 
+-        public Image(Id id, StringObject fileName, StringObject fileExtension, StringObject filePath)
+-        {
+-            id = Id;
+-            FileName = fileName;
+-            FileExtension = fileExtension;
+-            FilePath = filePath;
+-        }
++    // Required by EF Core.
++    private Image()
++    {
++    }
+ 
+-        public void UpdateImage(StringObject fileName, StringObject fileExtension, StringObject filePath, Id announcementId)
+-        {
+-            FileName = fileName;
+-            FileExtension = fileExtension;
+-            FilePath = filePath;
+-            AnnouncementId = announcementId;
+-        }
++    internal Image(Id id, Id announcementId, StringObject fileName, StringObject fileExtension, StringObject filePath)
++    {
++        Id = id;
++        AnnouncementId = announcementId;
++        FileName = fileName;
++        FileExtension = fileExtension;
++        FilePath = filePath;
+     }
+ }
+diff --git a/ICanHelp.Core/Entities/Liked/Liked.cs b/ICanHelp.Core/Entities/Liked/Liked.cs
+deleted file mode 100644
+index b4a9fed..0000000
+--- a/ICanHelp.Core/Entities/Liked/Liked.cs
++++ /dev/null
+@@ -1,28 +0,0 @@
+-﻿using ICanHelp.Core.Entities.Users;
+-using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Entities.Liked
+-{
+-    public abstract class Liked
+-    {
+-        public Id Id { get; private set; }
+-
+-        public bool IsLiked { get; set; }
+-
+-        public UserId UserLikerId { get; set; }
+-        public User UserLiker { get; set; }
+-
+-        protected Liked(Id id, bool isLiked, UserId userLikerId, User userLiker)
+-        {
+-            Id = id;
+-            IsLiked = isLiked;
+-            UserLikerId = userLikerId;
+-            UserLiker = userLiker;  
+-        }
+-    }
+-}
+diff --git a/ICanHelp.Core/Entities/Liked/LikedAnnouncement.cs b/ICanHelp.Core/Entities/Liked/LikedAnnouncement.cs
+index adaf7d6..9cbd44c 100644
+--- a/ICanHelp.Core/Entities/Liked/LikedAnnouncement.cs
++++ b/ICanHelp.Core/Entities/Liked/LikedAnnouncement.cs
+@@ -1,28 +1,26 @@
+-﻿using ICanHelp.Core.Entities.Users;
+ using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+ 
+-namespace ICanHelp.Core.Entities.Liked
+-{
+-    public class LikedAnnouncement : Liked
+-    {
+-        public Id AnnouncementId { get; set; }      
+-        public Announcement Announcement { get; set; }
++namespace ICanHelp.Core.Entities.Liked;
+ 
+-        public LikedAnnouncement(Id id, bool isLiked, UserId userLikerId, User userLiker, Id announcementId, Announcement announcement) : base(id, isLiked, userLikerId, userLiker)
+-        {
+-            AnnouncementId = announcementId;
+-            AnnouncementId = announcementId;
+-        }
++/// <summary>
++/// "User likes announcement". The row exists while the like exists, so unliking means deleting it.
++/// The key is (UserId, AnnouncementId).
++/// </summary>
++public class LikedAnnouncement
++{
++    public UserId UserId { get; private set; }
++    public Id AnnouncementId { get; private set; }
++    public DateTime LikedAt { get; private set; }
+ 
+-        public void UpdateIsAnnouncementLiked(bool isLiked)
+-        {
+-            IsLiked = isLiked;
+-        }
++    // Required by EF Core.
++    private LikedAnnouncement()
++    {
+     }
+ 
++    public LikedAnnouncement(UserId userId, Id announcementId, DateTime likedAtUtc)
++    {
++        UserId = userId;
++        AnnouncementId = announcementId;
++        LikedAt = likedAtUtc;
++    }
+ }
+diff --git a/ICanHelp.Core/Entities/Liked/LikedUser.cs b/ICanHelp.Core/Entities/Liked/LikedUser.cs
+index 7a0c2d7..7568f9f 100644
+--- a/ICanHelp.Core/Entities/Liked/LikedUser.cs
++++ b/ICanHelp.Core/Entities/Liked/LikedUser.cs
+@@ -1,27 +1,32 @@
+-﻿using ICanHelp.Core.Entities.Users;
++using ICanHelp.Core.Exceptions;
+ using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+ 
+-namespace ICanHelp.Core.Entities.Liked
++namespace ICanHelp.Core.Entities.Liked;
++
++/// <summary>
++/// "User likes another user" (e.g. a helper worth coming back to). Unliking means deleting the row.
++/// The key is (LikerId, LikedId).
++/// </summary>
++public class LikedUser
+ {
+-    public class LikedUser : Liked
++    public UserId LikerId { get; private set; }
++    public UserId LikedId { get; private set; }
++    public DateTime LikedAt { get; private set; }
++
++    // Required by EF Core.
++    private LikedUser()
+     {
+-        public UserId UserLikedId { get; set; }
+-        public User UserLiked { get; set; }
++    }
+ 
+-        public LikedUser(Id id, bool isLiked, UserId userLikerId, User userLiker, UserId userLikedId, User userLiked) : base(id, isLiked, userLikerId, userLiker)
++    public LikedUser(UserId likerId, UserId likedId, DateTime likedAtUtc)
++    {
++        if (likerId == likedId)
+         {
+-            UserLikedId = userLikedId;
+-            UserLiked = userLiked;
++            throw new DomainRuleException("A user cannot like himself.");
+         }
+ 
+-        public void UpdateIsUserLiked(bool isLiked)
+-        {
+-            IsLiked = isLiked;
+-        }
++        LikerId = likerId;
++        LikedId = likedId;
++        LikedAt = likedAtUtc;
+     }
+ }
+diff --git a/ICanHelp.Core/Entities/Location.cs b/ICanHelp.Core/Entities/Location.cs
+deleted file mode 100644
+index 3f8d493..0000000
+--- a/ICanHelp.Core/Entities/Location.cs
++++ /dev/null
+@@ -1,34 +0,0 @@
+-﻿using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Entities
+-{
+-    public class Location
+-    {
+-        public Id Id { get; set; }
+-
+-        public double? Latitude { get; set; }         
+-        public double? Longitude { get; set; }
+-
+-        public Id AnnouncementId { get; set; }
+-        public Announcement Announcement { get; set; }
+-
+-
+-
+-        public Location(double latitude, double longitude)
+-        {
+-            Latitude = latitude;
+-            Longitude = longitude;
+-        }
+-
+-        public void UpdateLocation(double latitude, double longitude)
+-        {
+-            Latitude = latitude;
+-            Longitude = longitude;
+-        }
+-    }
+-}
+diff --git a/ICanHelp.Core/Entities/Negotiations/ClientOffer.cs b/ICanHelp.Core/Entities/Negotiations/ClientOffer.cs
+deleted file mode 100644
+index ede9ce1..0000000
+--- a/ICanHelp.Core/Entities/Negotiations/ClientOffer.cs
++++ /dev/null
+@@ -1,37 +0,0 @@
+-﻿using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Entities.Negotiations
+-{
+-    public class ClientOffer : Offer
+-    {
+-        public Id RatingHelperId { get; set; }
+-        public Rating RatingHelper { get; set; }
+-
+-        public ClientOffer(Id id, Id announcementId, UserId clientId, UserId helperId,
+-            CustomDateTime wantToStart, CustomDateTime wantToFinish, Price price,
+-            Description description, bool isAccepted, AppUserRole acceptedBy, AppUserRole createdBy,
+-            Id ratingHelperId ,Rating ratingHelper)
+-                : base(id, announcementId, clientId, helperId, wantToStart,
+-                      wantToFinish, price, description, isAccepted, acceptedBy, createdBy)
+-        {
+-            RatingHelperId = ratingHelperId;
+-            RatingHelper = ratingHelper;
+-        }
+-
+-        public void UpdateClientOffer(CustomDateTime wantToStart, CustomDateTime wantToFinish,
+-            Price price, Description description, bool isAccepted, Id ratingHelperId)
+-        {
+-            WantToStart = wantToStart;
+-            WantToFinish = wantToFinish;
+-            Price = price;
+-            Description = description;
+-            IsAccepted = isAccepted;
+-            RatingHelperId = ratingHelperId;
+-        }
+-    }
+-}
+diff --git a/ICanHelp.Core/Entities/Negotiations/HelperOffer.cs b/ICanHelp.Core/Entities/Negotiations/HelperOffer.cs
+deleted file mode 100644
+index 00cf927..0000000
+--- a/ICanHelp.Core/Entities/Negotiations/HelperOffer.cs
++++ /dev/null
+@@ -1,37 +0,0 @@
+-﻿using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Entities.Negotiations
+-{
+-    public class HelperOffer : Offer
+-    {
+-        public Id RatingClientId { get; set; }
+-        public Rating RatingClient { get; set; }
+-        
+-        public HelperOffer(Id id, Id announcementId, UserId clientId, UserId helperId,
+-            CustomDateTime wantToStart, CustomDateTime wantToFinish, Price price,
+-            Description description, bool isAccepted, AppUserRole acceptedBy, AppUserRole createdBy,
+-            Id ratingClientId, Rating ratingClient)
+-                : base(id, announcementId, clientId, helperId, wantToStart,
+-                      wantToFinish, price, description, isAccepted, acceptedBy, createdBy)
+-        {
+-            RatingClientId = ratingClientId;
+-            RatingClient = ratingClient;
+-        }
+-
+-        public void UpdateHelperOffer(CustomDateTime wantToStart, CustomDateTime wantToFinish,
+-            Price price, Description description, bool isAccepted, Rating ratingClient)
+-        {
+-            WantToStart = wantToStart;
+-            WantToFinish = wantToFinish;
+-            Price = price;
+-            Description = description;
+-            IsAccepted = isAccepted;
+-            RatingClient = ratingClient;
+-        }
+-    }
+-}
+diff --git a/ICanHelp.Core/Entities/Negotiations/Offer.cs b/ICanHelp.Core/Entities/Negotiations/Offer.cs
+index b1b98f9..8930f1d 100644
+--- a/ICanHelp.Core/Entities/Negotiations/Offer.cs
++++ b/ICanHelp.Core/Entities/Negotiations/Offer.cs
+@@ -1,56 +1,74 @@
+-﻿using ICanHelp.Core.Entities.Users;
++using ICanHelp.Core.Enums;
++using ICanHelp.Core.Exceptions;
+ using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+ 
+-namespace ICanHelp.Core.Entities.Negotiations
+-{
+-    public abstract class Offer
+-    {
+-        public Id Id { get; private set; }
++namespace ICanHelp.Core.Entities.Negotiations;
+ 
+-        public Id AnnouncementId { get; set; }  
+-        public Announcement Announcement { get; set; }
++/// <summary>
++/// One step of a negotiation about an announcement. The client is always the announcement owner,
++/// so an offer only needs to know the helper and who proposed this step.
++/// Created and changed only through <see cref="Announcement"/>.
++/// </summary>
++public class Offer
++{
++    public Id Id { get; private set; }
++    public Id AnnouncementId { get; private set; }
+ 
+-        public UserId ClientId { get; set; }
+-        public User Client { get; set; }
++    public UserId HelperId { get; private set; }
++    public OfferParty ProposedBy { get; private set; }
+ 
+-        public UserId HelperId { get; set; }
+-        public User Helper { get; set; }
++    public Price Price { get; private set; }
++    public DateTime ProposedStart { get; private set; }
++    public DateTime ProposedEnd { get; private set; }
++    public Description? Message { get; private set; }
+ 
+-        public CustomDateTime WantToStart { get; set; }
+-        public CustomDateTime WantToFinish { get; set; }
++    public OfferStatus Status { get; private set; }
++    public DateTime CreatedAt { get; private set; }
+ 
+-        public Price Price { get; set; }
+-        public Description Description { get; set; }
++    /// <summary>The offer this one is a counter-offer to (null for the first offer of a helper).</summary>
++    public Id? ParentOfferId { get; private set; }
+ 
+-        public UserId AcceptedById { get; set; }
+-        public AppUserRole AcceptedBy { get; set; }
++    // Required by EF Core.
++    private Offer()
++    {
++    }
+ 
+-        public UserId CreatedById { get; set; }
+-        public AppUserRole CreatedBy { get; set; }
++    internal Offer(Id id, Id announcementId, UserId helperId, OfferParty proposedBy, Price price,
++        DateTime proposedStart, DateTime proposedEnd, Description? message, DateTime createdAtUtc, Id? parentOfferId)
++    {
++        if (price.Amount <= 0)
++        {
++            throw new DomainRuleException("Offer price must be greater than zero.");
++        }
+ 
+-        public bool IsAccepted { get; set; }
++        if (proposedEnd <= proposedStart)
++        {
++            throw new DomainRuleException("Offer end must be later than its start.");
++        }
+ 
+-        protected Offer(Id id, Id announcementId, UserId clientId, UserId helperId,
+-            CustomDateTime wantToStart, CustomDateTime wantToFinish, Price price, Description description,
+-            bool isAccepted, AppUserRole acceptedBy, AppUserRole createdBy)
++        if (proposedStart < createdAtUtc)
+         {
+-            Id = id;
+-            AnnouncementId = announcementId;
+-            ClientId = clientId;
+-            HelperId = helperId;
+-
+-            WantToStart = wantToStart;
+-            WantToFinish = wantToFinish;
+-            Price = price;
+-            Description = description;
+-            AcceptedBy = acceptedBy;
+-            CreatedBy = createdBy;
+-            IsAccepted = isAccepted;
++            throw new DomainRuleException("Offer cannot start in the past.");
+         }
++
++        Id = id;
++        AnnouncementId = announcementId;
++        HelperId = helperId;
++        ProposedBy = proposedBy;
++        Price = price;
++        ProposedStart = proposedStart;
++        ProposedEnd = proposedEnd;
++        Message = message;
++        CreatedAt = createdAtUtc;
++        ParentOfferId = parentOfferId;
++        Status = OfferStatus.Pending;
+     }
++
++    internal void Accept() => Status = OfferStatus.Accepted;
++
++    internal void Reject() => Status = OfferStatus.Rejected;
++
++    internal void Withdraw() => Status = OfferStatus.Withdrawn;
++
++    internal void MarkAsCountered() => Status = OfferStatus.Countered;
+ }
+diff --git a/ICanHelp.Core/Entities/Rating.cs b/ICanHelp.Core/Entities/Rating.cs
+index 2da9a45..16ca3ca 100644
+--- a/ICanHelp.Core/Entities/Rating.cs
++++ b/ICanHelp.Core/Entities/Rating.cs
+@@ -1,51 +1,49 @@
+-﻿using ICanHelp.Core.Entities.Negotiations;
+-using ICanHelp.Core.Entities.Users;
++using ICanHelp.Core.Exceptions;
+ using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+ 
+-namespace ICanHelp.Core.Entities
+-{
+-    public class Rating
+-    {
+-        public Id Id { get; set; }
+-
+-        public Id AnnouncementId { get; set; }
+-        public Announcement Announcement { get; set; }
+-
+-        public UserId RateeId { get; set; }
+-        public User Ratee { get; set; }
++namespace ICanHelp.Core.Entities;
+ 
+-        public UserId RaterId { get; set; }
+-        public User Rater { get; set; }
+-
+-        public Rate Rate { get; set; }
+-
+-        public Id ClientOfferId { get; set; }
+-        public ClientOffer ClientOffer { get; set; }
++/// <summary>
++/// A rating one participant of a finished announcement gives to the other one.
++/// One rater can rate an announcement only once (enforced by a unique index and the application layer).
++/// </summary>
++public class Rating
++{
++    public Id Id { get; private set; }
++    public Id AnnouncementId { get; private set; }
+ 
+-        public Id HelperOfferId { get; set; }
+-        public HelperOffer HelperOffer { get; set; }
++    public UserId RaterId { get; private set; }
++    public UserId RateeId { get; private set; }
+ 
++    public Rate Rate { get; private set; }
++    public Description? Comment { get; private set; }
++    public DateTime CreatedAt { get; private set; }
+ 
++    // Required by EF Core.
++    private Rating()
++    {
++    }
+ 
+-        protected Rating(Id id, Id announcementId, UserId rateeId, UserId raterId, Rate rate, Id clientOfferId, Id helperOfferId)
++    public Rating(Id id, Id announcementId, UserId raterId, UserId rateeId, Rate rate,
++        Description? comment, DateTime createdAtUtc)
++    {
++        if (raterId == rateeId)
+         {
+-            Id = id;
+-            AnnouncementId = announcementId;
+-            RaterId = raterId;
+-            RateeId = rateeId;
+-            Rate = rate;
+-            ClientOfferId = clientOfferId;
+-            HelperOfferId = helperOfferId;
++            throw new DomainRuleException("A user cannot rate himself.");
+         }
+ 
+-        public void UpdateRate(Rate rate)
+-        {
+-            Rate = rate;
+-        }
++        Id = id;
++        AnnouncementId = announcementId;
++        RaterId = raterId;
++        RateeId = rateeId;
++        Rate = rate;
++        Comment = comment;
++        CreatedAt = createdAtUtc;
++    }
++
++    public void Update(Rate rate, Description? comment)
++    {
++        Rate = rate;
++        Comment = comment;
+     }
+ }
+diff --git a/ICanHelp.Core/Entities/Subcategory.cs b/ICanHelp.Core/Entities/Subcategory.cs
+index 9baae27..1ad0c16 100644
+--- a/ICanHelp.Core/Entities/Subcategory.cs
++++ b/ICanHelp.Core/Entities/Subcategory.cs
+@@ -1,33 +1,25 @@
+-﻿using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
++using ICanHelp.Core.ValueObjects;
+ 
+-namespace ICanHelp.Core.Entities
+-{
+-    public class Subcategory
+-    {
+-        public Id Id { get; set; }
+-
+-        public StringObject SubcategoryName { get; set; }
+-
+-        public Id CategoryId { get; set; }
+-        public Category Category { get; set; }
++namespace ICanHelp.Core.Entities;
+ 
++/// <summary>A part of a <see cref="Category"/>. Created only through <see cref="Category.AddSubcategory"/>.</summary>
++public class Subcategory
++{
++    public Id Id { get; private set; }
++    public Id CategoryId { get; private set; }
++    public StringObject SubcategoryName { get; private set; }
+ 
+-        public Subcategory(Id id, StringObject subcategoryName, Id categoryId)
+-        {
+-            Id = id;
+-            SubcategoryName = subcategoryName;
+-            CategoryId = categoryId;
+-        }
++    // Required by EF Core.
++    private Subcategory()
++    {
++    }
+ 
+-        public void UpdateSubcategory(StringObject subcategoryName, Id categoryId)
+-        {
+-            SubcategoryName = subcategoryName;
+-            CategoryId = categoryId;
+-        }
++    internal Subcategory(Id id, Id categoryId, StringObject subcategoryName)
++    {
++        Id = id;
++        CategoryId = categoryId;
++        SubcategoryName = subcategoryName;
+     }
++
++    internal void Rename(StringObject subcategoryName) => SubcategoryName = subcategoryName;
+ }
+diff --git a/ICanHelp.Core/Entities/Users/ContactData.cs b/ICanHelp.Core/Entities/Users/ContactData.cs
+index dce2676..514bba3 100644
+--- a/ICanHelp.Core/Entities/Users/ContactData.cs
++++ b/ICanHelp.Core/Entities/Users/ContactData.cs
+@@ -1,44 +1,14 @@
+-﻿using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Entities.Users
+-{
+-    public class ContactData
+-    {
+-        public Id Id { get; private set; }
+-        public Email Email { get; set; }
+-
+-        public User User { get; set; }
+-        public UserId UserId { get; set; }
+-
+-        public PhoneNumber PhoneNumber { get; set; }
+-        public StringObject Country { get; set; }
+-        public StringObject City { get; set; }
+-        public StringObject PostalCode { get; set; }
+-
+-        public ContactData(Id id, Email email, PhoneNumber phoneNumber, User user, UserId userId, StringObject country, StringObject city, StringObject postalCode)
+-        {
+-            Id = id;
+-            Email = email;
+-            PhoneNumber = phoneNumber;
+-            User = user;
+-            UserId = userId;
+-            Country = country;
+-            City = city;
+-            PostalCode = postalCode;
+-        }
+-
+-        public void UpdateContactData(Email email, PhoneNumber phoneNumber, StringObject country, StringObject city, StringObject postalCode)
+-        {
+-            Email = email;
+-            PhoneNumber = phoneNumber;
+-            Country = country;
+-            City = city;
+-            PostalCode = postalCode;
+-        }
+-    }
+-}
++using ICanHelp.Core.ValueObjects;
++
++namespace ICanHelp.Core.Entities.Users;
++
++/// <summary>
++/// Contact details of a user. It has no identity of its own: it lives inside <see cref="User"/>
++/// (stored in the same table) and is compared by value.
++/// </summary>
++public sealed record ContactData(
++    Email Email,
++    PhoneNumber PhoneNumber,
++    StringObject Country,
++    StringObject City,
++    StringObject PostalCode);
+diff --git a/ICanHelp.Core/Entities/Users/User.cs b/ICanHelp.Core/Entities/Users/User.cs
+index ef535fb..ed20fa0 100644
+--- a/ICanHelp.Core/Entities/Users/User.cs
++++ b/ICanHelp.Core/Entities/Users/User.cs
+@@ -1,81 +1,81 @@
+-﻿using ICanHelp.Core.Entities.Liked;
+-using ICanHelp.Core.Entities.Negotiations;
+-using ICanHelp.Core.Entities.Users;
++using ICanHelp.Core.Enums;
++using ICanHelp.Core.Exceptions;
+ using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+ 
+-namespace ICanHelp.Core.Entities.Users
++namespace ICanHelp.Core.Entities.Users;
++
++public class User
+ {
+-    public class User
+-    {
+-        public UserId Id { get; private set; }
++    public UserId Id { get; private set; }
+ 
+-        public UserName UserName { get; private set; }
+-        public Password Password { get; private set; }
+-        public FullName FullName { get; private set; }
++    public UserName UserName { get; private set; }
++    public FullName FullName { get; private set; }
+ 
+-        public AppUserRole Role { get; private set; }
+-        public Id AppUserRoleId { get; private set; }
++    /// <summary>Hash of the password. The plain password is never stored.</summary>
++    public string PasswordHash { get; private set; }
+ 
+-        public CustomDateTime CreatedAt { get; private set; }
+-        public bool IsLocked { get; private set; }        
+-        public Description Description { get; private set; }
++    public UserRole Role { get; private set; }
++    public DateTime CreatedAt { get; private set; }
++    public bool IsLocked { get; private set; }
+ 
+-        public Id ContactDataId { get; set; }
+-        public ContactData ContactData { get; private set; }
++    public Description? Description { get; private set; }
++    public ContactData ContactData { get; private set; }
+ 
+-        public IEnumerable<Announcement> Announcements { get; set; }
++    // Required by EF Core.
++    private User()
++    {
++    }
+ 
+-        public IEnumerable<LikedAnnouncement> LikedAnnouncements { get; set; }
+-        public IEnumerable<LikedUser> LikedUsers { get; set; }
++    public User(UserId id, UserName userName, FullName fullName, string passwordHash,
++        ContactData contactData, DateTime createdAtUtc, UserRole role = UserRole.User)
++    {
++        EnsurePasswordHash(passwordHash);
++        ArgumentNullException.ThrowIfNull(contactData);
+ 
+-        public IEnumerable<Rating> ClientRatings { get; set; }
+-        public IEnumerable<Rating> HelperRatings { get; set; }
++        Id = id;
++        UserName = userName;
++        FullName = fullName;
++        PasswordHash = passwordHash;
++        ContactData = contactData;
++        CreatedAt = createdAtUtc;
++        Role = role;
++        IsLocked = false;
++    }
+ 
+-        public IEnumerable<ClientOffer> ClientOffers { get; set; }
+-        public IEnumerable<HelperOffer> HelperOffers { get; set; }
++    public void UpdateProfile(FullName fullName, Description? description, ContactData contactData)
++    {
++        ArgumentNullException.ThrowIfNull(contactData);
+ 
++        FullName = fullName;
++        Description = description;
++        ContactData = contactData;
++    }
+ 
++    public void ChangePasswordHash(string passwordHash)
++    {
++        EnsurePasswordHash(passwordHash);
++        PasswordHash = passwordHash;
++    }
+ 
+-        public User(UserId id, UserName userName, Password password, FullName fullName, AppUserRole role, Id appUserRoleId,
+-            CustomDateTime createdAt, bool isLocked, Description description, ContactData contactData,
+-            IEnumerable<Announcement> announcements, IEnumerable<LikedAnnouncement> likedAnnouncements,
+-            IEnumerable<LikedUser> likedUsers, IEnumerable<Rating> clientRatings, IEnumerable<Rating> helperRatings,
+-            IEnumerable<ClientOffer> clientOffers, IEnumerable<HelperOffer> helperOffers)
++    public void ChangeRole(UserRole role)
++    {
++        if (!Enum.IsDefined(role))
+         {
+-            Id = id;
+-            UserName = userName;
+-            Password = password;
+-            FullName = fullName;
+-            Role = role;
+-            AppUserRoleId = appUserRoleId;
+-            CreatedAt = createdAt;
+-            IsLocked = isLocked;
+-            Description = description;
+-            ContactData = contactData;
+-            Announcements = announcements;
+-            LikedAnnouncements = likedAnnouncements;
+-            LikedUsers = likedUsers;
+-            ClientRatings = clientRatings;
+-            HelperRatings = helperRatings;
+-            ClientOffers = clientOffers;
+-            HelperOffers = helperOffers;
++            throw new DomainRuleException($"Role: {role} is invalid.");
+         }
+ 
+-        public void UpdateUser(UserName userName, FullName fullName, AppUserRole role, Id appUserRoleId, bool isLocked,
+-            Description description, ContactData contactData)
++        Role = role;
++    }
++
++    public void Lock() => IsLocked = true;
++
++    public void Unlock() => IsLocked = false;
++
++    private static void EnsurePasswordHash(string passwordHash)
++    {
++        if (string.IsNullOrWhiteSpace(passwordHash))
+         {
+-            UserName = userName;
+-            FullName = fullName;
+-            Role = role;
+-            AppUserRoleId = appUserRoleId;
+-            IsLocked = isLocked;
+-            Description = description;
+-            ContactData = contactData;
++            throw new InvalidPasswordException();
+         }
+     }
+ }
+diff --git a/ICanHelp.Core/Enums/AnnouncementStatus.cs b/ICanHelp.Core/Enums/AnnouncementStatus.cs
+new file mode 100644
+index 0000000..8be47a4
+--- /dev/null
++++ b/ICanHelp.Core/Enums/AnnouncementStatus.cs
+@@ -0,0 +1,14 @@
++namespace ICanHelp.Core.Enums;
++
++public enum AnnouncementStatus
++{
++    /// <summary>Visible to helpers, accepts offers.</summary>
++    Open = 1,
++
++    /// <summary>One offer was accepted, work has not started yet.</summary>
++    Accepted = 2,
++
++    InProgress = 3,
++    Completed = 4,
++    Cancelled = 5
++}
+diff --git a/ICanHelp.Core/Enums/DifficultyLevel.cs b/ICanHelp.Core/Enums/DifficultyLevel.cs
+new file mode 100644
+index 0000000..3466865
+--- /dev/null
++++ b/ICanHelp.Core/Enums/DifficultyLevel.cs
+@@ -0,0 +1,8 @@
++namespace ICanHelp.Core.Enums;
++
++public enum DifficultyLevel
++{
++    Easy = 1,
++    Medium = 2,
++    Hard = 3
++}
+diff --git a/ICanHelp.Core/Enums/OfferParty.cs b/ICanHelp.Core/Enums/OfferParty.cs
+new file mode 100644
+index 0000000..d62aeef
+--- /dev/null
++++ b/ICanHelp.Core/Enums/OfferParty.cs
+@@ -0,0 +1,8 @@
++namespace ICanHelp.Core.Enums;
++
++/// <summary>The side of a negotiation: the announcement owner or the person who wants to help.</summary>
++public enum OfferParty
++{
++    Client = 1,
++    Helper = 2
++}
+diff --git a/ICanHelp.Core/Enums/OfferStatus.cs b/ICanHelp.Core/Enums/OfferStatus.cs
+new file mode 100644
+index 0000000..bc882fa
+--- /dev/null
++++ b/ICanHelp.Core/Enums/OfferStatus.cs
+@@ -0,0 +1,14 @@
++namespace ICanHelp.Core.Enums;
++
++public enum OfferStatus
++{
++    Pending = 1,
++    Accepted = 2,
++    Rejected = 3,
++
++    /// <summary>Replaced by a counter-offer from the other side.</summary>
++    Countered = 4,
++
++    /// <summary>Taken back by its author.</summary>
++    Withdrawn = 5
++}
+diff --git a/ICanHelp.Core/Enums/UserRole.cs b/ICanHelp.Core/Enums/UserRole.cs
+new file mode 100644
+index 0000000..01ec6a6
+--- /dev/null
++++ b/ICanHelp.Core/Enums/UserRole.cs
+@@ -0,0 +1,7 @@
++namespace ICanHelp.Core.Enums;
++
++public enum UserRole
++{
++    User = 1,
++    Admin = 2
++}
+diff --git a/ICanHelp.Core/Exceptions/DomainRuleException.cs b/ICanHelp.Core/Exceptions/DomainRuleException.cs
+new file mode 100644
+index 0000000..42bfe76
+--- /dev/null
++++ b/ICanHelp.Core/Exceptions/DomainRuleException.cs
+@@ -0,0 +1,9 @@
++namespace ICanHelp.Core.Exceptions;
++
++/// <summary>Thrown when a business rule of the domain is violated.</summary>
++public class DomainRuleException : CustomExceptions
++{
++    public DomainRuleException(string message) : base(message)
++    {
++    }
++}
+diff --git a/ICanHelp.Core/Exceptions/InvalidEmailException.cs b/ICanHelp.Core/Exceptions/InvalidEmailException.cs
+index f9ec04a..07f880e 100644
+--- a/ICanHelp.Core/Exceptions/InvalidEmailException.cs
++++ b/ICanHelp.Core/Exceptions/InvalidEmailException.cs
+@@ -6,7 +6,7 @@ using System.Threading.Tasks;
+ 
+ namespace ICanHelp.Core.Exceptions
+ {
+-    internal class InvalidEmailException : CustomExceptions
++    public class InvalidEmailException : CustomExceptions
+     {
+         public string Email { get; }
+         public InvalidEmailException(string email) : base($"Email: {email} is invalid.")
+diff --git a/ICanHelp.Core/Exceptions/InvalidPhoneNumberException.cs b/ICanHelp.Core/Exceptions/InvalidPhoneNumberException.cs
+index 8b2d1d7..e40d4fb 100644
+--- a/ICanHelp.Core/Exceptions/InvalidPhoneNumberException.cs
++++ b/ICanHelp.Core/Exceptions/InvalidPhoneNumberException.cs
+@@ -6,7 +6,7 @@ using System.Threading.Tasks;
+ 
+ namespace ICanHelp.Core.Exceptions
+ {
+-    internal class InvalidPhoneNumberException : CustomExceptions
++    public class InvalidPhoneNumberException : CustomExceptions
+     {
+         public string PhoneNumber { get; }
+         public InvalidPhoneNumberException(string phoneNumber) : base($"Phone number: {phoneNumber} is invalid.")
+diff --git a/ICanHelp.Core/Exceptions/InvalidRoleException.cs b/ICanHelp.Core/Exceptions/InvalidRoleException.cs
+deleted file mode 100644
+index 03ed47e..0000000
+--- a/ICanHelp.Core/Exceptions/InvalidRoleException.cs
++++ /dev/null
+@@ -1,17 +0,0 @@
+-﻿using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Exceptions
+-{
+-    internal class InvalidRoleException : CustomExceptions
+-    {
+-        public string Role { get; set; }
+-        public InvalidRoleException(string role) : base($"Role: {role} is invalid.")
+-        {
+-            Role = role;
+-        }
+-    }
+-}
+diff --git a/ICanHelp.Core/Exceptions/OfferNotFoundException.cs b/ICanHelp.Core/Exceptions/OfferNotFoundException.cs
+new file mode 100644
+index 0000000..3422681
+--- /dev/null
++++ b/ICanHelp.Core/Exceptions/OfferNotFoundException.cs
+@@ -0,0 +1,11 @@
++namespace ICanHelp.Core.Exceptions;
++
++public class OfferNotFoundException : CustomExceptions
++{
++    public Guid OfferId { get; }
++
++    public OfferNotFoundException(Guid offerId) : base($"Offer with id: {offerId} was not found.")
++    {
++        OfferId = offerId;
++    }
++}
+diff --git a/ICanHelp.Core/ICanHelp.Core.csproj b/ICanHelp.Core/ICanHelp.Core.csproj
+index 125f4c9..f467980 100644
+--- a/ICanHelp.Core/ICanHelp.Core.csproj
++++ b/ICanHelp.Core/ICanHelp.Core.csproj
+@@ -4,6 +4,8 @@
+     <TargetFramework>net9.0</TargetFramework>
+     <ImplicitUsings>enable</ImplicitUsings>
+     <Nullable>enable</Nullable>
++    <!-- CS8618: entities have a private parameterless constructor only for EF Core, which fills the properties itself. -->
++    <NoWarn>$(NoWarn);CS8618</NoWarn>
+   </PropertyGroup>
+ 
+ </Project>
+diff --git a/ICanHelp.Core/Repositories/IAnnouncementRepository.cs b/ICanHelp.Core/Repositories/IAnnouncementRepository.cs
+index f8311cc..f401dbb 100644
+--- a/ICanHelp.Core/Repositories/IAnnouncementRepository.cs
++++ b/ICanHelp.Core/Repositories/IAnnouncementRepository.cs
+@@ -1,15 +1,14 @@
+-﻿using ICanHelp.Core.Entities;
++using ICanHelp.Core.Entities;
+ using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+ 
+-namespace ICanHelp.Core.Repositories
++namespace ICanHelp.Core.Repositories;
++
++public interface IAnnouncementRepository
+ {
+-    public interface IAnnouncementRepository : IRepository<Announcement>
+-    {
+-        void Update(Announcement announcement);
+-    }
++    /// <summary>Loads the announcement together with its offers and images.</summary>
++    Task<Announcement?> GetByIdAsync(Id id, CancellationToken cancellationToken = default);
++
++    Task AddAsync(Announcement announcement, CancellationToken cancellationToken = default);
++
++    void Remove(Announcement announcement);
+ }
+diff --git a/ICanHelp.Core/Repositories/IAppUserRoleRepository.cs b/ICanHelp.Core/Repositories/IAppUserRoleRepository.cs
+deleted file mode 100644
+index 7e7bbc5..0000000
+--- a/ICanHelp.Core/Repositories/IAppUserRoleRepository.cs
++++ /dev/null
+@@ -1,15 +0,0 @@
+-﻿using ICanHelp.Core.Entities;
+-using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Repositories
+-{
+-    public interface IAppUserRoleRepository : IRepository<AppUserRole>
+-    {
+-        void Update(AppUserRole appUserRole);
+-    }
+-}
+diff --git a/ICanHelp.Core/Repositories/ICategoryRepository.cs b/ICanHelp.Core/Repositories/ICategoryRepository.cs
+index 9c87b6e..5fb9fad 100644
+--- a/ICanHelp.Core/Repositories/ICategoryRepository.cs
++++ b/ICanHelp.Core/Repositories/ICategoryRepository.cs
+@@ -1,15 +1,16 @@
+-﻿using ICanHelp.Core.Entities;
++using ICanHelp.Core.Entities;
+ using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+ 
+-namespace ICanHelp.Core.Repositories
++namespace ICanHelp.Core.Repositories;
++
++public interface ICategoryRepository
+ {
+-    public interface ICategoryRepository : IRepository<Category>
+-    {
+-        void Update(Category category);
+-    }
++    /// <summary>Loads the category together with its subcategories.</summary>
++    Task<Category?> GetByIdAsync(Id id, CancellationToken cancellationToken = default);
++
++    Task<IReadOnlyList<Category>> GetAllAsync(CancellationToken cancellationToken = default);
++
++    Task AddAsync(Category category, CancellationToken cancellationToken = default);
++
++    void Remove(Category category);
+ }
+diff --git a/ICanHelp.Core/Repositories/IContactData.cs b/ICanHelp.Core/Repositories/IContactData.cs
+deleted file mode 100644
+index 97357dd..0000000
+--- a/ICanHelp.Core/Repositories/IContactData.cs
++++ /dev/null
+@@ -1,16 +0,0 @@
+-﻿using ICanHelp.Core.Entities.Liked;
+-using ICanHelp.Core.Entities.Users;
+-using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Repositories
+-{
+-    public interface IContactData : IRepository<ContactData>
+-    {
+-        void Update(ContactData contactData);
+-    }
+-}
+diff --git a/ICanHelp.Core/Repositories/IDifficultLevelRepository.cs b/ICanHelp.Core/Repositories/IDifficultLevelRepository.cs
+deleted file mode 100644
+index 234c474..0000000
+--- a/ICanHelp.Core/Repositories/IDifficultLevelRepository.cs
++++ /dev/null
+@@ -1,15 +0,0 @@
+-﻿using ICanHelp.Core.Entities;
+-using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Repositories
+-{
+-    public interface IDifficultLevelRepository : IRepository<DifficultLevel>
+-    {
+-        void Update(DifficultLevel difficultLevel);
+-    }
+-}
+diff --git a/ICanHelp.Core/Repositories/IImagesRepository.cs b/ICanHelp.Core/Repositories/IImagesRepository.cs
+deleted file mode 100644
+index 02f0347..0000000
+--- a/ICanHelp.Core/Repositories/IImagesRepository.cs
++++ /dev/null
+@@ -1,15 +0,0 @@
+-﻿using ICanHelp.Core.Entities;
+-using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Repositories
+-{
+-    public interface IImagesRepository : IRepository<Image>
+-    {
+-        void Update(Image image);
+-    }
+-}
+diff --git a/ICanHelp.Core/Repositories/ILikedAnnouncementRepository.cs b/ICanHelp.Core/Repositories/ILikedAnnouncementRepository.cs
+index 3674c72..fa9a616 100644
+--- a/ICanHelp.Core/Repositories/ILikedAnnouncementRepository.cs
++++ b/ICanHelp.Core/Repositories/ILikedAnnouncementRepository.cs
+@@ -1,15 +1,13 @@
+-﻿using ICanHelp.Core.Entities.Liked;
++using ICanHelp.Core.Entities.Liked;
+ using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+ 
+-namespace ICanHelp.Core.Repositories
++namespace ICanHelp.Core.Repositories;
++
++public interface ILikedAnnouncementRepository
+ {
+-    public interface ILikedAnnouncementRepository : IRepository<LikedAnnouncement>
+-    {
+-        void Update(LikedAnnouncement likedAnnouncement);
+-    }
++    Task<LikedAnnouncement?> GetAsync(UserId userId, Id announcementId, CancellationToken cancellationToken = default);
++
++    Task AddAsync(LikedAnnouncement likedAnnouncement, CancellationToken cancellationToken = default);
++
++    void Remove(LikedAnnouncement likedAnnouncement);
+ }
+diff --git a/ICanHelp.Core/Repositories/ILikedUserRepository.cs b/ICanHelp.Core/Repositories/ILikedUserRepository.cs
+index f2a94d0..b958cd6 100644
+--- a/ICanHelp.Core/Repositories/ILikedUserRepository.cs
++++ b/ICanHelp.Core/Repositories/ILikedUserRepository.cs
+@@ -1,15 +1,13 @@
+-﻿using ICanHelp.Core.Entities.Liked;
++using ICanHelp.Core.Entities.Liked;
+ using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+ 
+-namespace ICanHelp.Core.Repositories
++namespace ICanHelp.Core.Repositories;
++
++public interface ILikedUserRepository
+ {
+-    public interface ILikedUserRepository : IRepository<LikedUser>
+-    {
+-        void Update(LikedUser likedUser);
+-    }
++    Task<LikedUser?> GetAsync(UserId likerId, UserId likedId, CancellationToken cancellationToken = default);
++
++    Task AddAsync(LikedUser likedUser, CancellationToken cancellationToken = default);
++
++    void Remove(LikedUser likedUser);
+ }
+diff --git a/ICanHelp.Core/Repositories/ILocationRepository.cs b/ICanHelp.Core/Repositories/ILocationRepository.cs
+deleted file mode 100644
+index 93a9b78..0000000
+--- a/ICanHelp.Core/Repositories/ILocationRepository.cs
++++ /dev/null
+@@ -1,14 +0,0 @@
+-﻿using ICanHelp.Core.Entities;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Repositories
+-{
+-    public interface ILocationRepository : IRepository<Location>
+-    {
+-        void Update(Location location);
+-    }
+-}
+diff --git a/ICanHelp.Core/Repositories/IRatingRepository.cs b/ICanHelp.Core/Repositories/IRatingRepository.cs
+index b60d5ba..dec9c49 100644
+--- a/ICanHelp.Core/Repositories/IRatingRepository.cs
++++ b/ICanHelp.Core/Repositories/IRatingRepository.cs
+@@ -1,15 +1,14 @@
+-﻿using ICanHelp.Core.Entities;
++using ICanHelp.Core.Entities;
+ using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+ 
+-namespace ICanHelp.Core.Repositories
++namespace ICanHelp.Core.Repositories;
++
++public interface IRatingRepository
+ {
+-    public interface IRatingRepository : IRepository<Rating>
+-    {
+-        void Update(Rating rating);
+-    }
++    Task<Rating?> GetByIdAsync(Id id, CancellationToken cancellationToken = default);
++
++    /// <summary>True if the rater has already rated this announcement.</summary>
++    Task<bool> ExistsAsync(Id announcementId, UserId raterId, CancellationToken cancellationToken = default);
++
++    Task AddAsync(Rating rating, CancellationToken cancellationToken = default);
+ }
+diff --git a/ICanHelp.Core/Repositories/IRepository.cs b/ICanHelp.Core/Repositories/IRepository.cs
+deleted file mode 100644
+index 8e7778e..0000000
+--- a/ICanHelp.Core/Repositories/IRepository.cs
++++ /dev/null
+@@ -1,18 +0,0 @@
+-﻿using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Linq.Expressions;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Repositories
+-{
+-    public interface IRepository<T> where T : class
+-    {
+-        IEnumerable<T> GetAll(Expression<Func<T, bool>>? filter = null, string? includeProperties = null, bool tracked = false);
+-        T Get(Expression<Func<T, bool>> filter, string? includeProperties = null, bool tracked = false);
+-        void Add(T entity);
+-        bool Any(Expression<Func<T, bool>> filter);
+-        void Remove(T entity);
+-    }
+-}
+diff --git a/ICanHelp.Core/Repositories/ISubcategoryRepository.cs b/ICanHelp.Core/Repositories/ISubcategoryRepository.cs
+deleted file mode 100644
+index eb7b5d7..0000000
+--- a/ICanHelp.Core/Repositories/ISubcategoryRepository.cs
++++ /dev/null
+@@ -1,15 +0,0 @@
+-﻿using ICanHelp.Core.Entities;
+-using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.Repositories
+-{
+-    public interface ISubcategoryRepository : IRepository<Subcategory>
+-    {
+-        void Update(Subcategory subcategory);
+-    }
+-}
+diff --git a/ICanHelp.Core/Repositories/IUnitOfWork.cs b/ICanHelp.Core/Repositories/IUnitOfWork.cs
+new file mode 100644
+index 0000000..852db0b
+--- /dev/null
++++ b/ICanHelp.Core/Repositories/IUnitOfWork.cs
+@@ -0,0 +1,7 @@
++namespace ICanHelp.Core.Repositories;
++
++public interface IUnitOfWork
++{
++    /// <summary>Runs the action in a transaction and saves all changes made by it.</summary>
++    Task ExecuteAsync(Func<Task> action, CancellationToken cancellationToken = default);
++}
+diff --git a/ICanHelp.Core/Repositories/IUserRepository.cs b/ICanHelp.Core/Repositories/IUserRepository.cs
+index ac274bb..4fcb70c 100644
+--- a/ICanHelp.Core/Repositories/IUserRepository.cs
++++ b/ICanHelp.Core/Repositories/IUserRepository.cs
+@@ -1,15 +1,17 @@
+-﻿using ICanHelp.Core.Entities.Offers;
++using ICanHelp.Core.Entities.Users;
+ using ICanHelp.Core.ValueObjects;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+ 
+-namespace ICanHelp.Core.Repositories
++namespace ICanHelp.Core.Repositories;
++
++public interface IUserRepository
+ {
+-    public interface IUserRepository : IRepository<User>
+-    {
+-        void Update(User user);
+-    }
++    Task<User?> GetByIdAsync(UserId id, CancellationToken cancellationToken = default);
++
++    Task<User?> GetByUserNameAsync(UserName userName, CancellationToken cancellationToken = default);
++
++    Task<bool> ExistsByUserNameAsync(UserName userName, CancellationToken cancellationToken = default);
++
++    Task<bool> ExistsByEmailAsync(Email email, CancellationToken cancellationToken = default);
++
++    Task AddAsync(User user, CancellationToken cancellationToken = default);
+ }
+diff --git a/ICanHelp.Core/ValueObjects/CustomDateTime.cs b/ICanHelp.Core/ValueObjects/CustomDateTime.cs
+deleted file mode 100644
+index 1f86371..0000000
+--- a/ICanHelp.Core/ValueObjects/CustomDateTime.cs
++++ /dev/null
+@@ -1,44 +0,0 @@
+-﻿using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.ValueObjects
+-{
+-    public sealed record CustomDateTime
+-    {
+-        public DateTime Value { get; }
+-
+-        public CustomDateTime(DateTime value)
+-        {
+-            // Walidacja daty. defalut DateTime.MinValue;
+-            if (value == default)
+-            {
+-                throw new ArgumentException("DateTime cannot be default.", nameof(value));
+-            }
+-
+-            // Walidacja zakresu (nie pozwalamy na daty dalej niz rok w przyszlosc i daty wczorajszej)
+-            if (value < DateTime.UtcNow.AddYears(1) || value > DateTime.UtcNow.AddDays(-1))
+-            {
+-                throw new ArgumentOutOfRangeException(nameof(value), "DateTime must be within a valid range.");
+-            }
+-
+-            // Walidacja czasu (godziny od 0 do 23, minuty od 0 do 59)
+-            if (value.Hour < 0 || value.Hour > 23 || value.Minute < 0 || value.Minute > 59)
+-            {
+-                throw new ArgumentException("Invalid time component in DateTime.", nameof(value));
+-            }
+-
+-            Value = value;
+-        }
+-
+-        // Konwersje implicit
+-        public static implicit operator CustomDateTime(DateTime value) => new(value);
+-        public static implicit operator DateTime(CustomDateTime customDateTime) => customDateTime.Value;
+-
+-        // Formatowanie
+-        public override string ToString() => Value.ToString("yyyy-MM-dd HH:mm:ss");
+-    }
+-
+-}
+diff --git a/ICanHelp.Core/ValueObjects/Description.cs b/ICanHelp.Core/ValueObjects/Description.cs
+index bbab8ae..8564b5a 100644
+--- a/ICanHelp.Core/ValueObjects/Description.cs
++++ b/ICanHelp.Core/ValueObjects/Description.cs
+@@ -1,27 +1,22 @@
+-﻿using ICanHelp.Core.Exceptions;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
++using ICanHelp.Core.Exceptions;
+ 
+-namespace ICanHelp.Core.ValueObjects
++namespace ICanHelp.Core.ValueObjects;
++
++public sealed record Description
+ {
+-    public sealed record Description
++    public string Value { get; }
++
++    public Description(string value)
+     {
+-        public string Value { get; }
+-        public Description(string value)
++        if (string.IsNullOrWhiteSpace(value) || value.Length is > 500 or < 2)
+         {
+-            if (string.IsNullOrWhiteSpace(value) || value.Length is > 500 or < 2)
+-            {
+-                throw new InvalidDescriptionException(value);
+-            }
+-
+-            Value = value;
++            throw new InvalidDescriptionException(value);
+         }
+ 
+-        public static implicit operator Description(string value) => new(value);
+-        public static implicit operator string(Description username) => username.Value;
+-        public override string ToString() => Value;
++        Value = value;
+     }
++
++    public static implicit operator Description(string value) => new(value);
++    public static implicit operator string(Description description) => description.Value;
++    public override string ToString() => Value;
+ }
+diff --git a/ICanHelp.Core/ValueObjects/Email.cs b/ICanHelp.Core/ValueObjects/Email.cs
+index 60c697f..5959543 100644
+--- a/ICanHelp.Core/ValueObjects/Email.cs
++++ b/ICanHelp.Core/ValueObjects/Email.cs
+@@ -8,9 +8,9 @@ using System.Threading.Tasks;
+ 
+ namespace ICanHelp.Core.ValueObjects
+ {
+-    public record Email
++    public sealed record Email
+     {
+-        private readonly Regex Regex = new(
++        private static readonly Regex EmailRegex = new(
+             @"^(?("")("".+?(?<!\\)""@)|(([0-9a-z]((\.(?!\.))|[-!#\$%&'\*\+/=\?\^`\{\}\|~\w])*)(?<=[0-9a-z])@))" +
+             @"(?(\[)(\[(\d{1,3}\.){3}\d{1,3}\])|(([0-9a-z][-0-9a-z]*[0-9a-z]*\.)+[a-z0-9][\-a-z0-9]{0,22}[a-z0-9]))$",
+             RegexOptions.Compiled);
+@@ -28,8 +28,8 @@ namespace ICanHelp.Core.ValueObjects
+                 throw new InvalidEmailException(value);
+             }
+ 
+-            value = value.ToLower();
+-            if (!Regex.IsMatch(value))
++            value = value.ToLowerInvariant();
++            if (!EmailRegex.IsMatch(value))
+             {
+                 throw new InvalidEmailException(value);
+             }
+diff --git a/ICanHelp.Core/ValueObjects/FullName.cs b/ICanHelp.Core/ValueObjects/FullName.cs
+index 396f487..58a292e 100644
+--- a/ICanHelp.Core/ValueObjects/FullName.cs
++++ b/ICanHelp.Core/ValueObjects/FullName.cs
+@@ -1,27 +1,22 @@
+-﻿using ICanHelp.Core.Exceptions;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
++using ICanHelp.Core.Exceptions;
+ 
+-namespace ICanHelp.Core.ValueObjects
++namespace ICanHelp.Core.ValueObjects;
++
++public sealed record FullName
+ {
+-    public sealed record FullName
++    public string Value { get; }
++
++    public FullName(string value)
+     {
+-        public string Value { get; }
+-        public FullName(string value)
++        if (string.IsNullOrWhiteSpace(value) || value.Length is > 100 or < 3)
+         {
+-            if (string.IsNullOrWhiteSpace(value) || value.Length is > 100 or < 3)
+-            {
+-                throw new InvalidFullNameException(value);
+-            }
+-
+-            Value = value;
++            throw new InvalidFullNameException(value);
+         }
+ 
+-        public static implicit operator FullName(string value) => value is null ? null : new(value);
+-        public static implicit operator string(FullName fullName) => fullName?.Value;
+-        public override string ToString() => Value;
++        Value = value;
+     }
++
++    public static implicit operator FullName(string value) => new(value);
++    public static implicit operator string(FullName fullName) => fullName.Value;
++    public override string ToString() => Value;
+ }
+diff --git a/ICanHelp.Core/ValueObjects/Id.cs b/ICanHelp.Core/ValueObjects/Id.cs
+index a9482a0..7cf1120 100644
+--- a/ICanHelp.Core/ValueObjects/Id.cs
++++ b/ICanHelp.Core/ValueObjects/Id.cs
+@@ -1,27 +1,24 @@
+-﻿using ICanHelp.Core.Exceptions;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
++using ICanHelp.Core.Exceptions;
+ 
+-namespace ICanHelp.Core.ValueObjects
++namespace ICanHelp.Core.ValueObjects;
++
++public sealed record Id
+ {
+-    public record Id
+-    {
+-        public Guid Value { get; }
++    public Guid Value { get; }
+ 
+-        public Id(Guid value)
++    public Id(Guid value)
++    {
++        if (value == Guid.Empty)
+         {
+-            if (value == Guid.Empty)
+-            {
+-                throw new InvalidIdentityException(value);
+-            }
+-
+-            Value = value;
++            throw new InvalidIdentityException(value);
+         }
+ 
+-        public static implicit operator Guid(Id value) => value.Value;
+-        public static implicit operator Id(Guid value) => new(value);
++        Value = value;
+     }
++
++    public static Id New() => new(Guid.NewGuid());
++
++    public static implicit operator Guid(Id id) => id.Value;
++    public static implicit operator Id(Guid value) => new(value);
++    public override string ToString() => Value.ToString();
+ }
+diff --git a/ICanHelp.Core/ValueObjects/Location.cs b/ICanHelp.Core/ValueObjects/Location.cs
+new file mode 100644
+index 0000000..81a465c
+--- /dev/null
++++ b/ICanHelp.Core/ValueObjects/Location.cs
+@@ -0,0 +1,28 @@
++using ICanHelp.Core.Exceptions;
++
++namespace ICanHelp.Core.ValueObjects;
++
++/// <summary>A point on the map (WGS84 coordinates).</summary>
++public sealed record Location
++{
++    public double Latitude { get; }
++    public double Longitude { get; }
++
++    public Location(double latitude, double longitude)
++    {
++        if (double.IsNaN(latitude) || latitude is < -90 or > 90)
++        {
++            throw new DomainRuleException("Latitude must be between -90 and 90.");
++        }
++
++        if (double.IsNaN(longitude) || longitude is < -180 or > 180)
++        {
++            throw new DomainRuleException("Longitude must be between -180 and 180.");
++        }
++
++        Latitude = latitude;
++        Longitude = longitude;
++    }
++
++    public override string ToString() => FormattableString.Invariant($"{Latitude}, {Longitude}");
++}
+diff --git a/ICanHelp.Core/ValueObjects/Password.cs b/ICanHelp.Core/ValueObjects/Password.cs
+index 07c2411..c7da535 100644
+--- a/ICanHelp.Core/ValueObjects/Password.cs
++++ b/ICanHelp.Core/ValueObjects/Password.cs
+@@ -1,27 +1,28 @@
+-﻿using ICanHelp.Core.Exceptions;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
++using ICanHelp.Core.Exceptions;
+ 
+-namespace ICanHelp.Core.ValueObjects
++namespace ICanHelp.Core.ValueObjects;
++
++/// <summary>
++/// A plain-text password, used only to validate user input (e.g. when registering).
++/// It must never be stored: the database keeps only <c>User.PasswordHash</c>.
++/// </summary>
++public sealed record Password
+ {
+-    public sealed record Password
++    public string Value { get; }
++
++    public Password(string value)
+     {
+-        public string Value { get; }
+-        public Password(string value)
++        if (string.IsNullOrWhiteSpace(value) || value.Length is > 200 or < 6)
+         {
+-            if (string.IsNullOrWhiteSpace(value) || value.Length is > 200 or < 6)
+-            {
+-                throw new InvalidPasswordException();
+-            }
+-
+-            Value = value;
++            throw new InvalidPasswordException();
+         }
+ 
+-        public static implicit operator Password(string value) => new(value);
+-        public static implicit operator string(Password password) => password.Value;
+-        public override string ToString() => Value;
++        Value = value;
+     }
++
++    public static implicit operator Password(string value) => new(value);
++    public static implicit operator string(Password password) => password.Value;
++
++    // Never print the password (logs, debugger, exception messages).
++    public override string ToString() => "********";
+ }
+diff --git a/ICanHelp.Core/ValueObjects/PhoneNumber.cs b/ICanHelp.Core/ValueObjects/PhoneNumber.cs
+index 0747e32..fc0db30 100644
+--- a/ICanHelp.Core/ValueObjects/PhoneNumber.cs
++++ b/ICanHelp.Core/ValueObjects/PhoneNumber.cs
+@@ -1,40 +1,26 @@
+-﻿using ICanHelp.Core.Exceptions;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+ using System.Text.RegularExpressions;
+-using System.Threading.Tasks;
++using ICanHelp.Core.Exceptions;
+ 
+-namespace ICanHelp.Core.ValueObjects
+-{
+-    public record PhoneNumber
+-    {
+-        private readonly Regex Regex = new(@"^\+?[1-9][0-9]{7,14}$");
+-        public string Value { get; }
+-
+-        public PhoneNumber(string value)
+-        {
+-            if (string.IsNullOrWhiteSpace(value))
+-            {
+-                throw new InvalidPhoneNumberException(value);
+-            }
++namespace ICanHelp.Core.ValueObjects;
+ 
+-            if (value.Length is > 25 or < 6)
+-            {
+-                throw new InvalidPhoneNumberException(value);
+-            }
++public sealed record PhoneNumber
++{
++    // Optional '+', then 8-15 digits (E.164), so the value is at most 16 characters long.
++    private static readonly Regex PhoneRegex = new(@"^\+?[1-9][0-9]{7,14}$", RegexOptions.Compiled);
+ 
+-            if (!Regex.IsMatch(value))
+-            {
+-                throw new InvalidPhoneNumberException(value);
+-            }
++    public string Value { get; }
+ 
+-            Value = value;
++    public PhoneNumber(string value)
++    {
++        if (string.IsNullOrWhiteSpace(value) || !PhoneRegex.IsMatch(value))
++        {
++            throw new InvalidPhoneNumberException(value);
+         }
+ 
+-        public static implicit operator string(PhoneNumber phoneNumber) => phoneNumber.Value;
+-        public static implicit operator PhoneNumber(string phoneNumber) => new(phoneNumber);
+-        public override string ToString() => Value;
++        Value = value;
+     }
++
++    public static implicit operator string(PhoneNumber phoneNumber) => phoneNumber.Value;
++    public static implicit operator PhoneNumber(string phoneNumber) => new(phoneNumber);
++    public override string ToString() => Value;
+ }
+diff --git a/ICanHelp.Core/ValueObjects/Price.cs b/ICanHelp.Core/ValueObjects/Price.cs
+index 31e92ee..a37f2d4 100644
+--- a/ICanHelp.Core/ValueObjects/Price.cs
++++ b/ICanHelp.Core/ValueObjects/Price.cs
+@@ -1,56 +1,50 @@
+-﻿using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
++using System.Globalization;
++using ICanHelp.Core.Exceptions;
+ 
+-namespace ICanHelp.Core.ValueObjects
++namespace ICanHelp.Core.ValueObjects;
++
++public sealed record Price
+ {
+-    public sealed record Price
++    public decimal Amount { get; }
++    public string Currency { get; }
++
++    public Price(decimal amount, string currency)
++    {
++        if (amount < 0)
++        {
++            throw new DomainRuleException("Price amount cannot be negative.");
++        }
++
++        if (string.IsNullOrWhiteSpace(currency) || currency.Trim().Length != 3)
++        {
++            throw new DomainRuleException("Currency must be a 3-letter ISO code.");
++        }
++
++        Amount = Math.Round(amount, 2, MidpointRounding.AwayFromZero);
++        Currency = currency.Trim().ToUpperInvariant();
++    }
++
++    public static Price Pln(decimal amount) => new(amount, "PLN");
++
++    public static Price operator +(Price left, Price right)
++    {
++        EnsureSameCurrency(left, right);
++        return new Price(left.Amount + right.Amount, left.Currency);
++    }
++
++    public static Price operator -(Price left, Price right)
++    {
++        EnsureSameCurrency(left, right);
++        return new Price(left.Amount - right.Amount, left.Currency);
++    }
++
++    private static void EnsureSameCurrency(Price left, Price right)
+     {
+-            public decimal Amount { get; }
+-            public string Currency { get; }
+-
+-            public Price(decimal amount, string currency)
+-            {
+-                if (amount < 0)
+-                {
+-                    throw new ArgumentException("Amount cannot be negative.", nameof(amount));
+-                }
+-
+-                if (string.IsNullOrWhiteSpace(currency) || currency.Length != 3)
+-                {
+-                    throw new ArgumentException("Currency must be a valid 3-letter ISO code.", nameof(currency));
+-                }
+-
+-                Amount = amount;
+-                Currency = currency.ToUpperInvariant();
+-            }
+-
+-            // Arithmetic operators
+-            public static Price operator +(Price left, Price right)
+-            {
+-                EnsureSameCurrency(left, right);
+-                return new Price(left.Amount + right.Amount, left.Currency);
+-            }
+-
+-            public static Price operator -(Price left, Price right)
+-            {
+-                EnsureSameCurrency(left, right);
+-                return new Price(left.Amount - right.Amount, left.Currency);
+-            }
+-
+-            private static void EnsureSameCurrency(Price left, Price right)
+-            {
+-                if (left.Currency != right.Currency)
+-                {
+-                    throw new InvalidOperationException("Cannot operate on different currencies.");
+-                }
+-            }
+-
+-            public override string ToString() => $"{Amount:0.00} {Currency}";
+-        public static implicit operator decimal(Price value) => value.Amount;
+-        public static implicit operator Price(decimal value) => new(value);
++        if (left.Currency != right.Currency)
++        {
++            throw new DomainRuleException("Cannot operate on prices in different currencies.");
++        }
+     }
+ 
++    public override string ToString() => $"{Amount.ToString("0.00", CultureInfo.InvariantCulture)} {Currency}";
+ }
+diff --git a/ICanHelp.Core/ValueObjects/Rate.cs b/ICanHelp.Core/ValueObjects/Rate.cs
+index 0f6d1e4..942e9ad 100644
+--- a/ICanHelp.Core/ValueObjects/Rate.cs
++++ b/ICanHelp.Core/ValueObjects/Rate.cs
+@@ -1,36 +1,22 @@
+-﻿using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
++using ICanHelp.Core.Exceptions;
+ 
+-namespace ICanHelp.Core.ValueObjects
++namespace ICanHelp.Core.ValueObjects;
++
++/// <summary>A whole-number rating from 1 to 5.</summary>
++public sealed record Rate
+ {
++    public int Value { get; }
+ 
+-        public sealed class Rate
++    public Rate(int value)
++    {
++        if (value is < 1 or > 5)
+         {
+-            public double Value { get; }
+-
+-            public Rate(double value)
+-            {
+-                if (value < 1 || value > 5)
+-                    throw new ArgumentOutOfRangeException(nameof(value), "Rating must be between 1 and 5.");
+-
+-                Value = value;
+-            }
+-
+-            public static Rate Create(double value)
+-            {
+-                return new Rate(value);
+-            }
+-
+-            public override string ToString() => $"{Value} star{(Value > 1 ? "s" : "")}";
+-
+-            // Optional: Equality logic
+-            public override bool Equals(object obj) =>
+-                obj is Rate other && Value.Equals(other.Value);
+-
+-        public override int GetHashCode() => Value.GetHashCode();
++            throw new DomainRuleException("Rate must be between 1 and 5.");
+         }
+ 
++        Value = value;
++    }
++
++    public static implicit operator int(Rate rate) => rate.Value;
++    public override string ToString() => Value.ToString();
+ }
+diff --git a/ICanHelp.Core/ValueObjects/Role.cs b/ICanHelp.Core/ValueObjects/Role.cs
+deleted file mode 100644
+index 2882e55..0000000
+--- a/ICanHelp.Core/ValueObjects/Role.cs
++++ /dev/null
+@@ -1,38 +0,0 @@
+-﻿using ICanHelp.Core.Exceptions;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
+-
+-namespace ICanHelp.Core.ValueObjects
+-{
+-    public sealed record Role
+-    {
+-        public static IEnumerable<string> AvailableRoles { get; } = new[] { "admin", "user" };
+-        public string Value { get; }
+-
+-        public Role(string value)
+-        {
+-            if (string.IsNullOrWhiteSpace(value) || value.Length > 30)
+-            {
+-                throw new InvalidRoleException(value);
+-            }
+-
+-            if (!AvailableRoles.Contains(value))
+-            {
+-                throw new InvalidRoleException(value);
+-            }
+-
+-            Value = value;
+-        }
+-
+-        public static Role Admin() => new Role("admin");
+-        public static Role User() => new Role("user");
+-
+-        public static implicit operator Role(string value) => new(value);
+-        public static implicit operator string(Role role) => role.Value;
+-
+-        public override string ToString() => Value;
+-    }
+-}
+diff --git a/ICanHelp.Core/ValueObjects/StringObject.cs b/ICanHelp.Core/ValueObjects/StringObject.cs
+index 4b8f0be..4ce4e94 100644
+--- a/ICanHelp.Core/ValueObjects/StringObject.cs
++++ b/ICanHelp.Core/ValueObjects/StringObject.cs
+@@ -1,28 +1,23 @@
+-﻿using ICanHelp.Core.Exceptions;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Security.AccessControl;
+-using System.Text;
+-using System.Threading.Tasks;
++using ICanHelp.Core.Exceptions;
+ 
+-namespace ICanHelp.Core.ValueObjects
++namespace ICanHelp.Core.ValueObjects;
++
++/// <summary>A short, required text (names, titles, file names). Compared by value.</summary>
++public sealed record StringObject
+ {
+-    public class StringObject
++    public string Value { get; }
++
++    public StringObject(string value)
+     {
+-        public string Value { get; }
+-        public StringObject(string value)
++        if (string.IsNullOrWhiteSpace(value) || value.Length > 100)
+         {
+-            if (string.IsNullOrWhiteSpace(value) || value.Length is > 100 or < 1)
+-            {
+-                throw new InvalidStringObjectException(value);
+-            }
+-
+-            Value = value;
++            throw new InvalidStringObjectException(value);
+         }
+ 
+-        public static implicit operator StringObject(string value) => value is null ? null : new(value);
+-        public static implicit operator string(StringObject customName) => customName?.Value;
+-        public override string ToString() => Value;
++        Value = value;
+     }
++
++    public static implicit operator StringObject(string value) => new(value);
++    public static implicit operator string(StringObject stringObject) => stringObject.Value;
++    public override string ToString() => Value;
+ }
+diff --git a/ICanHelp.Core/ValueObjects/UserId.cs b/ICanHelp.Core/ValueObjects/UserId.cs
+index 8af2469..39231ec 100644
+--- a/ICanHelp.Core/ValueObjects/UserId.cs
++++ b/ICanHelp.Core/ValueObjects/UserId.cs
+@@ -1,27 +1,24 @@
+-﻿using ICanHelp.Core.Exceptions;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
++using ICanHelp.Core.Exceptions;
+ 
+-namespace ICanHelp.Core.ValueObjects
++namespace ICanHelp.Core.ValueObjects;
++
++public sealed record UserId
+ {
+-    public sealed record UserId
+-    {
+-        public Guid Value { get; }
++    public Guid Value { get; }
+ 
+-        public UserId(Guid value)
++    public UserId(Guid value)
++    {
++        if (value == Guid.Empty)
+         {
+-            if (value == Guid.Empty)
+-            {
+-                throw new InvalidIdentityException(value);
+-            }
+-
+-            Value = value;
++            throw new InvalidIdentityException(value);
+         }
+ 
+-        public static implicit operator Guid(UserId value) => value.Value;
+-        public static implicit operator UserId(Guid value) => new(value);
++        Value = value;
+     }
++
++    public static UserId New() => new(Guid.NewGuid());
++
++    public static implicit operator Guid(UserId id) => id.Value;
++    public static implicit operator UserId(Guid value) => new(value);
++    public override string ToString() => Value.ToString();
+ }
+diff --git a/ICanHelp.Core/ValueObjects/UserName.cs b/ICanHelp.Core/ValueObjects/UserName.cs
+index 9282d5a..22439d0 100644
+--- a/ICanHelp.Core/ValueObjects/UserName.cs
++++ b/ICanHelp.Core/ValueObjects/UserName.cs
+@@ -1,27 +1,22 @@
+-﻿using ICanHelp.Core.Exceptions;
+-using System;
+-using System.Collections.Generic;
+-using System.Linq;
+-using System.Text;
+-using System.Threading.Tasks;
++using ICanHelp.Core.Exceptions;
+ 
+-namespace ICanHelp.Core.ValueObjects
++namespace ICanHelp.Core.ValueObjects;
++
++public sealed record UserName
+ {
+-    public sealed record UserName
++    public string Value { get; }
++
++    public UserName(string value)
+     {
+-        public string Value { get; }
+-        public UserName(string value)
++        if (string.IsNullOrWhiteSpace(value) || value.Length is > 30 or < 3)
+         {
+-            if (string.IsNullOrWhiteSpace(value) || value.Length is > 30 or < 3)
+-            {
+-                throw new InvalidStringObjectException(value);
+-            }
+-
+-            Value = value;
++            throw new InvalidStringObjectException(value);
+         }
+ 
+-        public static implicit operator UserName(string value) => new(value);
+-        public static implicit operator string(UserName username) => username?.Value;
+-        public override string ToString() => Value;
++        Value = value;
+     }
++
++    public static implicit operator UserName(string value) => new(value);
++    public static implicit operator string(UserName userName) => userName.Value;
++    public override string ToString() => Value;
+ }

@@ -1,15 +1,10 @@
-﻿using ICanHelp.Application.Abstractions;
+using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.DTO;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace ICanHelp.Application.Queries
+namespace ICanHelp.Application.Queries;
+
+/// <summary>Ratings given after an announcement was completed (at most one from each side).</summary>
+public sealed class GetRatingByAnnouncementId : IQuery<IReadOnlyList<RatingDto>>
 {
-    public class GetRatingByAnnouncementId : IQuery<RatingDto>
-    {
-        public Guid AnnouncementId { get; set; }
-    }
+    public Guid AnnouncementId { get; init; }
 }

@@ -1,14 +1,9 @@
-﻿using ICanHelp.Application.Abstractions;
+using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.DTO;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace ICanHelp.Application.Queries
+namespace ICanHelp.Application.Queries;
+
+/// <summary>All categories with their subcategories.</summary>
+public sealed class GetCategories : IQuery<IReadOnlyList<CategoryDto>>
 {
-    public class GetCategories : IQuery<IEnumerable<CategoryDto>>
-    {
-    }
 }

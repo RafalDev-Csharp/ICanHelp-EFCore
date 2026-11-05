@@ -4,6 +4,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- CS8618: entities have a private parameterless constructor only for EF Core, which fills the properties itself. -->
+    <NoWarn>$(NoWarn);CS8618</NoWarn>
   </PropertyGroup>
 
 </Project>

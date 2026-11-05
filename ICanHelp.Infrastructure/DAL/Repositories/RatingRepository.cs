@@ -1,38 +1,25 @@
-﻿using ICanHelp.Core.Repositories;
+using ICanHelp.Core.Entities;
+using ICanHelp.Core.Repositories;
 using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 
-namespace ICanHelp.Infrastructure.DAL.Repositories
+namespace ICanHelp.Infrastructure.DAL.Repositories;
+
+internal sealed class RatingRepository : IRatingRepository
 {
-    internal class RatingRepository : IRatingRepository
+    private readonly ICanHelpDbContext _db;
+
+    public RatingRepository(ICanHelpDbContext db)
     {
-        public Task AddRatingAsync(int rating)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task DeleteRatingAsync(int rating)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IEnumerable<int>> GetAllRatingsAsync()
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<int?> GetRatingByIdAsync(Id ratingId)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task UpdateRatingAsync(int rating)
-        {
-            throw new NotImplementedException();
-        }
+        _db = db;
     }
+
+    public Task<Rating?> GetByIdAsync(Id id, CancellationToken cancellationToken = default)
+        => _db.Ratings.SingleOrDefaultAsync(r => r.Id == id, cancellationToken);
+
+    public Task<bool> ExistsAsync(Id announcementId, UserId raterId, CancellationToken cancellationToken = default)
+        => _db.Ratings.AnyAsync(r => r.AnnouncementId == announcementId && r.RaterId == raterId, cancellationToken);
+
+    public async Task AddAsync(Rating rating, CancellationToken cancellationToken = default)
+        => await _db.Ratings.AddAsync(rating, cancellationToken);
 }

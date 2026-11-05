@@ -1,15 +1,14 @@
-﻿using ICanHelp.Core.Entities;
+using ICanHelp.Core.Entities;
 using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace ICanHelp.Core.Repositories
+namespace ICanHelp.Core.Repositories;
+
+public interface IRatingRepository
 {
-    public interface IRatingRepository : IRepository<Rating>
-    {
-        void Update(Rating rating);
-    }
+    Task<Rating?> GetByIdAsync(Id id, CancellationToken cancellationToken = default);
+
+    /// <summary>True if the rater has already rated this announcement.</summary>
+    Task<bool> ExistsAsync(Id announcementId, UserId raterId, CancellationToken cancellationToken = default);
+
+    Task AddAsync(Rating rating, CancellationToken cancellationToken = default);
 }

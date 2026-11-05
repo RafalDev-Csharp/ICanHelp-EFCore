@@ -1,56 +1,74 @@
-﻿using ICanHelp.Core.Entities.Users;
+using ICanHelp.Core.Enums;
+using ICanHelp.Core.Exceptions;
 using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace ICanHelp.Core.Entities.Negotiations
+namespace ICanHelp.Core.Entities.Negotiations;
+
+/// <summary>
+/// One step of a negotiation about an announcement. The client is always the announcement owner,
+/// so an offer only needs to know the helper and who proposed this step.
+/// Created and changed only through <see cref="Announcement"/>.
+/// </summary>
+public class Offer
 {
-    public abstract class Offer
+    public Id Id { get; private set; }
+    public Id AnnouncementId { get; private set; }
+
+    public UserId HelperId { get; private set; }
+    public OfferParty ProposedBy { get; private set; }
+
+    public Price Price { get; private set; }
+    public DateTime ProposedStart { get; private set; }
+    public DateTime ProposedEnd { get; private set; }
+    public Description? Message { get; private set; }
+
+    public OfferStatus Status { get; private set; }
+    public DateTime CreatedAt { get; private set; }
+
+    /// <summary>The offer this one is a counter-offer to (null for the first offer of a helper).</summary>
+    public Id? ParentOfferId { get; private set; }
+
+    // Required by EF Core.
+    private Offer()
     {
-        public Id Id { get; private set; }
-
-        public Id AnnouncementId { get; set; }  
-        public Announcement Announcement { get; set; }
-
-        public UserId ClientId { get; set; }
-        public User Client { get; set; }
-
-        public UserId HelperId { get; set; }
-        public User Helper { get; set; }
-
-        public CustomDateTime WantToStart { get; set; }
-        public CustomDateTime WantToFinish { get; set; }
-
-        public Price Price { get; set; }
-        public Description Description { get; set; }
-
-        public UserId AcceptedById { get; set; }
-        public AppUserRole AcceptedBy { get; set; }
-
-        public UserId CreatedById { get; set; }
-        public AppUserRole CreatedBy { get; set; }
-
-        public bool IsAccepted { get; set; }
-
-        protected Offer(Id id, Id announcementId, UserId clientId, UserId helperId,
-            CustomDateTime wantToStart, CustomDateTime wantToFinish, Price price, Description description,
-            bool isAccepted, AppUserRole acceptedBy, AppUserRole createdBy)
-        {
-            Id = id;
-            AnnouncementId = announcementId;
-            ClientId = clientId;
-            HelperId = helperId;
-
-            WantToStart = wantToStart;
-            WantToFinish = wantToFinish;
-            Price = price;
-            Description = description;
-            AcceptedBy = acceptedBy;
-            CreatedBy = createdBy;
-            IsAccepted = isAccepted;
-        }
     }
+
+    internal Offer(Id id, Id announcementId, UserId helperId, OfferParty proposedBy, Price price,
+        DateTime proposedStart, DateTime proposedEnd, Description? message, DateTime createdAtUtc, Id? parentOfferId)
+    {
+        if (price.Amount <= 0)
+        {
+            throw new DomainRuleException("Offer price must be greater than zero.");
+        }
+
+        if (proposedEnd <= proposedStart)
+        {
+            throw new DomainRuleException("Offer end must be later than its start.");
+        }
+
+        if (proposedStart < createdAtUtc)
+        {
+            throw new DomainRuleException("Offer cannot start in the past.");
+        }
+
+        Id = id;
+        AnnouncementId = announcementId;
+        HelperId = helperId;
+        ProposedBy = proposedBy;
+        Price = price;
+        ProposedStart = proposedStart;
+        ProposedEnd = proposedEnd;
+        Message = message;
+        CreatedAt = createdAtUtc;
+        ParentOfferId = parentOfferId;
+        Status = OfferStatus.Pending;
+    }
+
+    internal void Accept() => Status = OfferStatus.Accepted;
+
+    internal void Reject() => Status = OfferStatus.Rejected;
+
+    internal void Withdraw() => Status = OfferStatus.Withdrawn;
+
+    internal void MarkAsCountered() => Status = OfferStatus.Countered;
 }

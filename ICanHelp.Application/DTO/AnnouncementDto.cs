@@ -1,52 +1,28 @@
-﻿using ICanHelp.Core.Entities;
-using ICanHelp.Core.Entities.Liked;
-using ICanHelp.Core.Entities.Negotiations;
-using ICanHelp.Core.Entities.Users;
-using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+namespace ICanHelp.Application.DTO;
 
-namespace ICanHelp.Application.DTO
+/// <summary>An announcement on a list (without offers and images).</summary>
+public record AnnouncementDto
 {
-    public class AnnouncementDto
-    {
-        public Guid Id { get; set; }
+    public Guid Id { get; init; }
+    public Guid OwnerId { get; init; }
+    public Guid CategoryId { get; init; }
+    public Guid SubcategoryId { get; init; }
+    public string Difficulty { get; init; } = string.Empty;
+    public string Title { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public PriceDto Budget { get; init; } = new();
+    public LocationDto Location { get; init; } = new();
+    public string Status { get; init; } = string.Empty;
+    public DateTime CreatedAt { get; init; }
+    public Guid? AcceptedOfferId { get; init; }
 
-        public Guid CategoryId { get; set; }
-        public CategoryDto Category { get; set; }
+    /// <summary>Distance from the search point in km – only when the list was searched by location.</summary>
+    public double? DistanceKm { get; init; }
+}
 
-        public Guid SubcategoryId { get; set; }
-        public SubcategoryDto Subcategory { get; set; }
-
-        public Guid DifficultLevelId { get; set; }
-        public DifficultLevelDto DifficultLevel { get; set; }
-
-        public Guid OwnerId { get; set; }
-        public UserDto User { get; set; }
-
-        public string Title { get; set; }
-        public DateTime CreatedAt { get; set; }
-
-        public Guid LocationId { get; set; }
-        public LocationDto Location { get; set; }
-
-        public string Description { get; set; }
-        public decimal Price { get; set; }
-        public bool IsAvailable { get; set; }
-        public bool IsFinished { get; set; }
-
-        public Guid ClientOfferId { get; set; }
-        public ClientOfferDto ClientOffer { get; set; }
-
-        public IEnumerable<HelperOfferDto> HelperOffers { get; set; }
-
-        public IEnumerable<ImageDto> Images { get; set; }
-        public IEnumerable<RatingDto> Ratings { get; set; }
-
-        public Guid LikedAnnouncementId { get; set; }
-        public LikedAnnouncementDto LikedAnnouncement { get; set; }
-    }
+/// <summary>An announcement with the whole negotiation and images.</summary>
+public sealed record AnnouncementDetailsDto : AnnouncementDto
+{
+    public IReadOnlyList<OfferDto> Offers { get; init; } = [];
+    public IReadOnlyList<ImageDto> Images { get; init; } = [];
 }

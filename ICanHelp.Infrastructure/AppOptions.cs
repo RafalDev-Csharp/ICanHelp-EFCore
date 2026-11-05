@@ -9,6 +9,6 @@ namespace ICanHelp.Infrastructure
     public class AppOptions
     {
         public const string SectionName = "appICanHelpSettings";
-        public string SettingName { get; set; }
+        public string SettingName { get; set; } = string.Empty;
     }
 }

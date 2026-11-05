@@ -1,64 +1,67 @@
-﻿using ICanHelp.Infrastructure.DAL;
-using Microsoft.AspNetCore.Identity;
+using ICanHelp.Core.Entities;
+using ICanHelp.Core.ValueObjects;
+using ICanHelp.Infrastructure.DAL;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace ICanHelp.Infrastructure
+namespace ICanHelp.Infrastructure;
+
+/// <summary>On application start: applies pending migrations and seeds the categories.</summary>
+internal sealed class DbInitializer : IHostedService
 {
-    public class DbInitializer : IHostedService
+    private readonly IServiceProvider _serviceProvider;
+
+    public DbInitializer(IServiceProvider serviceProvider)
     {
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly RoleManager<IdentityRole> _roleManager;
-        private readonly ICanHelpDbContext _db;
+        _serviceProvider = serviceProvider;
+    }
 
-        public DbInitializer(
-            UserManager<ApplicationUser> userManager,
-            RoleManager<IdentityRole> roleManager,
-            ICanHelpDbContext db)
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        // A hosted service is a singleton, the DbContext is scoped - so we create a scope.
+        using var scope = _serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ICanHelpDbContext>();
+
+        if (!db.Database.GetMigrations().Any())
         {
-            _roleManager = roleManager;
-            _userManager = userManager;
-            _db = db;
+            return; // no migrations yet (dotnet ef migrations add Init)
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
+        await db.Database.MigrateAsync(cancellationToken);
+
+        if (await db.Categories.AnyAsync(cancellationToken))
         {
-            try
-            {
-                if (_db.Database.GetPendingMigrations().Count() > 0)
-                {
-                    _db.Database.Migrate();
-                }
-
-                if (!_roleManager.RoleExistsAsync(SD.Role_Admin).GetAwaiter().GetResult())
-                {
-                    _roleManager.CreateAsync(new IdentityRole(SD.Role_Admin)).Wait();
-                    _roleManager.CreateAsync(new IdentityRole(SD.Role_Customer)).Wait();
-                    _userManager.CreateAsync(new ApplicationUser
-                    {
-                        UserName = "admin@dotnetmastery.com",
-                        Email = "admin@dotnetmastery.com",
-                        Name = "Bhrugen Patel",
-                        NormalizedUserName = "ADMIN@DOTNETMASTERY.COM",
-                        NormalizedEmail = "ADMIN@DOTNETMASTERY.COM",
-                        PhoneNumber = "1112223333",
-                    }, "Admin123*").GetAwaiter().GetResult();
-
-                    ApplicationUser user = _db.ApplicationUsers.FirstOrDefault(u => u.Email == "admin@dotnetmastery.com");
-                    _userManager.AddToRoleAsync(user, SD.Role_Admin).GetAwaiter().GetResult();
-                }
-            }
-            catch (Exception e)
-            {
-                throw;
-            }
+            return;
         }
 
-        public Task StopAsync(CancellationToken cancellationToken)
-         => Task.CompletedTask;
+        db.Categories.AddRange(CreateCategories());
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    private static IEnumerable<Category> CreateCategories()
+    {
+        var data = new Dictionary<string, string[]>
+        {
+            ["Plumbing"] = ["Leaking tap", "Blocked drain", "Toilet repair"],
+            ["Painting"] = ["Wall painting", "Small repairs before painting"],
+            ["Assembly"] = ["Hanging pictures and shelves", "Furniture assembly"],
+            ["Electrical"] = ["Lamp installation", "Socket or switch replacement"],
+            ["Advice"] = ["Computer help", "Tutoring", "Other advice"]
+        };
+
+        foreach (var (categoryName, subcategories) in data)
+        {
+            var category = new Category(Id.New(), categoryName);
+
+            foreach (var subcategoryName in subcategories)
+            {
+                category.AddSubcategory(Id.New(), subcategoryName);
+            }
+
+            yield return category;
+        }
     }
 }

@@ -1,22 +1,10 @@
-﻿using ICanHelp.Core.Entities;
-using ICanHelp.Core.ValueObjects;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+namespace ICanHelp.Application.DTO;
 
-namespace ICanHelp.Application.DTO
+public sealed record ImageDto
 {
-    public class ImageDto
-    {
-        public Guid Id { get; set; }
-
-        public string FileName { get; set; }
-        public string FileExtension { get; set; }
-        public string FilePath { get; set; }
-
-        public AnnouncementDto Announcement { get; set; }
-        public Guid AnnouncementId { get; set; }
-    }
+    public Guid Id { get; init; }
+    public Guid AnnouncementId { get; init; }
+    public string FileName { get; init; } = string.Empty;
+    public string FileExtension { get; init; } = string.Empty;
+    public string FilePath { get; init; } = string.Empty;
 }
