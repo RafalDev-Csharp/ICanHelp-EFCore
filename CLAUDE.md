@@ -84,6 +84,12 @@ Wspólne: `RepositoryExtensions` (`GetOrThrowAsync` → `AnnouncementNotFound`, 
 - `DbInitializer` (IHostedService) – przy starcie: migracje + seed kategorii (nic nie robi, dopóki nie ma żadnej migracji).
 - Connection string: `ConnectionStrings:DefaultConnection` (w appsettings projektu Api).
 - Migracje w `ICanHelp.Infrastructure/DAL/Migrations`. `dotnet-ef` jako lokalne narzędzie (`.config/dotnet-tools.json`, 9.0.11).
+- Odległość (Krok 7): Core zostaje przy `Location` (lat/lon). W bazie kolumna `GeoPoint` (`geography`, computed PERSISTED
+  `geography::Point([Latitude],[Longitude],4326)`) jako shadow property + indeks przestrzenny `IX_Announcements_GeoPoint`
+  (ręczny SQL w migracji `AnnouncementGeoPoint` – EF go nie modeluje, nie ma go w snapshocie). `UseSqlServer(..., x => x.UseNetTopologySuite())`,
+  pomocnik `DAL/Spatial.cs` (SRID, `CreatePoint(lat, lon)` – w NTS X = długość!). `GetAnnouncements`: `Latitude`+`Longitude`
+  (+ `RadiusKm`, domyślnie 10, max 100) → `IsWithinDistance`, sortowanie od najbliższych, `AnnouncementDto.DistanceKm`.
+  Walidacja w `GetAnnouncements.GetDistanceFilter()` → `InvalidDistanceFilterException` (400).
 
 ## Uwierzytelnianie (Krok 5)
 - `POST api/users/sign-up` (komenda `SignUp`, 201 + Location; rola zawsze `User`), `POST api/users/sign-in` (`SignIn` e-mail+hasło
@@ -135,7 +141,7 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
 - [x] Szkielet: Core, Application (DTO, Queries), Infrastructure
 - [x] Przebudowa domeny (Core) – model powyżej
 - [x] Krok 1 – Infrastructure + Application dopasowane do nowego Core (konfiguracje EF, repozytoria, query handlery)
-- [ ] Krok 1b – ~~`dotnet build` zielony u autora~~ (zrobione), zostało: usunąć `DAL/Configurations/LocationConfiguration.cs` (`// OBSOLETE`)
+- [x] Krok 1b – build zielony, usunięty przestarzały `LocationConfiguration.cs`
 - [x] Krok 2 – `ICanHelp.Core.Tests` (xUnit + Shouldly): `Entities/Announcement*Tests.cs`, dane w `AnnouncementTestData.cs` (`Now`, `InStatus(...)`).
 - [x] Krok 3 – projekt `ICanHelp.Api`: kontrolery GET dla wszystkich zapytań, Swagger, ProblemDetails (`DomainExceptionHandler`),
   appsettings, launchSettings, `/health`. `dotnet build` zielony u autora (3.11.2026).
@@ -145,7 +151,9 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
 - [x] Krok 6 – komendy ogłoszeń/ofert/oceny (`Commands/AnnouncementCommands.cs`, `OfferCommands.cs`) + endpointy + kontakt po akceptacji.
   Testy: `Core.Tests/.../AnnouncementParticipantsTests.cs`, `Application.Tests/Commands/AnnouncementHandlersTests.cs`. Bez migracji.
   **Do sprawdzenia u autora: `dotnet build` + `dotnet test` (pisane bez kompilatora).**
-- [ ] Krok 7 – wyszukiwanie po odległości (NetTopologySuite / geography). Paginacja i filtry listy już są (`GetAnnouncements`).
+- [x] Krok 7 – wyszukiwanie po odległości (opis w sekcji „Infrastructure”), migracja `AnnouncementGeoPoint` (20261105190000,
+  pisana ręcznie), testy `Application.Tests/Queries/GetAnnouncementsDistanceFilterTests.cs`.
+  **Do sprawdzenia u autora: `dotnet build` + `dotnet test` + start API (migracja) + żądanie z `ICanHelp.Api.http` (pisane bez kompilatora).**
 - [ ] Krok 8 – testy integracyjne (Testcontainers), GitHub Actions CI, README z diagramem
 
 ## Jak pracować z AI (oszczędnie)

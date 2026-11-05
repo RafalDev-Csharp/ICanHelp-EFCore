@@ -9,6 +9,14 @@ GET {{baseUrl}}/api/categories
 GET {{baseUrl}}/api/announcements?status=Open&page=1&pageSize=10
 
 ###
+# Krok 7: ogłoszenia w promieniu 5 km od centrum Warszawy, od najbliższych (pole distanceKm)
+GET {{baseUrl}}/api/announcements?latitude=52.2297&longitude=21.0122&radiusKm=5&status=Open
+
+###
+# 400 (InvalidDistanceFilter) – sama szerokość bez długości
+GET {{baseUrl}}/api/announcements?latitude=52.2297
+
+###
 # 404 jako ProblemDetails
 GET {{baseUrl}}/api/announcements/3fa85f64-5717-4562-b3fc-2c963f66afa6
 

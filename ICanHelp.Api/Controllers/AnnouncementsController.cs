@@ -18,9 +18,14 @@ public sealed class AnnouncementsController : ControllerBase
 {
     // ---------- odczyt ----------
 
-    /// <summary>Strona ogłoszeń, od najnowszych. Każdy filtr jest opcjonalny.</summary>
+    /// <summary>
+    /// Strona ogłoszeń, od najnowszych. Każdy filtr jest opcjonalny.
+    /// Z <c>latitude</c> + <c>longitude</c> (i opcjonalnie <c>radiusKm</c>, domyślnie 10, max 100): tylko ogłoszenia
+    /// w promieniu, od najbliższych, z polem <c>distanceKm</c>.
+    /// </summary>
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<AnnouncementDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<IReadOnlyList<AnnouncementDto>>> GetAll(
         [FromQuery] GetAnnouncements query,
         [FromServices] IQueryHandler<GetAnnouncements, IReadOnlyList<AnnouncementDto>> handler,

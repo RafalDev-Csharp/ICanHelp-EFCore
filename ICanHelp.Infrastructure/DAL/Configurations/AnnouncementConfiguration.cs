@@ -3,6 +3,7 @@ using ICanHelp.Core.Entities.Negotiations;
 using ICanHelp.Core.Entities.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using NetTopologySuite.Geometries;
 
 namespace ICanHelp.Infrastructure.DAL.Configurations;
 
@@ -31,6 +32,13 @@ internal sealed class AnnouncementConfiguration : IEntityTypeConfiguration<Annou
             location.Property(l => l.Latitude).HasColumnName("Latitude");
             location.Property(l => l.Longitude).HasColumnName("Longitude");
         });
+
+        // Distance search: a geography point computed by SQL Server from Latitude/Longitude (PERSISTED, so it can have
+        // a spatial index – created in the AnnouncementGeoPoint migration, EF cannot model spatial indexes).
+        // Shadow property: the domain does not know about it, EF never writes it, only reads it in queries.
+        builder.Property<Point>(Spatial.GeoPoint)
+            .HasColumnType("geography")
+            .HasComputedColumnSql($"geography::Point([Latitude], [Longitude], {Spatial.Wgs84Srid})", stored: true);
 
         // References to other aggregates: only the foreign key, no navigation property.
         // Restrict = you cannot delete a user/category that still has announcements.

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using NetTopologySuite.Geometries;
 
 #nullable disable
 
@@ -46,6 +47,11 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<Point>("GeoPoint")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("geography")
+                        .HasComputedColumnSql("geography::Point([Latitude], [Longitude], 4326)", true);
 
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uniqueidentifier");

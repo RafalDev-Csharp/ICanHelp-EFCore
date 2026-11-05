@@ -15,6 +15,9 @@ public record AnnouncementDto
     public string Status { get; init; } = string.Empty;
     public DateTime CreatedAt { get; init; }
     public Guid? AcceptedOfferId { get; init; }
+
+    /// <summary>Distance from the search point in km – only when the list was searched by location.</summary>
+    public double? DistanceKm { get; init; }
 }
 
 /// <summary>An announcement with the whole negotiation and images.</summary>

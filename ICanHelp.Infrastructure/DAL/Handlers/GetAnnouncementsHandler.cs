@@ -3,6 +3,7 @@ using ICanHelp.Application.DTO;
 using ICanHelp.Application.Queries;
 using ICanHelp.Core.ValueObjects;
 using Microsoft.EntityFrameworkCore;
+using NetTopologySuite.Geometries;
 
 namespace ICanHelp.Infrastructure.DAL.Handlers;
 
@@ -45,6 +46,27 @@ internal sealed class GetAnnouncementsHandler : IQueryHandler<GetAnnouncements, 
         }
 
         var (skip, take) = Extensions.ToSkipTake(query.Page, query.PageSize);
+
+        // Throws InvalidDistanceFilterException (→ 400) for incomplete/out-of-range parameters.
+        if (query.GetDistanceFilter() is { } near)
+        {
+            var origin = Spatial.CreatePoint(near.Latitude, near.Longitude);
+
+            // geography: Distance/IsWithinDistance are in metres. IsWithinDistance → STDistance(...) <= @radius,
+            // which can use the spatial index IX_Announcements_GeoPoint.
+            var nearest = await announcements
+                .Where(a => EF.Property<Point>(a, Spatial.GeoPoint).IsWithinDistance(origin, near.RadiusMeters))
+                .Select(a => new { Announcement = a, Distance = EF.Property<Point>(a, Spatial.GeoPoint).Distance(origin) })
+                .OrderBy(x => x.Distance)
+                .ThenByDescending(x => x.Announcement.CreatedAt)
+                .Skip(skip)
+                .Take(take)
+                .ToListAsync(cancellationToken);
+
+            return nearest
+                .Select(x => x.Announcement.AsDto() with { DistanceKm = Math.Round(x.Distance / 1000, 2) })
+                .ToList();
+        }
 
         var page = await announcements
             .OrderByDescending(a => a.CreatedAt)

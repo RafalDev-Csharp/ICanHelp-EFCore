@@ -15,7 +15,9 @@ internal static class Extensions
         var connectionString = configuration.GetConnectionString(ConnectionStringName)
             ?? throw new InvalidOperationException($"Connection string '{ConnectionStringName}' is missing.");
 
-        services.AddDbContext<ICanHelpDbContext>(options => options.UseSqlServer(connectionString));
+        // UseNetTopologySuite: mapping of the geography column (distance search, Spatial.cs).
+        services.AddDbContext<ICanHelpDbContext>(options =>
+            options.UseSqlServer(connectionString, sql => sql.UseNetTopologySuite()));
 
         services.AddScoped<IAnnouncementRepository, AnnouncementRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
