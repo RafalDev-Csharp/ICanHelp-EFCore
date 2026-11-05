@@ -8,8 +8,8 @@ namespace ICanHelp.Api.ErrorHandling;
 /// <summary>
 /// Zamienia wyjątki domeny na odpowiedzi ProblemDetails:
 /// <list type="bullet">
-/// <item><see cref="OfferNotFoundException"/> → 404</item>
-/// <item><see cref="DomainRuleException"/> (złamana reguła biznesowa), zajęta nazwa/e-mail → 409</item>
+/// <item><see cref="OfferNotFoundException"/>, <see cref="AnnouncementNotFoundException"/>, <see cref="UserNotFoundException"/> → 404</item>
+/// <item><see cref="DomainRuleException"/> (złamana reguła biznesowa), zajęta nazwa/e-mail, ponowna ocena → 409</item>
 /// <item><see cref="InvalidCredentialsException"/> → 401, <see cref="UserLockedException"/> → 403</item>
 /// <item>pozostałe <see cref="CustomExceptions"/> (błędne dane, np. e-mail) → 400</item>
 /// </list>
@@ -36,9 +36,10 @@ internal sealed class DomainExceptionHandler : IExceptionHandler
 
         var (status, title) = domainException switch
         {
-            OfferNotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),
+            OfferNotFoundException or AnnouncementNotFoundException or UserNotFoundException
+                => (StatusCodes.Status404NotFound, "Resource not found"),
             DomainRuleException => (StatusCodes.Status409Conflict, "Business rule violated"),
-            UserNameAlreadyInUseException or EmailAlreadyInUseException
+            UserNameAlreadyInUseException or EmailAlreadyInUseException or AlreadyRatedException
                 => (StatusCodes.Status409Conflict, "Resource already exists"),
             InvalidCredentialsException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
             UserLockedException => (StatusCodes.Status403Forbidden, "Forbidden"),

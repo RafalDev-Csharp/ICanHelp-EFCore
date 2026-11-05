@@ -49,6 +49,7 @@ public class Announcement
         StringObject title, Description description, Price budget, Location location, DateTime createdAtUtc)
     {
         EnsureBudget(budget);
+        EnsureDifficulty(difficulty);
 
         Id = id;
         OwnerId = ownerId;
@@ -68,6 +69,7 @@ public class Announcement
     {
         EnsureStatus(AnnouncementStatus.Open, "be edited");
         EnsureBudget(budget);
+        EnsureDifficulty(difficulty);
 
         CategoryId = categoryId;
         SubcategoryId = subcategoryId;
@@ -204,26 +206,58 @@ public class Announcement
 
     // ---------- lifecycle ----------
 
-    public void Start()
+    /// <summary>Work begins. Either participant can mark it: the owner or the helper of the accepted offer.</summary>
+    public void Start(UserId actorId)
     {
         EnsureStatus(AnnouncementStatus.Accepted, "be started");
+        EnsureParticipant(actorId);
+
         Status = AnnouncementStatus.InProgress;
     }
 
-    public void Complete()
+    /// <summary>Only the owner (the client) confirms that the work is done.</summary>
+    public void Complete(UserId actorId)
     {
         EnsureStatus(AnnouncementStatus.InProgress, "be completed");
+        EnsureOwner(actorId, "complete");
+
         Status = AnnouncementStatus.Completed;
     }
 
-    public void Cancel()
+    public void Cancel(UserId actorId)
     {
         if (Status is not (AnnouncementStatus.Open or AnnouncementStatus.Accepted))
         {
             throw new DomainRuleException($"Announcement in status {Status} cannot be cancelled.");
         }
 
+        EnsureOwner(actorId, "cancel");
+
         Status = AnnouncementStatus.Cancelled;
+    }
+
+    /// <summary>The helper whose offer was accepted (null while no offer is accepted).</summary>
+    public UserId? GetAcceptedHelperId()
+        => AcceptedOfferId is null ? null : GetOffer(AcceptedOfferId).HelperId;
+
+    /// <summary>True if the user is the owner or the helper of the accepted offer.</summary>
+    public bool IsParticipant(UserId userId)
+        => userId == OwnerId || userId == GetAcceptedHelperId();
+
+    // ---------- rating ----------
+
+    /// <summary>
+    /// After completion each participant can rate the other one: the owner rates the helper and the other way round.
+    /// Rating is a separate aggregate; the "only once" rule is checked by the application layer (and a unique index).
+    /// </summary>
+    public Rating CreateRating(Id ratingId, UserId raterId, Rate rate, Description? comment, DateTime createdAtUtc)
+    {
+        EnsureStatus(AnnouncementStatus.Completed, "be rated");
+        EnsureParticipant(raterId);
+
+        var rateeId = raterId == OwnerId ? GetAcceptedHelperId()! : OwnerId;
+
+        return new Rating(ratingId, Id, raterId, rateeId, rate, comment, createdAtUtc);
     }
 
     // ---------- helpers ----------
@@ -259,11 +293,35 @@ public class Announcement
         throw new DomainRuleException("The user is not a participant of this negotiation.");
     }
 
+    private void EnsureParticipant(UserId actorId)
+    {
+        if (!IsParticipant(actorId))
+        {
+            throw new DomainRuleException("Only the owner or the accepted helper can do this.");
+        }
+    }
+
+    private void EnsureOwner(UserId actorId, string action)
+    {
+        if (actorId != OwnerId)
+        {
+            throw new DomainRuleException($"Only the owner can {action} the announcement.");
+        }
+    }
+
     private void EnsureStatus(AnnouncementStatus expected, string action)
     {
         if (Status != expected)
         {
             throw new DomainRuleException($"Announcement in status {Status} cannot {action}.");
+        }
+    }
+
+    private static void EnsureDifficulty(DifficultyLevel difficulty)
+    {
+        if (!Enum.IsDefined(difficulty))
+        {
+            throw new DomainRuleException($"Difficulty: {difficulty} is invalid.");
         }
     }
 

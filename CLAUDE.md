@@ -42,7 +42,8 @@ Jeden użytkownik może być raz klientem, raz pomocnikiem (rola w transakcji, n
   ContactData (VO: Email, PhoneNumber, Country, City, PostalCode – w tabeli Users, Email unikalny)
 - `Announcement` (agregat): OwnerId, CategoryId, SubcategoryId, Difficulty (enum), Title, Description, Budget (Price),
   Location (VO lat/lon), Status, CreatedAt, AcceptedOfferId?, **Offers**, **Images** (max 5)
-  - metody: `AddOffer`, `CounterOffer`, `AcceptOffer`, `RejectOffer`, `WithdrawOffer`, `AddImage`, `RemoveImage`, `Start`, `Complete`, `Cancel`
+  - metody: `AddOffer`, `CounterOffer`, `AcceptOffer`, `RejectOffer`, `WithdrawOffer`, `AddImage`, `RemoveImage`,
+    `Start(actor)`, `Complete(actor)`, `Cancel(actor)`, `GetAcceptedHelperId()`, `IsParticipant(user)`, `CreateRating(...)`
   - `Offer` (część agregatu): HelperId, ProposedBy (Client/Helper), Price, ProposedStart/End, Message?, Status, ParentOfferId?
     (kontroferta = nowy `Offer` wskazujący poprzedni; poprzedni dostaje status `Countered`)
 - `Category` (agregat) → `Subcategory` (część agregatu, unikalna nazwa w kategorii)
@@ -55,6 +56,8 @@ Announcement: `Open` → (AcceptOffer) `Accepted` → (Start) `InProgress` → (
 Offer: `Pending` → `Accepted` | `Rejected` | `Withdrawn` | `Countered` (zastąpiona kontrofertą)
 Akceptuje/odrzuca/kontruje zawsze **druga strona** niż autor oferty; wycofać może tylko autor.
 Oferty przyjmowane tylko w statusie `Open`. Po akceptacji pozostałe `Pending` → `Rejected`.
+`Start` – właściciel albo zaakceptowany pomocnik; `Complete` i `Cancel` – tylko właściciel. Ocena (`CreateRating`) tylko po `Completed`,
+przez uczestnika; ocenianego (druga strona) wybiera domena. „Raz na ogłoszenie” – handler (`AlreadyRatedException`) + unikalny indeks.
 
 ## Gdzie co leży
 ```
@@ -68,7 +71,9 @@ Api             Program.cs, Controllers (Announcements, Categories, Users), Erro
                 appsettings*.json, Properties/launchSettings.json, ICanHelp.Api.http (przykładowe żądania)
 ```
 Zapytania (`GetX`) definiuje Application, a ich handlery są w Infrastructure, bo czytają prosto z DbContext.
-Handlery komend będą w Application i będą używać repozytoriów + `IUnitOfWork`. Rejestracja handlerów: Scrutor.
+Handlery komend są w Application (`Commands/Handlers`), używają repozytoriów + `IUnitOfWork`. Rejestracja handlerów: Scrutor.
+Wspólne: `RepositoryExtensions` (`GetOrThrowAsync` → `AnnouncementNotFound`, `GetActiveOrThrowAsync` → `UserNotFound`/`UserLocked`),
+`Time/DateTimeExtensions.AsUtc()` (daty z JSON bez strefy = UTC).
 
 ## Infrastructure (jak jest zbudowane)
 - `ICanHelpDbContext.ConfigureConventions` – globalne konwertery VO (`DAL/Converters`) i enumy jako string.
@@ -94,14 +99,19 @@ Handlery komend będą w Application i będą używać repozytoriów + `IUnitOfW
 - Prywatność: `GET api/users/{id}` zwraca `UserPublicDto` (bez kontaktu, roli, blokady; query `GetUserPublicById`).
   Pełny `UserDto` tylko w `/me` i w `GET api/users` (`[Authorize(Roles = "Admin")]`). `liked-*` – tylko właściciel lub admin
   (`IsSelfOrAdmin` w kontrolerze, inaczej 403). Oceny, ogłoszenia, kategorie – publiczne.
-  Krok 6: kontakt drugiej strony dopiero po akceptacji oferty; `OwnerId`/`HelperId` w komendach brać z tokenu (`sub`), nie z body.
+  Kontakt drugiej strony: `GET api/announcements/{id}/contact` (query `GetAnnouncementContact`) – tylko uczestnik, status
+  Accepted/InProgress/Completed, inaczej 404. Id aktora w komendach zawsze z tokenu (`User.TryGetUserId`, `Api/Security`), pola `[JsonIgnore]`.
 
 ## Api (jak jest zbudowane)
 - Kontrolery `[ApiController]`, trasy `api/<zasób>`. Handler wstrzykiwany do akcji przez `[FromServices] IQueryHandler<TQuery, TResult>`
   (bez mediatora). Zapytanie z filtrami bindowane `[FromQuery]` prosto do klasy z Application (`GetAnnouncements`, `GetUsers`).
   `null` z handlera → `NotFound()`. Komendy: `[FromBody]` + `[FromServices] ICommandHandler<T>`. Dostęp do GET-ów – sekcja „Uwierzytelnianie”.
+- Komendy ogłoszeń (wszystkie `[Authorize]`, `api/announcements`): `POST` (201 + `CreatedDto`), `POST {id}/offers` (201),
+  `POST {id}/offers/{offerId}/counter|accept|reject|withdraw`, `POST {id}/start|complete|cancel` (204), `POST {id}/ratings` (201).
+  Akcje bez body idą przez prywatne `Execute(userId => komenda, ...)` w kontrolerze. Przykłady całego przepływu w `ICanHelp.Api.http`.
 - Błędy zawsze jako ProblemDetails: `AddProblemDetails` + `UseExceptionHandler` + `UseStatusCodePages`.
-  `DomainExceptionHandler`: `OfferNotFoundException` → 404, `DomainRuleException` → 409, wyjątki auth (wyżej), inne `CustomExceptions` → 400
+  `DomainExceptionHandler`: `OfferNotFound`/`AnnouncementNotFound`/`UserNotFound` → 404, `DomainRuleException`, `AlreadyRated` → 409,
+  wyjątki auth (wyżej), inne `CustomExceptions` (np. `InvalidCategory`) → 400
   (pole `errorCode` = nazwa wyjątku bez „Exception”), reszta → 500 bez szczegółów. Każda odpowiedź ma `traceId`.
 - Enumy w JSON jako string (`JsonStringEnumConverter`). Swagger (Swashbuckle) tylko w Development, z komentarzy `///`.
 - `GET /health` – health check (bez sprawdzania bazy). Porty: http 5080, https 7080. W Development `/` → `/swagger`,
@@ -126,16 +136,15 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
 - [x] Przebudowa domeny (Core) – model powyżej
 - [x] Krok 1 – Infrastructure + Application dopasowane do nowego Core (konfiguracje EF, repozytoria, query handlery)
 - [ ] Krok 1b – ~~`dotnet build` zielony u autora~~ (zrobione), zostało: usunąć `DAL/Configurations/LocationConfiguration.cs` (`// OBSOLETE`)
-- [x] Krok 2 – projekt `ICanHelp.Core.Tests` (xUnit + Shouldly): testy `Announcement` (oferty, kontroferty, akceptacja, statusy)
-  – `Entities/AnnouncementTests.cs` (tworzenie, edycja, zdjęcia, cykl życia), `Entities/AnnouncementOfferTests.cs` (negocjacje),
-  `Entities/AnnouncementTestData.cs` (stały czas `Now`, użytkownicy, `InStatus(...)`). `dotnet test`: 77/77 zielone.
+- [x] Krok 2 – `ICanHelp.Core.Tests` (xUnit + Shouldly): `Entities/Announcement*Tests.cs`, dane w `AnnouncementTestData.cs` (`Now`, `InStatus(...)`).
 - [x] Krok 3 – projekt `ICanHelp.Api`: kontrolery GET dla wszystkich zapytań, Swagger, ProblemDetails (`DomainExceptionHandler`),
   appsettings, launchSettings, `/health`. `dotnet build` zielony u autora (3.11.2026).
-- [x] Krok 4 – `docker-compose.yml` (SQL Server 2022), connection string, manifest `dotnet-ef`,
-  migracja `Init` w `DAL/Migrations` (20261105141305). API startuje, `DbInitializer` migruje i seeduje kategorie.
+- [x] Krok 4 – `docker-compose.yml` (SQL Server 2022), manifest `dotnet-ef`, migracja `Init` (20261105141305), seed kategorii.
 - [x] Krok 5 – rejestracja/logowanie (JWT, hash hasła): opis w sekcji „Uwierzytelnianie”, projekt `ICanHelp.Application.Tests`
   (14 testów `SignUpHandler`/`SignInHandler`). Bez nowej migracji (schemat Users bez zmian). **Do sprawdzenia u autora: `dotnet build` + `dotnet test`.**
-- [ ] Krok 6 – use-case'y: dodaj ogłoszenie, złóż ofertę, kontroferta, akceptacja, zakończenie, ocena
+- [x] Krok 6 – komendy ogłoszeń/ofert/oceny (`Commands/AnnouncementCommands.cs`, `OfferCommands.cs`) + endpointy + kontakt po akceptacji.
+  Testy: `Core.Tests/.../AnnouncementParticipantsTests.cs`, `Application.Tests/Commands/AnnouncementHandlersTests.cs`. Bez migracji.
+  **Do sprawdzenia u autora: `dotnet build` + `dotnet test` (pisane bez kompilatora).**
 - [ ] Krok 7 – wyszukiwanie po odległości (NetTopologySuite / geography). Paginacja i filtry listy już są (`GetAnnouncements`).
 - [ ] Krok 8 – testy integracyjne (Testcontainers), GitHub Actions CI, README z diagramem
 

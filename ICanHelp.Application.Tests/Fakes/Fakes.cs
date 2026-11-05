@@ -1,6 +1,7 @@
 using ICanHelp.Application.DTO;
 using ICanHelp.Application.Security;
 using ICanHelp.Application.Time;
+using ICanHelp.Core.Entities;
 using ICanHelp.Core.Entities.Users;
 using ICanHelp.Core.Enums;
 using ICanHelp.Core.Repositories;
@@ -80,4 +81,56 @@ internal sealed class FakeTokenStorage : ITokenStorage
     public void Set(JwtDto jwt) => _jwt = jwt;
 
     public JwtDto? Get() => _jwt;
+}
+
+internal sealed class InMemoryAnnouncementRepository : IAnnouncementRepository
+{
+    public List<Announcement> Announcements { get; } = new();
+
+    public Task<Announcement?> GetByIdAsync(Id id, CancellationToken cancellationToken = default)
+        => Task.FromResult(Announcements.SingleOrDefault(a => a.Id == id));
+
+    public Task AddAsync(Announcement announcement, CancellationToken cancellationToken = default)
+    {
+        Announcements.Add(announcement);
+        return Task.CompletedTask;
+    }
+
+    public void Remove(Announcement announcement) => Announcements.Remove(announcement);
+}
+
+internal sealed class InMemoryCategoryRepository : ICategoryRepository
+{
+    public List<Category> Categories { get; } = new();
+
+    public Task<Category?> GetByIdAsync(Id id, CancellationToken cancellationToken = default)
+        => Task.FromResult(Categories.SingleOrDefault(c => c.Id == id));
+
+    public Task<IReadOnlyList<Category>> GetAllAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<Category>>(Categories);
+
+    public Task AddAsync(Category category, CancellationToken cancellationToken = default)
+    {
+        Categories.Add(category);
+        return Task.CompletedTask;
+    }
+
+    public void Remove(Category category) => Categories.Remove(category);
+}
+
+internal sealed class InMemoryRatingRepository : IRatingRepository
+{
+    public List<Rating> Ratings { get; } = new();
+
+    public Task<Rating?> GetByIdAsync(Id id, CancellationToken cancellationToken = default)
+        => Task.FromResult(Ratings.SingleOrDefault(r => r.Id == id));
+
+    public Task<bool> ExistsAsync(Id announcementId, UserId raterId, CancellationToken cancellationToken = default)
+        => Task.FromResult(Ratings.Any(r => r.AnnouncementId == announcementId && r.RaterId == raterId));
+
+    public Task AddAsync(Rating rating, CancellationToken cancellationToken = default)
+    {
+        Ratings.Add(rating);
+        return Task.CompletedTask;
+    }
 }

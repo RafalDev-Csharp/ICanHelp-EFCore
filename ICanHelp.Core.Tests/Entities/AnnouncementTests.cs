@@ -133,7 +133,7 @@ public class AnnouncementTests
     {
         var announcement = InStatus(AnnouncementStatus.Accepted);
 
-        announcement.Start();
+        announcement.Start(OwnerId);
 
         announcement.Status.ShouldBe(AnnouncementStatus.InProgress);
     }
@@ -147,7 +147,7 @@ public class AnnouncementTests
     {
         var announcement = InStatus(status);
 
-        Should.Throw<DomainRuleException>(() => announcement.Start());
+        Should.Throw<DomainRuleException>(() => announcement.Start(OwnerId));
 
         announcement.Status.ShouldBe(status);
     }
@@ -157,7 +157,7 @@ public class AnnouncementTests
     {
         var announcement = InStatus(AnnouncementStatus.InProgress);
 
-        announcement.Complete();
+        announcement.Complete(OwnerId);
 
         announcement.Status.ShouldBe(AnnouncementStatus.Completed);
     }
@@ -171,7 +171,7 @@ public class AnnouncementTests
     {
         var announcement = InStatus(status);
 
-        Should.Throw<DomainRuleException>(() => announcement.Complete());
+        Should.Throw<DomainRuleException>(() => announcement.Complete(OwnerId));
 
         announcement.Status.ShouldBe(status);
     }
@@ -183,7 +183,7 @@ public class AnnouncementTests
     {
         var announcement = InStatus(status);
 
-        announcement.Cancel();
+        announcement.Cancel(OwnerId);
 
         announcement.Status.ShouldBe(AnnouncementStatus.Cancelled);
     }
@@ -196,7 +196,7 @@ public class AnnouncementTests
     {
         var announcement = InStatus(status);
 
-        Should.Throw<DomainRuleException>(() => announcement.Cancel());
+        Should.Throw<DomainRuleException>(() => announcement.Cancel(OwnerId));
 
         announcement.Status.ShouldBe(status);
     }
@@ -210,10 +210,10 @@ public class AnnouncementTests
         announcement.AcceptOffer(offer.Id, OwnerId);
         announcement.Status.ShouldBe(AnnouncementStatus.Accepted);
 
-        announcement.Start();
+        announcement.Start(Helper);
         announcement.Status.ShouldBe(AnnouncementStatus.InProgress);
 
-        announcement.Complete();
+        announcement.Complete(OwnerId);
         announcement.Status.ShouldBe(AnnouncementStatus.Completed);
         announcement.AcceptedOfferId.ShouldBe(offer.Id);
     }

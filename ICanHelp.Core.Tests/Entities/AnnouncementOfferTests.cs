@@ -257,7 +257,7 @@ public class AnnouncementOfferTests
     {
         var announcement = CreateAnnouncement();
         var offer = announcement.AddHelperOffer(Helper);
-        announcement.Cancel();
+        announcement.Cancel(OwnerId);
 
         Should.Throw<DomainRuleException>(() => announcement.Counter(offer, OwnerId));
 

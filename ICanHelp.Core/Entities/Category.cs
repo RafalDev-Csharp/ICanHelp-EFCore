@@ -51,6 +51,8 @@ public class Category
         subcategory.Rename(subcategoryName);
     }
 
+    public bool HasSubcategory(Id subcategoryId) => _subcategories.Any(s => s.Id == subcategoryId);
+
     public void RemoveSubcategory(Id subcategoryId)
         => _subcategories.Remove(GetSubcategory(subcategoryId));
 

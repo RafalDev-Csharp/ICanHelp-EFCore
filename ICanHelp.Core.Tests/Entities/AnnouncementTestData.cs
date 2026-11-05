@@ -66,7 +66,7 @@ internal static class AnnouncementTestData
 
         if (status == AnnouncementStatus.Cancelled)
         {
-            announcement.Cancel();
+            announcement.Cancel(OwnerId);
             return announcement;
         }
 
@@ -77,13 +77,13 @@ internal static class AnnouncementTestData
             return announcement;
         }
 
-        announcement.Start();
+        announcement.Start(OwnerId);
         if (status == AnnouncementStatus.InProgress)
         {
             return announcement;
         }
 
-        announcement.Complete();
+        announcement.Complete(OwnerId);
         return announcement;
     }
 }
