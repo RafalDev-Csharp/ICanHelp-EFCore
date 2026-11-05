@@ -113,8 +113,8 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
   `Entities/AnnouncementTestData.cs` (stały czas `Now`, użytkownicy, `InStatus(...)`). `dotnet test`: 77/77 zielone.
 - [x] Krok 3 – projekt `ICanHelp.Api`: kontrolery GET dla wszystkich zapytań, Swagger, ProblemDetails (`DomainExceptionHandler`),
   appsettings, launchSettings, `/health`. `dotnet build` zielony u autora (3.11.2026).
-- [ ] Krok 4 – Docker Compose z SQL Server, connection string, manifest `dotnet-ef` (gotowe);
-  **do zrobienia u autora:** wygenerować migrację `Init` i sprawdzić, że API startuje i seeduje kategorie
+- [x] Krok 4 – `docker-compose.yml` (SQL Server 2022), connection string, manifest `dotnet-ef`,
+  migracja `Init` w `DAL/Migrations` (20261105141305). API startuje, `DbInitializer` migruje i seeduje kategorie.
 - [ ] Krok 5 – rejestracja/logowanie (JWT, hash hasła)
 - [ ] Krok 6 – use-case'y: dodaj ogłoszenie, złóż ofertę, kontroferta, akceptacja, zakończenie, ocena
 - [ ] Krok 7 – wyszukiwanie po odległości (NetTopologySuite / geography). Paginacja i filtry listy już są (`GetAnnouncements`).
