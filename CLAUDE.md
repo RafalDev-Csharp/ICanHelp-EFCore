@@ -76,6 +76,7 @@ Handlery komend będą w Application i będą używać repozytoriów + `IUnitOfW
 - Strona odczytu: handlery zapytań w `DAL/Handlers` czytają z DbContext (`AsNoTracking`) i mapują do DTO (`Handlers/Extensions.cs`).
 - `DbInitializer` (IHostedService) – przy starcie: migracje + seed kategorii (nic nie robi, dopóki nie ma żadnej migracji).
 - Connection string: `ConnectionStrings:DefaultConnection` (w appsettings projektu Api).
+- Migracje w `ICanHelp.Infrastructure/DAL/Migrations`. `dotnet-ef` jako lokalne narzędzie (`.config/dotnet-tools.json`, 9.0.11).
 
 ## Api (jak jest zbudowane)
 - Kontrolery `[ApiController]`, trasy `api/<zasób>`. Handler wstrzykiwany do akcji przez `[FromServices] IQueryHandler<TQuery, TResult>`
@@ -87,16 +88,18 @@ Handlery komend będą w Application i będą używać repozytoriów + `IUnitOfW
 - Enumy w JSON jako string (`JsonStringEnumConverter`). Swagger (Swashbuckle) tylko w Development, z komentarzy `///`.
 - `GET /health` – health check (bez sprawdzania bazy). Porty: http 5080, https 7080. W Development `/` → `/swagger`,
   `UseHttpsRedirection` tylko poza Development.
-- Connection string domyślnie LocalDB (`appsettings.json`) – Krok 4 zamieni na SQL Server z Dockera.
+- Connection string (`appsettings.json`) wskazuje SQL Server z `docker-compose.yml` (localhost,1433, sa / hasło dev).
+  Na produkcji nadpisać zmienną `ConnectionStrings__DefaultConnection`.
 - `public partial class Program` – pod `WebApplicationFactory` w testach integracyjnych.
 
 ## Komendy
 ```bash
 dotnet build
 dotnet test
-dotnet run --project ICanHelp.Api   # Swagger: http://localhost:5080/swagger
-# migracja Init w Kroku 4
-dotnet ef migrations add <Name> -p ICanHelp.Infrastructure -s ICanHelp.Api
+docker compose up -d                # SQL Server w Dockerze
+dotnet tool restore                 # instaluje dotnet-ef z manifestu
+dotnet run --project ICanHelp.Api   # Swagger: http://localhost:5080/swagger; przy starcie DbInitializer robi migracje + seed
+dotnet ef migrations add <Name> -p ICanHelp.Infrastructure -s ICanHelp.Api -o DAL/Migrations
 dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
 ```
 
@@ -110,7 +113,8 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
   `Entities/AnnouncementTestData.cs` (stały czas `Now`, użytkownicy, `InStatus(...)`). `dotnet test`: 77/77 zielone.
 - [x] Krok 3 – projekt `ICanHelp.Api`: kontrolery GET dla wszystkich zapytań, Swagger, ProblemDetails (`DomainExceptionHandler`),
   appsettings, launchSettings, `/health`. `dotnet build` zielony u autora (3.11.2026).
-- [ ] Krok 4 – pierwsza migracja `Init` + Docker Compose z SQL Server
+- [ ] Krok 4 – Docker Compose z SQL Server, connection string, manifest `dotnet-ef` (gotowe);
+  **do zrobienia u autora:** wygenerować migrację `Init` i sprawdzić, że API startuje i seeduje kategorie
 - [ ] Krok 5 – rejestracja/logowanie (JWT, hash hasła)
 - [ ] Krok 6 – use-case'y: dodaj ogłoszenie, złóż ofertę, kontroferta, akceptacja, zakończenie, ocena
 - [ ] Krok 7 – wyszukiwanie po odległości (NetTopologySuite / geography). Paginacja i filtry listy już są (`GetAnnouncements`).
