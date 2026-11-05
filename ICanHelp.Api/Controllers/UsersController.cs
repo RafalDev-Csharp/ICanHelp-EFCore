@@ -3,6 +3,7 @@ using ICanHelp.Application.Commands;
 using ICanHelp.Application.DTO;
 using ICanHelp.Application.Queries;
 using ICanHelp.Application.Security;
+using ICanHelp.Core.Enums;
 using ICanHelp.Infrastructure.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -68,23 +69,28 @@ public sealed class UsersController : ControllerBase
         return user is null ? NotFound() : Ok(user);
     }
 
+    /// <summary>Lista wszystkich kont z pełnymi danymi – tylko dla admina.</summary>
     [HttpGet]
+    [Authorize(Roles = nameof(UserRole.Admin))]
     [ProducesResponseType<IReadOnlyList<UserDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<IReadOnlyList<UserDto>>> GetAll(
         [FromQuery] GetUsers query,
         [FromServices] IQueryHandler<GetUsers, IReadOnlyList<UserDto>> handler,
         CancellationToken cancellationToken)
         => Ok(await handler.HandleAsync(query, cancellationToken));
 
+    /// <summary>Publiczny profil użytkownika (bez e-maila, telefonu i adresu).</summary>
     [HttpGet("{userId:guid}")]
-    [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<UserPublicDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<UserDto>> GetById(
+    public async Task<ActionResult<UserPublicDto>> GetById(
         Guid userId,
-        [FromServices] IQueryHandler<GetUserById, UserDto?> handler,
+        [FromServices] IQueryHandler<GetUserPublicById, UserPublicDto?> handler,
         CancellationToken cancellationToken)
     {
-        var user = await handler.HandleAsync(new GetUserById { UserId = userId }, cancellationToken);
+        var user = await handler.HandleAsync(new GetUserPublicById { UserId = userId }, cancellationToken);
 
         return user is null ? NotFound() : Ok(user);
     }
@@ -98,21 +104,46 @@ public sealed class UsersController : ControllerBase
         CancellationToken cancellationToken)
         => Ok(await handler.HandleAsync(new GetRatingsByUser { UserId = userId }, cancellationToken));
 
-    /// <summary>Ogłoszenia polubione przez użytkownika.</summary>
+    /// <summary>Ogłoszenia polubione przez użytkownika – widzi je tylko on sam (albo admin).</summary>
     [HttpGet("{userId:guid}/liked-announcements")]
+    [Authorize]
     [ProducesResponseType<IReadOnlyList<LikedAnnouncementDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<IReadOnlyList<LikedAnnouncementDto>>> GetLikedAnnouncements(
         Guid userId,
         [FromServices] IQueryHandler<GetLikedAnnouncements, IReadOnlyList<LikedAnnouncementDto>> handler,
         CancellationToken cancellationToken)
-        => Ok(await handler.HandleAsync(new GetLikedAnnouncements { UserId = userId }, cancellationToken));
+    {
+        if (!IsSelfOrAdmin(userId))
+        {
+            return Forbid();
+        }
 
-    /// <summary>Użytkownicy polubieni przez użytkownika.</summary>
+        return Ok(await handler.HandleAsync(new GetLikedAnnouncements { UserId = userId }, cancellationToken));
+    }
+
+    /// <summary>Użytkownicy polubieni przez użytkownika – widzi ich tylko on sam (albo admin).</summary>
     [HttpGet("{userId:guid}/liked-users")]
+    [Authorize]
     [ProducesResponseType<IReadOnlyList<LikedUserDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<IReadOnlyList<LikedUserDto>>> GetLikedUsers(
         Guid userId,
         [FromServices] IQueryHandler<GetLikedUsers, IReadOnlyList<LikedUserDto>> handler,
         CancellationToken cancellationToken)
-        => Ok(await handler.HandleAsync(new GetLikedUsers { UserId = userId }, cancellationToken));
+    {
+        if (!IsSelfOrAdmin(userId))
+        {
+            return Forbid();
+        }
+
+        return Ok(await handler.HandleAsync(new GetLikedUsers { UserId = userId }, cancellationToken));
+    }
+
+    /// <summary>Czy zalogowany użytkownik to <paramref name="userId"/> albo admin.</summary>
+    private bool IsSelfOrAdmin(Guid userId)
+        => User.IsInRole(nameof(UserRole.Admin))
+           || (Guid.TryParse(User.FindFirst(AuthClaims.UserId)?.Value, out var currentUserId) && currentUserId == userId);
 }

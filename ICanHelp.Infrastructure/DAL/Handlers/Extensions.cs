@@ -104,6 +104,17 @@ internal static class Extensions
             ContactData = entity.ContactData.AsDto()
         };
 
+    public static UserPublicDto AsPublicDto(this User entity)
+        => new()
+        {
+            Id = entity.Id,
+            UserName = entity.UserName,
+            FullName = entity.FullName,
+            Description = entity.Description?.Value,
+            City = entity.ContactData.City,
+            CreatedAt = entity.CreatedAt
+        };
+
     public static ContactDataDto AsDto(this ContactData entity)
         => new()
         {
