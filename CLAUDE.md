@@ -143,6 +143,10 @@ Wspólne: `RepositoryExtensions` (`GetOrThrowAsync` → `AnnouncementNotFound`, 
 - `api/conversations` (`[Authorize]`): `GET {id}` (`ConversationDto`: `Timeline` = Message/Offer/AnnouncementChanged od najstarszych – oferty
   tego pomocnika, zmiany ogłoszenia po `CreatedAt` wątku; `MyRole`, `UnreadCount`, `CanWrite`; obcy → 404), `POST {id}/messages` (201),
   `POST {id}/read` (204). Obcy przy zapisie → 409 (DomainRule), brak wątku → 404 `ConversationNotFound`.
+- `GET api/me/conversations` (Krok 12, query `GetMyConversations`, handler `GetMyConversationsHandler`): `MyConversationDto` –
+  ogłoszenie (tytuł, miniatura, status), `myRole`, `otherParty`, `lastOffer` (+ `isOutdated`), `lastMessagePreview`, `unreadCount`,
+  `announcementChangedSinceLastRead` (tylko pomocnik), sortowanie po `lastActivityAt`; filtry `role`, `status`, `page`, `pageSize`.
+  Jedno zapytanie SQL z podzapytaniami, sort/stronicowanie w pamięci (patrz komentarz w handlerze).
 - Tabele `Conversations` (unikalny indeks AnnouncementId+HelperId, indeksy ClientId/HelperId) i `ConversationMessages` (indeks ConversationId+SentAt),
   Cascade z ogłoszenia. Migracja `Conversations` zakłada wątki dla istniejących ofert.
 
@@ -206,7 +210,10 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
 - [x] Krok 11 – wątek negocjacji + prywatność ofert (sekcja „Rozmowa”), migracja `Conversations` (20261106170000, ręczna, z backfillem
   wątków dla istniejących ofert). Testy: `Core.Tests/.../ConversationTests.cs`, `Application.Tests/Commands/ConversationHandlersTests.cs`,
   `Api.Tests/ConversationTests.cs`. Pisane bez kompilatora (sesja w chmurze) – **do zrobienia u autora: `dotnet build` + `dotnet test`, commit.**
-- [ ] Kroki 12–13 – „moje negocjacje”, powiadomienia: `docs/PLAN-NEGOCJACJE.md`
+- [x] Krok 12 – „moje negocjacje”: `GET api/me/conversations` (sekcja „Rozmowa”), bez migracji. Testy: `Api.Tests/MyConversationsTests.cs`,
+  `Application.Tests/Queries/MyConversationPreviewTests.cs`. Pisane bez kompilatora – **do zrobienia u autora: `dotnet build` + `dotnet test`
+  (razem z Krokiem 11), commit.**
+- [ ] Krok 13 – powiadomienia (opcjonalnie): `docs/PLAN-NEGOCJACJE.md`
 
 ## Jak pracować z AI (oszczędnie)
 - Jedna sesja = jeden krok z listy. Na start: „Przeczytaj CLAUDE.md, zrób Krok N”.

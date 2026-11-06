@@ -98,13 +98,24 @@
 
 ## Krok 12 – „Moje negocjacje” (lista rozmów z podglądem ogłoszenia)
 
-- [ ] Query `GetMyConversations` (handler w Infrastructure, `AsNoTracking`, stronicowanie):
+- [x] Query `GetMyConversations` (handler w Infrastructure, `AsNoTracking`, stronicowanie):
       `GET api/me/conversations` → `[{ conversationId, announcementId, title, thumbnailUrl, announcementStatus, myRole (Client/Helper),
-      otherParty { id, userName }, lastOffer { price, status, proposedBy, isOutdated }, lastMessagePreview, lastActivityAt, unreadCount,
-      announcementChangedSinceLastRead }]`, sortowanie po `lastActivityAt` malejąco
-- [ ] Filtry: `role=Client|Helper`, `status=Open|...`
-- [ ] Indeksy pod zapytanie (Conversations po ClientId / HelperId, Messages po ConversationId + SentAt)
-- [ ] Testy Api (dwie rozmowy jednocześnie, licznik nieprzeczytanych, flaga zmiany ogłoszenia)
+      otherParty { id, userName }, lastOffer { id, price, status, proposedBy, isOutdated, createdAt }, lastMessagePreview, lastActivityAt,
+      unreadCount, announcementChangedSinceLastRead }]`, sortowanie po `lastActivityAt` malejąco
+      **Realizacja:** jedno zapytanie SQL ze skalarnymi podzapytaniami (ostatnia wiadomość/oferta/zmiana, liczniki nieprzeczytanych
+      dla obu stron); `lastActivityAt` = max(założenie wątku, ostatnia wiadomość, ostatnia oferta, ostatnia edycja ogłoszenia),
+      sortowanie + stronicowanie w pamięci (wątków jednego użytkownika jest niewiele; gdy urośnie → zdenormalizowana kolumna
+      `Conversations.LastActivityAt`). `announcementChangedSinceLastRead` – tylko dla pomocnika (właściciel edytował sam);
+      nigdy nieczytany wątek = zmiany po jego założeniu. Podgląd wiadomości: 100 znaków, cięcie na granicy słowa + „…”.
+      Endpoint w `ConversationsController` (`~/api/me/conversations`). Akceptacja/odrzucenie oferty nie zmienia `lastActivityAt`
+      (oferta nie ma daty zmiany statusu) – zmiana statusu widać w `lastOffer.status`.
+- [x] Filtry: `role=Client|Helper`, `status=Open|...` (+ `page`, `pageSize` 1–100)
+- [x] Indeksy pod zapytanie – już z Kroku 11 (Conversations po ClientId / HelperId, Messages po ConversationId + SentAt,
+      Offers po AnnouncementId + HelperId + Status, AnnouncementChanges po kluczu AnnouncementId + Revision). Bez migracji.
+- [x] Testy Api (`MyConversationsTests`: dwie rozmowy naraz i kolejność po aktywności, kontroferta, stronicowanie, licznik
+      nieprzeczytanych z obu stron, flaga zmiany ogłoszenia + `isOutdated`, filtry rola/status, 401) + Application
+      (`MyConversationPreviewTests`)
+- [ ] `dotnet build` + `dotnet test` (kod pisany bez kompilatora), commit
 
 ## Krok 13 (opcjonalnie) – powiadomienia
 

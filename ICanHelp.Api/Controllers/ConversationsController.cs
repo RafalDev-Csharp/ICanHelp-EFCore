@@ -3,6 +3,7 @@ using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.Commands;
 using ICanHelp.Application.DTO;
 using ICanHelp.Application.Queries;
+using ICanHelp.Core.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,6 +18,41 @@ namespace ICanHelp.Api.Controllers;
 [Authorize]
 public sealed class ConversationsController : ControllerBase
 {
+    /// <summary>
+    /// „Moje negocjacje”: wątki zalogowanego użytkownika (jako właściciel ogłoszenia albo pomocnik) z podglądem
+    /// ogłoszenia, ostatniej oferty i wiadomości, licznikiem nieprzeczytanych i flagą zmiany ogłoszenia –
+    /// od ostatniej aktywności. Filtry: <c>role</c> (Client / Helper), <c>status</c> ogłoszenia (np. Open).
+    /// Do odpytywania (polling), dopóki nie ma powiadomień (Krok 13).
+    /// </summary>
+    [HttpGet("~/api/me/conversations")]
+    [ProducesResponseType<IReadOnlyList<MyConversationDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<MyConversationDto>>> GetMine(
+        [FromQuery] OfferParty? role,
+        [FromQuery] AnnouncementStatus? status,
+        [FromServices] IQueryHandler<GetMyConversations, IReadOnlyList<MyConversationDto>> handler,
+        CancellationToken cancellationToken,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        if (!User.TryGetUserId(out var userId))
+        {
+            return Unauthorized();
+        }
+
+        var conversations = await handler.HandleAsync(new GetMyConversations
+        {
+            UserId = userId,
+            Role = role,
+            Status = status,
+            Page = page,
+            PageSize = pageSize
+        }, cancellationToken);
+
+        return Ok(conversations);
+    }
+
     /// <summary>
     /// Wątek z osią czasu: wiadomości, oferty tego pomocnika i zmiany ogłoszenia (wpisy „AnnouncementChanged”),
     /// od najstarszych. Dla osób spoza wątku: 404.

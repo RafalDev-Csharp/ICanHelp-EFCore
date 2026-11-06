@@ -164,6 +164,17 @@ Authorization: Bearer {{signIn.response.body.$.accessToken}}
 # Prywatność ofert: bez tokenu "offers" jest puste, widać tylko "helperCount"
 GET {{baseUrl}}/api/announcements/{{announcementId}}
 
+### ======== Krok 12: moje negocjacje ========
+# Lista wątków zalogowanego użytkownika, od ostatniej aktywności: podgląd ogłoszenia, ostatnia oferta i wiadomość,
+# "unreadCount", "announcementChangedSinceLastRead" (ostrzeżenie dla pomocnika). Filtry: role=Client|Helper, status=Open|...
+GET {{baseUrl}}/api/me/conversations
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+###
+# Pomocnik: tylko trwające negocjacje
+GET {{baseUrl}}/api/me/conversations?role=Helper&status=Open&page=1&pageSize=20
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
 ### ======== Krok 10: zdjęcia ========
 # Właściciel dodaje zdjęcie (multipart, pole "file"; JPEG/PNG/WebP, max 5 MB, max 5) -> 201 { id }, Location = adres pliku.
 # To też zmiana treści: nowa rewizja, w ofercie "changesSinceOffer" z polem "Images" (stare/nowe id zdjęć).
