@@ -77,7 +77,8 @@
       pisać mogą tylko te dwie osoby; pisanie dozwolone w `Open`, a po akceptacji tylko w wątku zaakceptowanego pomocnika
       (status ogłoszenia handler czyta z repozytorium ogłoszeń); `MarkAsRead(userId, atUtc)`.
       **Realizacja:** reguła „czy wolno pisać” jest w domenie – `Announcement.AllowsConversationWith(helperId)`
-      (po akceptacji: Accepted/InProgress/Completed – tylko zaakceptowany pomocnik; Cancelled – nikt), `Conversation.SendMessage`
+      (po akceptacji: Accepted/InProgress – tylko zaakceptowany pomocnik; Completed/Cancelled – nikt, wątek tylko do odczytu;
+      decyzja autora 6.11.2026: po zakończeniu zostają już tylko wzajemne oceny), `Conversation.SendMessage`
       dostaje ogłoszenie parametrem. Wysłanie wiadomości = nadawca przeczytał wątek do teraz.
 - [x] Api: `POST api/announcements/{id}/conversations` (pomocnik zakłada wątek, 201 albo 200 z istniejącym id),
       `GET api/conversations/{id}` (wątek: wiadomości + oferty tego pomocnika + zmiany ogłoszenia jako jedna oś czasu),

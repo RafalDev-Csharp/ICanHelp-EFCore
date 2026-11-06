@@ -353,14 +353,14 @@ public class Announcement
 
     /// <summary>
     /// Can the owner and this helper (still) write to each other? While open – every helper. After acceptance only
-    /// the accepted helper (details of the job, later of the rating). Cancelled – nobody.
+    /// the accepted helper, until the job is done (details of the job). Completed – nobody: the conversation becomes
+    /// read-only, what is left is rating each other. Cancelled – nobody.
     /// </summary>
     public bool AllowsConversationWith(UserId helperId)
         => Status switch
         {
             AnnouncementStatus.Open => true,
-            AnnouncementStatus.Accepted or AnnouncementStatus.InProgress or AnnouncementStatus.Completed
-                => helperId == GetAcceptedHelperId(),
+            AnnouncementStatus.Accepted or AnnouncementStatus.InProgress => helperId == GetAcceptedHelperId(),
             _ => false
         };
 

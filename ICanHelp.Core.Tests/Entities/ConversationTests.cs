@@ -107,7 +107,6 @@ public class ConversationTests
     [Theory]
     [InlineData(AnnouncementStatus.Accepted)]
     [InlineData(AnnouncementStatus.InProgress)]
-    [InlineData(AnnouncementStatus.Completed)]
     public void SendMessage_AfterAcceptance_OnlyAcceptedHelpersConversation(AnnouncementStatus status)
     {
         var announcement = CreateAnnouncement();
@@ -115,14 +114,9 @@ public class ConversationTests
         var other = Start(announcement, OtherHelper);
         var offer = announcement.AddHelperOffer(Helper);
         announcement.AcceptOffer(offer.Id, OwnerId);
-        if (status != AnnouncementStatus.Accepted)
+        if (status == AnnouncementStatus.InProgress)
         {
             announcement.Start(OwnerId);
-        }
-
-        if (status == AnnouncementStatus.Completed)
-        {
-            announcement.Complete(OwnerId);
         }
 
         Send(accepted, announcement, OwnerId);
@@ -131,6 +125,23 @@ public class ConversationTests
 
         Should.Throw<DomainRuleException>(() => Send(other, announcement, OtherHelper));
         Should.Throw<DomainRuleException>(() => Send(other, announcement, OwnerId));
+    }
+
+    [Fact]
+    public void SendMessage_AfterCompletion_NobodyCanWrite()
+    {
+        var announcement = CreateAnnouncement();
+        var conversation = Start(announcement);
+        var offer = announcement.AddHelperOffer(Helper);
+        announcement.AcceptOffer(offer.Id, OwnerId);
+        Send(conversation, announcement, Helper);
+        announcement.Start(OwnerId);
+        announcement.Complete(OwnerId);
+
+        Should.Throw<DomainRuleException>(() => Send(conversation, announcement, Helper));
+        Should.Throw<DomainRuleException>(() => Send(conversation, announcement, OwnerId));
+        conversation.Messages.Count.ShouldBe(1); // historia zostaje do odczytu
+        announcement.AllowsConversationWith(Helper).ShouldBeFalse();
     }
 
     [Fact]

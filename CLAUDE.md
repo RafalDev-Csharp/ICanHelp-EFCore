@@ -57,7 +57,8 @@ Jeden użytkownik może być raz klientem, raz pomocnikiem (rola w transakcji, n
 - `Conversation` (agregat, `Entities/Negotiations`): AnnouncementId, ClientId (= właściciel), HelperId, CreatedAt, `Client/HelperLastReadAt`,
   **Messages** (`ConversationMessage`: SenderId, Text (Description ≤ 500), SentAt, AnnouncementRevision). Jeden na parę (AnnouncementId, HelperId).
   Tworzy go `announcement.StartConversation` (tylko Open, nie właściciel); `SendMessage(..., announcement, at)` sprawdza
-  `announcement.AllowsConversationWith(HelperId)`: Open – każdy, Accepted/InProgress/Completed – tylko zaakceptowany pomocnik, Cancelled – nikt.
+  `announcement.AllowsConversationWith(HelperId)`: Open – każdy, Accepted/InProgress – tylko zaakceptowany pomocnik, Completed/Cancelled – nikt
+  (wątek tylko do odczytu; po Completed zostają oceny).
   `MarkAsRead` (znacznik nie cofa się; wysłanie = przeczytane), `CountUnread`. Rozmowa ≠ oferta (wiadomości nie da się zaakceptować).
 - Później: `HelperProfile` z obszarem działania / trasą dojazdu (punkt + promień) → wyszukiwanie „po drodze”
 
