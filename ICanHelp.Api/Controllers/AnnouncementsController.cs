@@ -3,6 +3,7 @@ using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.Commands;
 using ICanHelp.Application.DTO;
 using ICanHelp.Application.Queries;
+using ICanHelp.Application.Storage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,6 +17,9 @@ namespace ICanHelp.Api.Controllers;
 [Route("api/announcements")]
 public sealed class AnnouncementsController : ControllerBase
 {
+    // Zapas na nagłówki multipart ponad sam plik (limit pliku sprawdza handler: ImageFiles.MaxBytes).
+    private const int MaxImageRequestBytes = ImageFiles.MaxBytes + 1024 * 1024;
+
     // ---------- odczyt ----------
 
     /// <summary>
@@ -32,7 +36,7 @@ public sealed class AnnouncementsController : ControllerBase
         CancellationToken cancellationToken)
         => Ok(await handler.HandleAsync(query, cancellationToken));
 
-    /// <summary>Ogłoszenie z całą negocjacją (oferty) i zdjęciami.</summary>
+    /// <summary>Ogłoszenie z całą negocjacją (oferty) i zdjęciami (od najstarszego; pierwsze = miniatura).</summary>
     [HttpGet("{announcementId:guid}")]
     [ProducesResponseType<AnnouncementDetailsDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
@@ -80,6 +84,32 @@ public sealed class AnnouncementsController : ControllerBase
             new GetAnnouncementContact { AnnouncementId = announcementId, UserId = userId }, cancellationToken);
 
         return contact is null ? NotFound() : Ok(contact);
+    }
+
+    /// <summary>
+    /// Plik zdjęcia (publiczny, jak ogłoszenie). Adres jest w <c>images[].url</c> i <c>thumbnailUrl</c>.
+    /// Zdjęcie o danym id nigdy się nie zmienia, więc przeglądarka może je trzymać w cache.
+    /// </summary>
+    [HttpGet("{announcementId:guid}/images/{imageId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetImage(
+        Guid announcementId,
+        Guid imageId,
+        [FromServices] IQueryHandler<GetAnnouncementImage, ImageFileDto?> handler,
+        CancellationToken cancellationToken)
+    {
+        var image = await handler.HandleAsync(
+            new GetAnnouncementImage { AnnouncementId = announcementId, ImageId = imageId }, cancellationToken);
+
+        if (image is null)
+        {
+            return NotFound();
+        }
+
+        // Cache tylko dla znalezionego pliku (404 nie powinno zostać w przeglądarce). File(...) zamyka strumień po wysłaniu.
+        Response.Headers.CacheControl = "public, max-age=86400";
+        return File(image.Content, image.ContentType);
     }
 
     // ---------- ogłoszenie ----------
@@ -133,6 +163,56 @@ public sealed class AnnouncementsController : ControllerBase
         await handler.HandleAsync(command with { AnnouncementId = announcementId, ActorId = userId }, cancellationToken);
         return NoContent();
     }
+
+    /// <summary>
+    /// Dodaje zdjęcie (multipart/form-data, pole <c>file</c>): JPEG, PNG albo WebP, max 5 MB, max 5 zdjęć.
+    /// Tylko właściciel, tylko status Open. Jak każda zmiana treści podbija <c>revision</c> – oczekujące oferty
+    /// stają się nieaktualne (<c>changesSinceOffer</c> z polem <c>Images</c>). Zwraca id zdjęcia; Location = adres pliku.
+    /// </summary>
+    [HttpPost("{announcementId:guid}/images")]
+    [Authorize]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(MaxImageRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxImageRequestBytes)]
+    [ProducesResponseType<CreatedDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<CreatedDto>> PostImage(
+        Guid announcementId,
+        IFormFile file,
+        [FromServices] ICommandHandler<AddAnnouncementImage> handler,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+        {
+            return Unauthorized();
+        }
+
+        var imageId = Guid.NewGuid();
+        await using var content = file.OpenReadStream();
+        await handler.HandleAsync(new AddAnnouncementImage
+        {
+            AnnouncementId = announcementId,
+            ImageId = imageId,
+            ActorId = userId,
+            FileName = file.FileName,
+            Content = content
+        }, cancellationToken);
+
+        return CreatedAtAction(nameof(GetImage), new { announcementId, imageId }, new CreatedDto(imageId));
+    }
+
+    /// <summary>Usuwa zdjęcie (tylko właściciel, tylko status Open). Też podbija <c>revision</c>.</summary>
+    [HttpDelete("{announcementId:guid}/images/{imageId:guid}")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public Task<IActionResult> DeleteImage(Guid announcementId, Guid imageId,
+        [FromServices] ICommandHandler<RemoveAnnouncementImage> handler, CancellationToken cancellationToken)
+        => Execute(userId => new RemoveAnnouncementImage(announcementId, imageId, userId), handler, cancellationToken);
 
     /// <summary>Anuluje ogłoszenie (tylko właściciel, w statusie Open albo Accepted).</summary>
     [HttpPost("{announcementId:guid}/cancel")]
@@ -274,7 +354,7 @@ public sealed class AnnouncementsController : ControllerBase
         [FromServices] ICommandHandler<WithdrawOffer> handler, CancellationToken cancellationToken)
         => Execute(userId => new WithdrawOffer(announcementId, offerId, userId), handler, cancellationToken);
 
-    /// <summary>Akcje bez body: komenda z id z trasy + id z tokenu, odpowiedź 204.</summary>
+    /// <summary>Akcje bez body (POST/DELETE): komenda z id z trasy + id z tokenu, odpowiedź 204.</summary>
     private async Task<IActionResult> Execute<TCommand>(Func<Guid, TCommand> createCommand,
         ICommandHandler<TCommand> handler, CancellationToken cancellationToken)
         where TCommand : class, ICommand

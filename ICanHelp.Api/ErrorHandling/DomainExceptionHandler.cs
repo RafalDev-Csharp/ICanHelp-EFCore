@@ -8,11 +8,12 @@ namespace ICanHelp.Api.ErrorHandling;
 /// <summary>
 /// Zamienia wyjątki domeny na odpowiedzi ProblemDetails:
 /// <list type="bullet">
-/// <item><see cref="OfferNotFoundException"/>, <see cref="AnnouncementNotFoundException"/>, <see cref="UserNotFoundException"/> → 404</item>
+/// <item><see cref="OfferNotFoundException"/>, <see cref="AnnouncementNotFoundException"/>, <see cref="UserNotFoundException"/>,
+/// <see cref="ImageNotFoundException"/> → 404</item>
 /// <item><see cref="DomainRuleException"/> (złamana reguła biznesowa), zajęta nazwa/e-mail, ponowna ocena,
 /// <see cref="ConcurrencyConflictException"/> (równoczesna zmiana) → 409</item>
 /// <item><see cref="InvalidCredentialsException"/> → 401, <see cref="UserLockedException"/> → 403</item>
-/// <item>pozostałe <see cref="CustomExceptions"/> (błędne dane, np. e-mail) → 400</item>
+/// <item>pozostałe <see cref="CustomExceptions"/> (błędne dane, np. e-mail, <see cref="InvalidImageException"/>) → 400</item>
 /// </list>
 /// Inne wyjątki nie są tu obsługiwane – middleware zwróci 500 bez szczegółów.
 /// </summary>
@@ -37,7 +38,7 @@ internal sealed class DomainExceptionHandler : IExceptionHandler
 
         var (status, title) = domainException switch
         {
-            OfferNotFoundException or AnnouncementNotFoundException or UserNotFoundException
+            OfferNotFoundException or AnnouncementNotFoundException or UserNotFoundException or ImageNotFoundException
                 => (StatusCodes.Status404NotFound, "Resource not found"),
             DomainRuleException => (StatusCodes.Status409Conflict, "Business rule violated"),
             ConcurrencyConflictException => (StatusCodes.Status409Conflict, "Concurrent change"),

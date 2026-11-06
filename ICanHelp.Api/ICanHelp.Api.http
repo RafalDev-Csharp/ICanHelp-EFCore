@@ -130,6 +130,31 @@ Content-Type: application/json
 ###
 GET {{baseUrl}}/api/announcements/{{announcementId}}
 
+### ======== Krok 10: zdjęcia ========
+# Właściciel dodaje zdjęcie (multipart, pole "file"; JPEG/PNG/WebP, max 5 MB, max 5) -> 201 { id }, Location = adres pliku.
+# To też zmiana treści: nowa rewizja, w ofercie "changesSinceOffer" z polem "Images" (stare/nowe id zdjęć).
+# Podmień ścieżkę na dowolny plik .jpg na dysku. Plik tekstowy -> 400 InvalidImage, nie-właściciel -> 409.
+# @name addImage
+POST {{baseUrl}}/api/announcements/{{announcementId}}/images
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+Content-Type: multipart/form-data; boundary=ICanHelpBoundary
+
+--ICanHelpBoundary
+Content-Disposition: form-data; name="file"; filename="kran.jpg"
+Content-Type: image/jpeg
+
+< ./kran.jpg
+--ICanHelpBoundary--
+
+###
+# Plik zdjęcia (publiczny) – ten sam adres jest w "images[].url" i "thumbnailUrl"
+GET {{baseUrl}}/api/announcements/{{announcementId}}/images/{{addImage.response.body.$.id}}
+
+###
+# Usunięcie zdjęcia (tylko właściciel, Open) -> 204; kolejna rewizja
+DELETE {{baseUrl}}/api/announcements/{{announcementId}}/images/{{addImage.response.body.$.id}}
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
 ###
 # Kontroferta właściciela -> 201 { id nowej oferty }
 # @name counterOffer

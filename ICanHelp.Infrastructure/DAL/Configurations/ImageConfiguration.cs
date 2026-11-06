@@ -14,6 +14,7 @@ internal sealed class ImageConfiguration : IEntityTypeConfiguration<Image>
         builder.Property(x => x.FileName).IsRequired();
         builder.Property(x => x.FileExtension).IsRequired().HasMaxLength(10);
         builder.Property(x => x.FilePath).IsRequired();
+        builder.Property(x => x.AddedAt).IsRequired();
 
         // The relation to Announcement is configured in AnnouncementConfiguration (the aggregate root).
     }

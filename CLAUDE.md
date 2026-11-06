@@ -44,10 +44,12 @@ Jeden użytkownik może być raz klientem, raz pomocnikiem (rola w transakcji, n
 - `Announcement` (agregat): OwnerId, CategoryId, SubcategoryId, Difficulty (enum), Title, Description, Budget (Price),
   Location (VO lat/lon), Status, CreatedAt, AcceptedOfferId?, **Offers**, **Images** (max 5),
   **Revision** (0 = opublikowane, +1 przy realnej edycji; token współbieżności), UpdatedAt?, **Changes** (`AnnouncementChange`: rewizja, czas, `AnnouncementFields` [Flags])
-  - metody: `Update(actor, ..., at)` (tylko właściciel, `Open`), `GetChangesSince(rev)`, `AddOffer`, `CounterOffer`, `AcceptOffer`, `RejectOffer`, `WithdrawOffer`, `AddImage`, `RemoveImage`,
+  - metody: `Update(actor, ..., at)` (tylko właściciel, `Open`), `GetChangesSince(rev)`, `AddOffer`, `CounterOffer`, `AcceptOffer`, `RejectOffer`, `WithdrawOffer`, `AddImage(actor,…,at)`, `RemoveImage(actor, id, at)`, `GetThumbnail()`,
     `Start(actor)`, `Complete(actor)`, `Cancel(actor)`, `GetAcceptedHelperId()`, `IsParticipant(user)`, `CreateRating(...)`
   - `Offer` (część agregatu): HelperId, ProposedBy (Client/Helper), Price, ProposedStart/End, Message?, Status, ParentOfferId?
     (kontroferta = nowy `Offer` wskazujący poprzedni; poprzedni dostaje status `Countered`)
+  - `Image` (część agregatu): FileName (do wyświetlania), FileExtension, FilePath (ścieżka w magazynie, nie trafia do DTO), AddedAt
+    (najstarsze = miniatura). Dodanie/usunięcie = nowa rewizja z flagą `Images` (stare/nowe = lista id zdjęć „id1, id2”).
 - `Category` (agregat) → `Subcategory` (część agregatu, unikalna nazwa w kategorii)
 - `Rating`: AnnouncementId, RaterId, RateeId, Rate (1–5), Comment?; unikalne (AnnouncementId, RaterId)
 - `LikedAnnouncement` (UserId, AnnouncementId) i `LikedUser` (LikerId, LikedId) – klucze złożone, istnienie wiersza = polubione
@@ -99,6 +101,15 @@ Wspólne: `RepositoryExtensions` (`GetOrThrowAsync` → `AnnouncementNotFound`, 
   pomocnik `DAL/Spatial.cs` (SRID, `CreatePoint(lat, lon)` – w NTS X = długość!). `GetAnnouncements`: `Latitude`+`Longitude`
   (+ `RadiusKm`, domyślnie 10, max 100) → `IsWithinDistance`, sortowanie od najbliższych, `AnnouncementDto.DistanceKm`.
   Walidacja w `GetAnnouncements.GetDistanceFilter()` → `InvalidDistanceFilterException` (400).
+
+## Zdjęcia (Krok 10)
+- `POST api/announcements/{id}/images` (multipart, pole `file`, 201 + Location), `DELETE …/images/{imageId}` (204),
+  `GET …/images/{imageId}` (publiczny plik, `Cache-Control` 1 dzień). `ImageDto.Url`, `AnnouncementDto.ThumbnailUrl` (lista: podzapytanie).
+- `Application/Storage`: `IFileStorage` (Save/OpenRead/Delete po ścieżce względnej), `ImageFiles` – format z „magic bytes”
+  (JPEG/PNG/WebP, nie z nazwy/Content-Type), max 5 MB (liczone przy czytaniu), ścieżka `{announcementId:N}/{imageId:N}.ext`.
+- Handler: walidacja pliku → w transakcji `AddImage` (reguły) → zapis pliku; błąd po zapisie = plik kasowany. Usuwanie: plik po commicie.
+- `Infrastructure/Storage/LocalFileStorage` – katalog `Storage:ImagesPath` (domyślnie `App_Data/images` w Api, w .gitignore);
+  testy Api: katalog tymczasowy z `ApiFactory`. Błędy: `InvalidImage` → 400, `ImageNotFound` → 404.
 
 ## Uwierzytelnianie (Krok 5)
 - `POST api/users/sign-up` (komenda `SignUp`, 201 + Location; rola zawsze `User`), `POST api/users/sign-in` (`SignIn` e-mail+hasło
@@ -170,9 +181,11 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
 
 - [x] Krok 9 – PATCH ogłoszenia + rewizje (stare/nowe wartości pól → podświetlanie zmian) + blokada akceptacji nieaktualnej oferty
   (szczegóły: `docs/PLAN-NEGOCJACJE.md`). Migracja `AnnouncementRevisions` (20261106120000, pisana ręcznie). 6.11.2026: build + 195/195 testów zielone.
-  Poprawka (różnica netto „było → jest”, `EditsSinceOffer`): Core 105/105 + Application 59/59 zielone;
-  **1 nowy test Api (`LaterEdit_CannotHideEarlierPriceChange`) do uruchomienia przy następnym pełnym przebiegu z Dockerem.**
-- [ ] Kroki 10–13 – zdjęcia, wątek wiadomości + prywatność ofert, „moje negocjacje”, powiadomienia: `docs/PLAN-NEGOCJACJE.md`
+  Poprawka (różnica netto „było → jest”, `EditsSinceOffer`) – zweryfikowana w pełnym przebiegu Kroku 10.
+- [x] Krok 10 – zdjęcia (sekcja „Zdjęcia”), migracja `ImageAddedAt` (20261106150000, ręczna). Testy: `Core.Tests/.../AnnouncementImageTests.cs`,
+  `Application.Tests/Commands/ImageHandlersTests.cs`, `Api.Tests/AnnouncementImageTests.cs`. 6.11.2026: build + 241/241 testów zielone
+  (w tym integracyjne z migracją; potwierdza też test `LaterEdit_CannotHideEarlierPriceChange` z Kroku 9).
+- [ ] Kroki 11–13 – wątek wiadomości + prywatność ofert, „moje negocjacje”, powiadomienia: `docs/PLAN-NEGOCJACJE.md`
 
 ## Jak pracować z AI (oszczędnie)
 - Jedna sesja = jeden krok z listy. Na start: „Przeczytaj CLAUDE.md, zrób Krok N”.

@@ -26,8 +26,13 @@ internal static class Extensions
             CreatedAt = entity.CreatedAt,
             AcceptedOfferId = entity.AcceptedOfferId?.Value,
             Revision = entity.Revision,
-            UpdatedAt = entity.UpdatedAt
+            UpdatedAt = entity.UpdatedAt,
+            ThumbnailUrl = entity.GetThumbnailUrl()
         };
+
+    /// <summary>URL of the oldest image (needs the images loaded; the list query computes it with a subquery instead).</summary>
+    private static string? GetThumbnailUrl(this Announcement entity)
+        => entity.GetThumbnail() is { } thumbnail ? ImageDto.GetUrl(entity.Id, thumbnail.Id) : null;
 
     public static AnnouncementDetailsDto AsDetailsDto(this Announcement entity)
         => new()
@@ -46,8 +51,9 @@ internal static class Extensions
             AcceptedOfferId = entity.AcceptedOfferId?.Value,
             Revision = entity.Revision,
             UpdatedAt = entity.UpdatedAt,
+            ThumbnailUrl = entity.GetThumbnailUrl(),
             Offers = entity.Offers.OrderBy(o => o.CreatedAt).Select(o => o.AsDto(entity)).ToList(),
-            Images = entity.Images.Select(i => i.AsDto()).ToList(),
+            Images = entity.Images.OrderBy(i => i.AddedAt).ThenBy(i => i.Id.Value).Select(i => i.AsDto()).ToList(),
             Changes = entity.Changes.OrderBy(c => c.Revision).Select(c => c.AsDto()).ToList()
         };
 
@@ -97,7 +103,8 @@ internal static class Extensions
             AnnouncementId = entity.AnnouncementId,
             FileName = entity.FileName,
             FileExtension = entity.FileExtension,
-            FilePath = entity.FilePath
+            Url = ImageDto.GetUrl(entity.AnnouncementId, entity.Id),
+            AddedAt = entity.AddedAt
         };
 
     public static CategoryDto AsDto(this Category entity)

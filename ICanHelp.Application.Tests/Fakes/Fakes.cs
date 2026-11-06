@@ -1,5 +1,6 @@
 using ICanHelp.Application.DTO;
 using ICanHelp.Application.Security;
+using ICanHelp.Application.Storage;
 using ICanHelp.Application.Time;
 using ICanHelp.Core.Entities;
 using ICanHelp.Core.Entities.Users;
@@ -132,5 +133,37 @@ internal sealed class InMemoryRatingRepository : IRatingRepository
     {
         Ratings.Add(rating);
         return Task.CompletedTask;
+    }
+}
+
+/// <summary>Pliki w słowniku: ścieżka → bajty.</summary>
+internal sealed class InMemoryFileStorage : IFileStorage
+{
+    public Dictionary<string, byte[]> Files { get; } = new();
+
+    public async Task SaveAsync(string path, Stream content, CancellationToken cancellationToken = default)
+    {
+        using var buffer = new MemoryStream();
+        await content.CopyToAsync(buffer, cancellationToken);
+        Files[path] = buffer.ToArray();
+    }
+
+    public Task<Stream?> OpenReadAsync(string path, CancellationToken cancellationToken = default)
+        => Task.FromResult<Stream?>(Files.TryGetValue(path, out var bytes) ? new MemoryStream(bytes) : null);
+
+    public Task DeleteAsync(string path, CancellationToken cancellationToken = default)
+    {
+        Files.Remove(path);
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>Jak <see cref="FakeUnitOfWork"/>, ale „zapis do bazy” po akcji się nie udaje (np. konflikt współbieżności).</summary>
+internal sealed class FailingUnitOfWork : IUnitOfWork
+{
+    public async Task ExecuteAsync(Func<Task> action, CancellationToken cancellationToken = default)
+    {
+        await action();
+        throw new InvalidOperationException("SaveChanges failed.");
     }
 }

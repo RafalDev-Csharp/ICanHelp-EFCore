@@ -1,6 +1,6 @@
 namespace ICanHelp.Application.DTO;
 
-/// <summary>An announcement on a list (without offers and images).</summary>
+/// <summary>An announcement on a list (without offers and images – only the thumbnail).</summary>
 public record AnnouncementDto
 {
     public Guid Id { get; init; }
@@ -22,11 +22,14 @@ public record AnnouncementDto
     /// <summary>When the content was last edited (null if never).</summary>
     public DateTime? UpdatedAt { get; init; }
 
+    /// <summary>URL of the first (oldest) image – the thumbnail on a list; null if there are no images.</summary>
+    public string? ThumbnailUrl { get; init; }
+
     /// <summary>Distance from the search point in km – only when the list was searched by location.</summary>
     public double? DistanceKm { get; init; }
 }
 
-/// <summary>An announcement with the whole negotiation and images.</summary>
+/// <summary>An announcement with the whole negotiation and images (oldest first).</summary>
 public sealed record AnnouncementDetailsDto : AnnouncementDto
 {
     public IReadOnlyList<OfferDto> Offers { get; init; } = [];

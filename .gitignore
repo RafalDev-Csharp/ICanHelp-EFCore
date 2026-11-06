@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Zdjęcia wgrane lokalnie (Krok 10, Storage:ImagesPath)
+App_Data/

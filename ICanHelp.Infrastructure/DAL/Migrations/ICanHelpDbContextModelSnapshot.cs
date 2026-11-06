@@ -164,6 +164,9 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<Guid>("AnnouncementId")
                         .HasColumnType("uniqueidentifier");
 

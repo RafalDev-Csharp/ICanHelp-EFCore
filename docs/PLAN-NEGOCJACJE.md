@@ -48,19 +48,25 @@
       (np. „⚠ edytowano 2 razy po Twojej ofercie”). Testy Core + nowy test Api `LaterEdit_CannotHideEarlierPriceChange`
       (**Api jeszcze nieuruchomiony** – przy następnym pełnym przebiegu z Dockerem)
 - [x] Build (7/7) + testy 195/195 zielone (Visual Studio, 6.11.2026), w tym 35 integracyjnych z migracją
-- [ ] Commit
+- [x] Commit (5a491b6)
 
 ## Krok 10 – zdjęcia ogłoszenia (upload / usuwanie)
 
-- [ ] Core: `AddImage(actorId, ..., changedAtUtc)` / `RemoveImage(actorId, imageId, changedAtUtc)` – tylko właściciel, tylko `Open`,
-      każda zmiana podbija rewizję z flagą `Images` (użyj prywatnego `RecordChange` z Kroku 9)
-- [ ] Application: abstrakcja `IFileStorage` (`SaveAsync(stream, fileName) → path`, `DeleteAsync(path)`), komendy `AddAnnouncementImage`,
-      `RemoveAnnouncementImage`; walidacja: jpg/png/webp, max np. 5 MB, max 5 zdjęć (reguła już w domenie)
-- [ ] Infrastructure: `LocalFileStorage` (katalog z konfiguracji, np. `Storage:ImagesPath`), serwowanie plików (static files albo
-      `GET api/announcements/{id}/images/{imageId}`)
-- [ ] Api: `POST api/announcements/{id}/images` (multipart/form-data, 201), `DELETE api/announcements/{id}/images/{imageId}` (204)
-- [ ] Miniatura: na start pierwsze zdjęcie = miniatura (`AnnouncementDto.ThumbnailUrl`); generowanie mniejszych plików – później
-- [ ] Testy Core + Api (upload, limit, nie-właściciel → 409, oferta staje się `IsOutdated` po dodaniu zdjęcia)
+- [x] Core: `AddImage(actorId, imageId, ..., addedAtUtc)` / `RemoveImage(actorId, imageId, changedAtUtc)` – tylko właściciel, tylko `Open`,
+      każda zmiana podbija rewizję z flagą `Images` (`RecordChange`). Stare/nowe wartości = id zdjęć w kolejności dodania
+      („id1, id2”) – nie nazwy plików, bo dwa różne zdjęcia mogą mieć tę samą nazwę. `Image.AddedAt`, `GetThumbnail()`,
+      nieznane zdjęcie → `ImageNotFoundException` (404, wcześniej `DomainRule`)
+- [x] Application: `IFileStorage` – **zmiana względem planu:** `SaveAsync(path, stream)`, ścieżkę wybiera aplikacja
+      (`ImageFiles.GetStoragePath`), żeby domena sprawdziła reguły *przed* zapisem pliku; `OpenReadAsync`, `DeleteAsync`.
+      Komendy `AddAnnouncementImage`, `RemoveAnnouncementImage`; walidacja: format po „magic bytes” (jpg/png/webp), max 5 MB
+      (liczone przy czytaniu, nie z nagłówka), max 5 zdjęć (domena). Błąd po zapisie pliku → plik kasowany.
+- [x] Infrastructure: `LocalFileStorage` (`Storage:ImagesPath`, ochrona przed `../`), `GET api/announcements/{id}/images/{imageId}`
+      (query `GetAnnouncementImage`), migracja `20261106150000_ImageAddedAt`
+- [x] Api: `POST api/announcements/{id}/images` (multipart/form-data, pole `file`, 201), `DELETE api/announcements/{id}/images/{imageId}` (204)
+- [x] Miniatura: najstarsze zdjęcie (`AnnouncementDto.ThumbnailUrl`, na liście jako podzapytanie); mniejsze pliki – później
+- [x] Testy Core (`AnnouncementImageTests`), Application (`ImageHandlersTests`), Api (`AnnouncementImageTests`: upload, pobranie,
+      limit, zły plik, za duży, nie-właściciel → 409, oferta `IsOutdated` po dodaniu zdjęcia, usuwanie)
+- [x] `dotnet build` + `dotnet test` – 241/241 zielone (6.11.2026), commit
 
 ## Krok 11 – wątek negocjacji (wiadomości) + prywatność ofert
 

@@ -6,7 +6,7 @@ using static ICanHelp.Core.Tests.Entities.AnnouncementTestData;
 
 namespace ICanHelp.Core.Tests.Entities;
 
-/// <summary>Tworzenie, edycja, zdjęcia i cykl życia ogłoszenia (bez negocjacji).</summary>
+/// <summary>Tworzenie, edycja i cykl życia ogłoszenia (bez negocjacji; zdjęcia: AnnouncementImageTests).</summary>
 public class AnnouncementTests
 {
     // ---------- tworzenie ----------
@@ -76,54 +76,6 @@ public class AnnouncementTests
         Should.Throw<DomainRuleException>(() => announcement.Update(OwnerId, announcement.CategoryId,
             announcement.SubcategoryId, announcement.Difficulty, "Nowy tytuł", announcement.Description,
             announcement.Budget, announcement.Location, Now.AddHours(1)));
-    }
-
-    // ---------- zdjęcia ----------
-
-    [Fact]
-    public void AddImage_AddsImageLinkedToAnnouncement()
-    {
-        var announcement = CreateAnnouncement();
-        var imageId = Id.New();
-
-        var image = announcement.AddImage(imageId, "kran", ".jpg", "images/kran.jpg");
-
-        image.Id.ShouldBe(imageId);
-        image.AnnouncementId.ShouldBe(announcement.Id);
-        announcement.Images.ShouldHaveSingleItem().ShouldBeSameAs(image);
-    }
-
-    [Fact]
-    public void AddImage_MoreThanMax_Throws()
-    {
-        var announcement = CreateAnnouncement();
-        for (var i = 0; i < Announcement.MaxImages; i++)
-        {
-            announcement.AddImage(Id.New(), $"img{i}", ".jpg", $"images/img{i}.jpg");
-        }
-
-        Should.Throw<DomainRuleException>(() => announcement.AddImage(Id.New(), "extra", ".jpg", "images/extra.jpg"));
-
-        announcement.Images.Count.ShouldBe(Announcement.MaxImages);
-    }
-
-    [Fact]
-    public void RemoveImage_ExistingImage_RemovesIt()
-    {
-        var announcement = CreateAnnouncement();
-        var image = announcement.AddImage(Id.New(), "kran", ".jpg", "images/kran.jpg");
-
-        announcement.RemoveImage(image.Id);
-
-        announcement.Images.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void RemoveImage_UnknownImage_Throws()
-    {
-        var announcement = CreateAnnouncement();
-
-        Should.Throw<DomainRuleException>(() => announcement.RemoveImage(Id.New()));
     }
 
     // ---------- cykl życia ----------

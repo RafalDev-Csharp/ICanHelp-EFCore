@@ -56,7 +56,12 @@ internal sealed class GetAnnouncementsHandler : IQueryHandler<GetAnnouncements, 
             // which can use the spatial index IX_Announcements_GeoPoint.
             var nearest = await announcements
                 .Where(a => EF.Property<Point>(a, Spatial.GeoPoint).IsWithinDistance(origin, near.RadiusMeters))
-                .Select(a => new { Announcement = a, Distance = EF.Property<Point>(a, Spatial.GeoPoint).Distance(origin) })
+                .Select(a => new
+                {
+                    Announcement = a,
+                    Distance = EF.Property<Point>(a, Spatial.GeoPoint).Distance(origin),
+                    ThumbnailId = a.Images.OrderBy(i => i.AddedAt).Select(i => i.Id).FirstOrDefault()
+                })
                 .OrderBy(x => x.Distance)
                 .ThenByDescending(x => x.Announcement.CreatedAt)
                 .Skip(skip)
@@ -64,16 +69,31 @@ internal sealed class GetAnnouncementsHandler : IQueryHandler<GetAnnouncements, 
                 .ToListAsync(cancellationToken);
 
             return nearest
-                .Select(x => x.Announcement.AsDto() with { DistanceKm = Math.Round(x.Distance / 1000, 2) })
+                .Select(x => x.Announcement.AsDto() with
+                {
+                    DistanceKm = Math.Round(x.Distance / 1000, 2),
+                    ThumbnailUrl = ThumbnailUrl(x.Announcement.Id, x.ThumbnailId)
+                })
                 .ToList();
         }
 
+        // Thumbnail = the oldest image, as a subquery – the list does not load whole image collections.
         var page = await announcements
             .OrderByDescending(a => a.CreatedAt)
             .Skip(skip)
             .Take(take)
+            .Select(a => new
+            {
+                Announcement = a,
+                ThumbnailId = a.Images.OrderBy(i => i.AddedAt).Select(i => i.Id).FirstOrDefault()
+            })
             .ToListAsync(cancellationToken);
 
-        return page.Select(a => a.AsDto()).ToList();
+        return page
+            .Select(x => x.Announcement.AsDto() with { ThumbnailUrl = ThumbnailUrl(x.Announcement.Id, x.ThumbnailId) })
+            .ToList();
     }
+
+    private static string? ThumbnailUrl(Id announcementId, Id? imageId)
+        => imageId is null ? null : ImageDto.GetUrl(announcementId, imageId);
 }

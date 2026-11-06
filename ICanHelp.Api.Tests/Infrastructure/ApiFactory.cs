@@ -20,6 +20,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
         .Build();
 
+    // Zdjęcia z testów (Krok 10) – osobny katalog tymczasowy, usuwany po przebiegu.
+    public string ImagesPath { get; } = Path.Combine(Path.GetTempPath(), "icanhelp-tests-images-" + Guid.NewGuid().ToString("N"));
+
     public async Task InitializeAsync()
     {
         await _sql.StartAsync();
@@ -43,12 +46,18 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         // usług, a ustawienia z UseSetting są widoczne już w builder.Configuration.
         builder.UseSetting("ConnectionStrings:DefaultConnection", connectionString);
         builder.UseSetting("Auth:SigningKey", SigningKey);
+        builder.UseSetting("Storage:ImagesPath", ImagesPath);
     }
 
     async Task IAsyncLifetime.DisposeAsync()
     {
         await DisposeAsync();      // zatrzymuje hosta
         await _sql.DisposeAsync(); // usuwa kontener
+
+        if (Directory.Exists(ImagesPath))
+        {
+            Directory.Delete(ImagesPath, recursive: true);
+        }
     }
 }
 
