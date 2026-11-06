@@ -16,6 +16,12 @@ public record AnnouncementDto
     public DateTime CreatedAt { get; init; }
     public Guid? AcceptedOfferId { get; init; }
 
+    /// <summary>0 = as published, +1 for every edit. Offers made on an older revision are outdated.</summary>
+    public int Revision { get; init; }
+
+    /// <summary>When the content was last edited (null if never).</summary>
+    public DateTime? UpdatedAt { get; init; }
+
     /// <summary>Distance from the search point in km – only when the list was searched by location.</summary>
     public double? DistanceKm { get; init; }
 }
@@ -25,4 +31,28 @@ public sealed record AnnouncementDetailsDto : AnnouncementDto
 {
     public IReadOnlyList<OfferDto> Offers { get; init; } = [];
     public IReadOnlyList<ImageDto> Images { get; init; } = [];
+
+    /// <summary>History of edits, oldest first.</summary>
+    public IReadOnlyList<AnnouncementChangeDto> Changes { get; init; } = [];
+}
+
+/// <summary>One edit of an announcement: which revision it created and what exactly changed.</summary>
+public sealed record AnnouncementChangeDto
+{
+    public int Revision { get; init; }
+    public DateTime ChangedAt { get; init; }
+    public IReadOnlyList<AnnouncementFieldChangeDto> Fields { get; init; } = [];
+}
+
+/// <summary>
+/// One changed field with its value before and after – the UI highlights the difference
+/// (for Title/Description best as a word diff). Formats: Budget "150.00 PLN", Location "50.0614, 19.9366",
+/// Category "{categoryId}/{subcategoryId}", Difficulty "Easy".
+/// </summary>
+public sealed record AnnouncementFieldChangeDto
+{
+    /// <summary>Category, Difficulty, Title, Description, Budget, Location or Images.</summary>
+    public string Field { get; init; } = string.Empty;
+    public string? OldValue { get; init; }
+    public string? NewValue { get; init; }
 }

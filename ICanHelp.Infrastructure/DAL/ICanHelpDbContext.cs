@@ -15,6 +15,7 @@ public sealed class ICanHelpDbContext : DbContext
     public DbSet<Announcement> Announcements => Set<Announcement>();
     public DbSet<Offer> Offers => Set<Offer>();
     public DbSet<Image> Images => Set<Image>();
+    public DbSet<AnnouncementChange> AnnouncementChanges => Set<AnnouncementChange>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Subcategory> Subcategories => Set<Subcategory>();
     public DbSet<Rating> Ratings => Set<Rating>();
@@ -51,5 +52,7 @@ public sealed class ICanHelpDbContext : DbContext
         configurationBuilder.Properties<OfferParty>().HaveConversion<string>().HaveMaxLength(20);
         configurationBuilder.Properties<DifficultyLevel>().HaveConversion<string>().HaveMaxLength(20);
         configurationBuilder.Properties<UserRole>().HaveConversion<string>().HaveMaxLength(20);
+        // [Flags] enum as text, e.g. "Description, Budget" (Enum.Parse reads it back).
+        configurationBuilder.Properties<AnnouncementFields>().HaveConversion<string>().HaveMaxLength(200);
     }
 }

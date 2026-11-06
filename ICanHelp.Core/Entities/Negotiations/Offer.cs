@@ -28,13 +28,20 @@ public class Offer
     /// <summary>The offer this one is a counter-offer to (null for the first offer of a helper).</summary>
     public Id? ParentOfferId { get; private set; }
 
+    /// <summary>
+    /// <see cref="Announcement.Revision"/> at the moment the offer was made. If the announcement was edited later,
+    /// the offer is outdated: it was priced for a different description, so it cannot be accepted any more.
+    /// </summary>
+    public int AnnouncementRevision { get; private set; }
+
     // Required by EF Core.
     private Offer()
     {
     }
 
     internal Offer(Id id, Id announcementId, UserId helperId, OfferParty proposedBy, Price price,
-        DateTime proposedStart, DateTime proposedEnd, Description? message, DateTime createdAtUtc, Id? parentOfferId)
+        DateTime proposedStart, DateTime proposedEnd, Description? message, DateTime createdAtUtc, Id? parentOfferId,
+        int announcementRevision)
     {
         if (price.Amount <= 0)
         {
@@ -61,6 +68,7 @@ public class Offer
         Message = message;
         CreatedAt = createdAtUtc;
         ParentOfferId = parentOfferId;
+        AnnouncementRevision = announcementRevision;
         Status = OfferStatus.Pending;
     }
 

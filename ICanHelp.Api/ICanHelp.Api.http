@@ -116,6 +116,21 @@ Content-Type: application/json
 }
 
 ###
+# Właściciel poprawia ogłoszenie (PATCH: tylko zmieniane pola) -> 204.
+# Oferta wyżej staje się nieaktualna: w GET ogłoszenia "isOutdated": true, "changedSinceOffer": ["Description"],
+# a próba jej akceptacji -> 409. Kontroferta (niżej) powstaje już na nowej rewizji, więc da się ją zaakceptować.
+PATCH {{baseUrl}}/api/announcements/{{announcementId}}
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "description": "Kran cieknie od tygodnia, mam nową uszczelkę. Syfon pod zlewem też do wymiany."
+}
+
+###
+GET {{baseUrl}}/api/announcements/{{announcementId}}
+
+###
 # Kontroferta właściciela -> 201 { id nowej oferty }
 # @name counterOffer
 POST {{baseUrl}}/api/announcements/{{announcementId}}/offers/{{makeOffer.response.body.$.id}}/counter

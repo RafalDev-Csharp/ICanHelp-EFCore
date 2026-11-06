@@ -56,6 +56,10 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("int");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -68,6 +72,9 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
 
                     b.ComplexProperty<Dictionary<string, object>>("Budget", "ICanHelp.Core.Entities.Announcement.Budget#Price", b1 =>
                         {
@@ -111,6 +118,27 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                     b.HasIndex("Status", "CreatedAt");
 
                     b.ToTable("Announcements");
+                });
+
+            modelBuilder.Entity("ICanHelp.Core.Entities.AnnouncementChange", b =>
+                {
+                    b.Property<Guid>("AnnouncementId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ChangedFields")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("AnnouncementId", "Revision");
+
+                    b.ToTable("AnnouncementChanges");
                 });
 
             modelBuilder.Entity("ICanHelp.Core.Entities.Category", b =>
@@ -204,6 +232,9 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
 
                     b.Property<Guid>("AnnouncementId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AnnouncementRevision")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -387,6 +418,45 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ICanHelp.Core.Entities.AnnouncementChange", b =>
+                {
+                    b.HasOne("ICanHelp.Core.Entities.Announcement", null)
+                        .WithMany("Changes")
+                        .HasForeignKey("AnnouncementId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsMany("ICanHelp.Core.Entities.AnnouncementFieldChange", "Fields", b1 =>
+                        {
+                            b1.Property<Guid>("AnnouncementId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<int>("Revision")
+                                .HasColumnType("int");
+
+                            b1.Property<string>("Field")
+                                .HasMaxLength(20)
+                                .HasColumnType("nvarchar(20)");
+
+                            b1.Property<string>("NewValue")
+                                .HasMaxLength(500)
+                                .HasColumnType("nvarchar(500)");
+
+                            b1.Property<string>("OldValue")
+                                .HasMaxLength(500)
+                                .HasColumnType("nvarchar(500)");
+
+                            b1.HasKey("AnnouncementId", "Revision", "Field");
+
+                            b1.ToTable("AnnouncementFieldChanges");
+
+                            b1.WithOwner()
+                                .HasForeignKey("AnnouncementId", "Revision");
+                        });
+
+                    b.Navigation("Fields");
+                });
+
             modelBuilder.Entity("ICanHelp.Core.Entities.Image", b =>
                 {
                     b.HasOne("ICanHelp.Core.Entities.Announcement", null)
@@ -530,6 +600,8 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
 
             modelBuilder.Entity("ICanHelp.Core.Entities.Announcement", b =>
                 {
+                    b.Navigation("Changes");
+
                     b.Navigation("Images");
 
                     b.Navigation("Offers");

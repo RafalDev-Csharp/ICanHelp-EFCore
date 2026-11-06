@@ -1,4 +1,6 @@
+using ICanHelp.Application.Exceptions;
 using ICanHelp.Core.Repositories;
+using Microsoft.EntityFrameworkCore;
 
 namespace ICanHelp.Infrastructure.DAL;
 
@@ -20,6 +22,12 @@ internal sealed class SqlUnitOfWork : IUnitOfWork
             await action();
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Someone changed the same aggregate in the meantime (concurrency token, e.g. Announcement.Revision).
+            await transaction.RollbackAsync(cancellationToken);
+            throw new ConcurrencyConflictException();
         }
         catch
         {

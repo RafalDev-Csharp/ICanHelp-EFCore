@@ -107,6 +107,33 @@ public sealed class AnnouncementsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { announcementId }, new CreatedDto(announcementId));
     }
 
+    /// <summary>
+    /// Częściowa edycja ogłoszenia: wysyłasz tylko pola do zmiany (pominięte / <c>null</c> = bez zmian).
+    /// Tylko właściciel, tylko status Open. Realna zmiana podbija <c>revision</c>: oczekujące oferty dostają
+    /// <c>isOutdated = true</c> i nie da się ich zaakceptować – trzeba złożyć kontrofertę.
+    /// </summary>
+    [HttpPatch("{announcementId:guid}")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Update(
+        Guid announcementId,
+        [FromBody] UpdateAnnouncement command,
+        [FromServices] ICommandHandler<UpdateAnnouncement> handler,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+        {
+            return Unauthorized();
+        }
+
+        await handler.HandleAsync(command with { AnnouncementId = announcementId, ActorId = userId }, cancellationToken);
+        return NoContent();
+    }
+
     /// <summary>Anuluje ogłoszenie (tylko właściciel, w statusie Open albo Accepted).</summary>
     [HttpPost("{announcementId:guid}/cancel")]
     [Authorize]

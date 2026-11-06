@@ -1,3 +1,4 @@
+using System.Globalization;
 using ICanHelp.Core.Entities.Negotiations;
 using ICanHelp.Core.Enums;
 using ICanHelp.Core.Exceptions;
@@ -16,6 +17,7 @@ public class Announcement
 
     private readonly List<Offer> _offers = new();
     private readonly List<Image> _images = new();
+    private readonly List<AnnouncementChange> _changes = new();
 
     public Id Id { get; private set; }
     public UserId OwnerId { get; private set; }
@@ -37,8 +39,21 @@ public class Announcement
     /// <summary>The offer chosen by the owner (null until an offer is accepted).</summary>
     public Id? AcceptedOfferId { get; private set; }
 
+    /// <summary>
+    /// Version of the content: 0 = as published, +1 for every edit that really changes something.
+    /// Every offer remembers the revision it was made on (<see cref="Offer.AnnouncementRevision"/>).
+    /// Also used as a concurrency token: two simultaneous changes of the same announcement cannot both win.
+    /// </summary>
+    public int Revision { get; private set; }
+
+    /// <summary>When the content was last edited (null if never).</summary>
+    public DateTime? UpdatedAt { get; private set; }
+
     public IReadOnlyCollection<Offer> Offers => _offers.AsReadOnly();
     public IReadOnlyCollection<Image> Images => _images.AsReadOnly();
+
+    /// <summary>History of edits, one entry per revision.</summary>
+    public IReadOnlyCollection<AnnouncementChange> Changes => _changes.AsReadOnly();
 
     // Required by EF Core.
     private Announcement()
@@ -62,14 +77,44 @@ public class Announcement
         Location = location;
         CreatedAt = createdAtUtc;
         Status = AnnouncementStatus.Open;
+        Revision = 0;
     }
 
-    public void Update(Id categoryId, Id subcategoryId, DifficultyLevel difficulty, StringObject title,
-        Description description, Price budget, Location location)
+    /// <summary>
+    /// The owner corrects the announcement while it is still open (typo, more details, other budget...).
+    /// Returns the parts that really changed. If nothing changed, no new revision is created,
+    /// so pending offers do not become outdated without a reason.
+    /// </summary>
+    public AnnouncementFields Update(UserId actorId, Id categoryId, Id subcategoryId, DifficultyLevel difficulty,
+        StringObject title, Description description, Price budget, Location location, DateTime changedAtUtc)
     {
         EnsureStatus(AnnouncementStatus.Open, "be edited");
+        EnsureOwner(actorId, "edit");
         EnsureBudget(budget);
         EnsureDifficulty(difficulty);
+
+        // Compared as text – the same text is stored as "before/after", so the UI can show exactly what changed.
+        // Even one letter counts: it can change the meaning of the job.
+        var fields = new List<AnnouncementFieldChange>();
+        void Compare(AnnouncementFields field, string oldValue, string newValue)
+        {
+            if (!string.Equals(oldValue, newValue, StringComparison.Ordinal))
+            {
+                fields.Add(new AnnouncementFieldChange(field, oldValue, newValue));
+            }
+        }
+
+        Compare(AnnouncementFields.Category, $"{CategoryId}/{SubcategoryId}", $"{categoryId}/{subcategoryId}");
+        Compare(AnnouncementFields.Difficulty, Difficulty.ToString(), difficulty.ToString());
+        Compare(AnnouncementFields.Title, Title.Value, title.Value);
+        Compare(AnnouncementFields.Description, Description.Value, description.Value);
+        Compare(AnnouncementFields.Budget, Format(Budget), Format(budget));
+        Compare(AnnouncementFields.Location, Format(Location), Format(location));
+
+        if (fields.Count == 0)
+        {
+            return AnnouncementFields.None;
+        }
 
         CategoryId = categoryId;
         SubcategoryId = subcategoryId;
@@ -78,7 +123,34 @@ public class Announcement
         Description = description;
         Budget = budget;
         Location = location;
+
+        return RecordChange(fields, changedAtUtc);
     }
+
+    /// <summary>
+    /// What is different now compared to the given revision, per field: the value then → the value now.
+    /// Several edits of one field are merged (150 → 300 → 500 gives 150 → 500), so a later edit cannot hide
+    /// an earlier one: whatever is still different from that revision is listed. A field that was changed and then
+    /// changed back to exactly the same text is not listed – there is no difference to show (the edits are still
+    /// counted by <see cref="GetEditsSince"/> and kept in <see cref="Changes"/>).
+    /// </summary>
+    public IReadOnlyList<AnnouncementFieldDiff> GetFieldChangesSince(int revision)
+        => _changes
+            .Where(c => c.Revision > revision)
+            .OrderBy(c => c.Revision)
+            .SelectMany(c => c.Fields)
+            .GroupBy(f => f.Field)
+            .Select(g => new AnnouncementFieldDiff(g.Key, g.First().OldValue, g.Last().NewValue))
+            .Where(d => !string.Equals(d.OldValue, d.NewValue, StringComparison.Ordinal))
+            .OrderBy(d => d.Field)
+            .ToList();
+
+    /// <summary>All parts that are different now compared to the given revision (None if the same).</summary>
+    public AnnouncementFields GetChangesSince(int revision)
+        => GetFieldChangesSince(revision).Aggregate(AnnouncementFields.None, (all, diff) => all | diff.Field);
+
+    /// <summary>How many edits were made after the given revision (also those that were later reverted).</summary>
+    public int GetEditsSince(int revision) => Math.Max(0, Revision - revision);
 
     // ---------- images ----------
 
@@ -121,7 +193,7 @@ public class Announcement
         }
 
         var offer = new Offer(offerId, Id, helperId, OfferParty.Helper, price, proposedStart, proposedEnd,
-            message, createdAtUtc, parentOfferId: null);
+            message, createdAtUtc, parentOfferId: null, Revision);
 
         _offers.Add(offer);
         return offer;
@@ -142,15 +214,20 @@ public class Announcement
         }
 
         // The new offer is created first: if its data is invalid, the original stays untouched.
+        // A counter-offer is always made on the current revision, so it is also the way to "refresh" an outdated offer.
         var counter = new Offer(newOfferId, Id, original.HelperId, party, price, proposedStart, proposedEnd,
-            message, createdAtUtc, original.Id);
+            message, createdAtUtc, original.Id, Revision);
 
         original.MarkAsCountered();
         _offers.Add(counter);
         return counter;
     }
 
-    /// <summary>The side that did not propose the offer accepts it; all other pending offers are rejected.</summary>
+    /// <summary>
+    /// The side that did not propose the offer accepts it; all other pending offers are rejected.
+    /// An offer made before the last edit of the announcement cannot be accepted – the terms were agreed for
+    /// a different description. Either side can make a counter-offer instead (it is made on the current revision).
+    /// </summary>
     public void AcceptOffer(Id offerId, UserId actorId)
     {
         EnsureStatus(AnnouncementStatus.Open, "accept an offer");
@@ -161,6 +238,12 @@ public class Announcement
         if (party == offer.ProposedBy)
         {
             throw new DomainRuleException("You cannot accept your own offer.");
+        }
+
+        if (offer.AnnouncementRevision != Revision)
+        {
+            throw new DomainRuleException(
+                "The announcement has changed since this offer was made. Make a counter-offer with up-to-date terms instead.");
         }
 
         offer.Accept();
@@ -261,6 +344,22 @@ public class Announcement
     }
 
     // ---------- helpers ----------
+
+    // Every real change of the content: new revision + history entry. Images (Krok 10) will use it too.
+    private AnnouncementFields RecordChange(IReadOnlyCollection<AnnouncementFieldChange> fields, DateTime changedAtUtc)
+    {
+        Revision++;
+        UpdatedAt = changedAtUtc;
+        var change = new AnnouncementChange(Id, Revision, changedAtUtc, fields);
+        _changes.Add(change);
+        return change.ChangedFields;
+    }
+
+    private static string Format(Price price)
+        => $"{price.Amount.ToString("0.00", CultureInfo.InvariantCulture)} {price.Currency}";
+
+    private static string Format(Location location)
+        => string.Create(CultureInfo.InvariantCulture, $"{location.Latitude}, {location.Longitude}");
 
     private Offer GetOffer(Id offerId)
         => _offers.FirstOrDefault(o => o.Id == offerId) ?? throw new OfferNotFoundException(offerId);

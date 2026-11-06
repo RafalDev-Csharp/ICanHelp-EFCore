@@ -40,8 +40,8 @@ public class AnnouncementTests
         var categoryId = Id.New();
         var subcategoryId = Id.New();
 
-        announcement.Update(categoryId, subcategoryId, DifficultyLevel.Hard, "Malowanie ściany",
-            "Pomalować ścianę w salonie.", Price.Pln(300), new Location(50.0647, 19.9450));
+        announcement.Update(OwnerId, categoryId, subcategoryId, DifficultyLevel.Hard, "Malowanie ściany",
+            "Pomalować ścianę w salonie.", Price.Pln(300), new Location(50.0647, 19.9450), Now.AddHours(1));
 
         announcement.CategoryId.ShouldBe(categoryId);
         announcement.SubcategoryId.ShouldBe(subcategoryId);
@@ -57,9 +57,9 @@ public class AnnouncementTests
     {
         var announcement = CreateAnnouncement();
 
-        Should.Throw<DomainRuleException>(() => announcement.Update(announcement.CategoryId,
+        Should.Throw<DomainRuleException>(() => announcement.Update(OwnerId, announcement.CategoryId,
             announcement.SubcategoryId, announcement.Difficulty, announcement.Title, announcement.Description,
-            Price.Pln(0), announcement.Location));
+            Price.Pln(0), announcement.Location, Now.AddHours(1)));
 
         announcement.Budget.ShouldBe(Price.Pln(150));
     }
@@ -73,9 +73,9 @@ public class AnnouncementTests
     {
         var announcement = InStatus(status);
 
-        Should.Throw<DomainRuleException>(() => announcement.Update(announcement.CategoryId,
+        Should.Throw<DomainRuleException>(() => announcement.Update(OwnerId, announcement.CategoryId,
             announcement.SubcategoryId, announcement.Difficulty, "Nowy tytuł", announcement.Description,
-            announcement.Budget, announcement.Location));
+            announcement.Budget, announcement.Location, Now.AddHours(1)));
     }
 
     // ---------- zdjęcia ----------

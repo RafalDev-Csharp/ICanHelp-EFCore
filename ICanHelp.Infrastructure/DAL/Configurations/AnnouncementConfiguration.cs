@@ -19,6 +19,11 @@ internal sealed class AnnouncementConfiguration : IEntityTypeConfiguration<Annou
         builder.Property(x => x.Difficulty).IsRequired();
         builder.Property(x => x.Status).IsRequired();
         builder.Property(x => x.CreatedAt).IsRequired();
+        builder.Property(x => x.UpdatedAt).IsRequired(false);
+
+        // Concurrency token: EF adds "WHERE Revision = <value read>" to every UPDATE of the announcement.
+        // An edit and an accept at the same moment → the second one gets DbUpdateConcurrencyException (→ 409).
+        builder.Property(x => x.Revision).IsRequired().IsConcurrencyToken();
 
         // Value objects with more than one field are stored in the same table (columns BudgetAmount, BudgetCurrency...).
         builder.ComplexProperty(x => x.Budget, budget =>
@@ -69,6 +74,12 @@ internal sealed class AnnouncementConfiguration : IEntityTypeConfiguration<Annou
             .HasForeignKey(i => i.AnnouncementId)
             .OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(x => x.Images).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.HasMany(x => x.Changes)
+            .WithOne()
+            .HasForeignKey(c => c.AnnouncementId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(x => x.Changes).UsePropertyAccessMode(PropertyAccessMode.Field);
 
         // The accepted offer. NoAction, because offers are already removed by the cascade above.
         builder.HasOne<Offer>()

@@ -23,6 +23,25 @@ public sealed record CreateAnnouncement : ICommand
     public LocationDto Location { get; init; } = new();
 }
 
+/// <summary>
+/// Częściowa edycja ogłoszenia (PATCH): pole <c>null</c> albo pominięte = bez zmian. Tylko właściciel, tylko status Open.
+/// Każda realna zmiana tworzy nową rewizję – oczekujące oferty stają się nieaktualne (<c>OfferDto.IsOutdated</c>).
+/// </summary>
+public sealed record UpdateAnnouncement : ICommand
+{
+    [JsonIgnore] public Guid AnnouncementId { get; init; }
+    [JsonIgnore] public Guid ActorId { get; init; }
+
+    /// <summary>Zmiana kategorii wymaga podania też podkategorii (która musi do niej należeć).</summary>
+    public Guid? CategoryId { get; init; }
+    public Guid? SubcategoryId { get; init; }
+    public DifficultyLevel? Difficulty { get; init; }
+    public string? Title { get; init; }
+    public string? Description { get; init; }
+    public PriceDto? Budget { get; init; }
+    public LocationDto? Location { get; init; }
+}
+
 /// <summary>Anulowanie ogłoszenia (tylko właściciel, status Open albo Accepted).</summary>
 public sealed record CancelAnnouncement(Guid AnnouncementId, Guid ActorId) : ICommand;
 
