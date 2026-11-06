@@ -94,7 +94,7 @@
       istniejące testy czytają oferty jako właściciel albo autor – bez zmian.
 - [x] Migracja `20261106170000_Conversations` napisana ręcznie (+ snapshot, Designer); zakłada wątki dla istniejących par (ogłoszenie, pomocnik) z ofert
 - [x] Testy Core (`ConversationTests`), Application (`ConversationHandlersTests`), Api (`ConversationTests`, w tym prywatność ofert)
-- [ ] `dotnet build` + `dotnet test` (kod pisany bez kompilatora), commit
+- [x] `dotnet build` + `dotnet test` – zweryfikowane razem z Krokiem 12 (286/286, 6.11.2026), commit
 
 ## Krok 12 – „Moje negocjacje” (lista rozmów z podglądem ogłoszenia)
 
@@ -115,7 +115,7 @@
 - [x] Testy Api (`MyConversationsTests`: dwie rozmowy naraz i kolejność po aktywności, kontroferta, stronicowanie, licznik
       nieprzeczytanych z obu stron, flaga zmiany ogłoszenia + `isOutdated`, filtry rola/status, 401) + Application
       (`MyConversationPreviewTests`)
-- [ ] `dotnet build` + `dotnet test` (kod pisany bez kompilatora), commit
+- [x] `dotnet build` + `dotnet test` – 286/286 zielone (6.11.2026), commit 77f0e73
 
 ## Krok 13 (opcjonalnie) – powiadomienia
 
