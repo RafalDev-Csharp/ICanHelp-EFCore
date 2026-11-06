@@ -130,6 +130,40 @@ Content-Type: application/json
 ###
 GET {{baseUrl}}/api/announcements/{{announcementId}}
 
+### ======== Krok 11: rozmowa (wątek negocjacji) ========
+# Pomocnik otwiera wątek z właścicielem -> 201 { id } (już istnieje, np. po ofercie wyżej -> 200 z tym samym id).
+# Można to zrobić przed ofertą, żeby o coś zapytać.
+# @name startConversation
+POST {{baseUrl}}/api/announcements/{{announcementId}}/conversations
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+@conversationId = {{startConversation.response.body.$.id}}
+
+# Wiadomość pomocnika (2–500 znaków) -> 201 { id }
+POST {{baseUrl}}/api/conversations/{{conversationId}}/messages
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "text": "Czy syfon pod zlewem też jest do wymiany?"
+}
+
+###
+# Wątek oczami właściciela: "timeline" = Message / Offer / AnnouncementChanged (od najstarszych), "unreadCount".
+# Obcy -> 404.
+GET {{baseUrl}}/api/conversations/{{conversationId}}
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+###
+# Właściciel przeczytał wątek -> 204 (unreadCount = 0)
+POST {{baseUrl}}/api/conversations/{{conversationId}}/read
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+###
+# Prywatność ofert: bez tokenu "offers" jest puste, widać tylko "helperCount"
+GET {{baseUrl}}/api/announcements/{{announcementId}}
+
 ### ======== Krok 10: zdjęcia ========
 # Właściciel dodaje zdjęcie (multipart, pole "file"; JPEG/PNG/WebP, max 5 MB, max 5) -> 201 { id }, Location = adres pliku.
 # To też zmiana treści: nowa rewizja, w ofercie "changesSinceOffer" z polem "Images" (stare/nowe id zdjęć).

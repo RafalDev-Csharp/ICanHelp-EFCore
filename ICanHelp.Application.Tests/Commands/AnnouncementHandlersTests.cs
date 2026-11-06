@@ -21,6 +21,7 @@ public class AnnouncementHandlersTests
     private readonly InMemoryAnnouncementRepository _announcements = new();
     private readonly InMemoryCategoryRepository _categories = new();
     private readonly InMemoryRatingRepository _ratings = new();
+    private readonly InMemoryConversationRepository _conversations = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly FixedClock _clock = new();
 
@@ -100,7 +101,7 @@ public class AnnouncementHandlersTests
         var announcement = await CreateAnnouncementAsync();
         var command = OfferCommand(announcement.Id);
 
-        await new MakeOfferHandler(_announcements, _users, _unitOfWork, _clock).HandleAsync(command);
+        await new MakeOfferHandler(_announcements, _users, _conversations, _unitOfWork, _clock).HandleAsync(command);
 
         var offer = announcement.Offers.ShouldHaveSingleItem();
         offer.Id.Value.ShouldBe(command.OfferId);
@@ -118,7 +119,7 @@ public class AnnouncementHandlersTests
         var start = DateTime.SpecifyKind(_clock.UtcNow.AddDays(1), DateTimeKind.Unspecified);
         var command = OfferCommand(announcement.Id) with { ProposedStart = start, ProposedEnd = start.AddHours(2) };
 
-        await new MakeOfferHandler(_announcements, _users, _unitOfWork, _clock).HandleAsync(command);
+        await new MakeOfferHandler(_announcements, _users, _conversations, _unitOfWork, _clock).HandleAsync(command);
 
         var offer = announcement.Offers.ShouldHaveSingleItem();
         offer.ProposedStart.Kind.ShouldBe(DateTimeKind.Utc);
@@ -132,7 +133,7 @@ public class AnnouncementHandlersTests
         var command = OfferCommand(announcement.Id) with { HelperId = _owner.Id };
 
         await Should.ThrowAsync<DomainRuleException>(
-            () => new MakeOfferHandler(_announcements, _users, _unitOfWork, _clock).HandleAsync(command));
+            () => new MakeOfferHandler(_announcements, _users, _conversations, _unitOfWork, _clock).HandleAsync(command));
     }
 
     [Fact]
@@ -141,7 +142,7 @@ public class AnnouncementHandlersTests
         var command = OfferCommand(Id.New());
 
         await Should.ThrowAsync<AnnouncementNotFoundException>(
-            () => new MakeOfferHandler(_announcements, _users, _unitOfWork, _clock).HandleAsync(command));
+            () => new MakeOfferHandler(_announcements, _users, _conversations, _unitOfWork, _clock).HandleAsync(command));
     }
 
     [Fact]
@@ -368,7 +369,7 @@ public class AnnouncementHandlersTests
     private async Task<Guid> MakeOfferAsync(Announcement announcement)
     {
         var command = OfferCommand(announcement.Id);
-        await new MakeOfferHandler(_announcements, _users, _unitOfWork, _clock).HandleAsync(command);
+        await new MakeOfferHandler(_announcements, _users, _conversations, _unitOfWork, _clock).HandleAsync(command);
         return command.OfferId;
     }
 

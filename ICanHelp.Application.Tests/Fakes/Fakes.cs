@@ -3,6 +3,7 @@ using ICanHelp.Application.Security;
 using ICanHelp.Application.Storage;
 using ICanHelp.Application.Time;
 using ICanHelp.Core.Entities;
+using ICanHelp.Core.Entities.Negotiations;
 using ICanHelp.Core.Entities.Users;
 using ICanHelp.Core.Enums;
 using ICanHelp.Core.Repositories;
@@ -132,6 +133,24 @@ internal sealed class InMemoryRatingRepository : IRatingRepository
     public Task AddAsync(Rating rating, CancellationToken cancellationToken = default)
     {
         Ratings.Add(rating);
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class InMemoryConversationRepository : IConversationRepository
+{
+    public List<Conversation> Conversations { get; } = new();
+
+    public Task<Conversation?> GetByIdAsync(Id id, CancellationToken cancellationToken = default)
+        => Task.FromResult(Conversations.SingleOrDefault(c => c.Id == id));
+
+    public Task<Conversation?> GetByParticipantsAsync(Id announcementId, UserId helperId,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(Conversations.SingleOrDefault(c => c.AnnouncementId == announcementId && c.HelperId == helperId));
+
+    public Task AddAsync(Conversation conversation, CancellationToken cancellationToken = default)
+    {
+        Conversations.Add(conversation);
         return Task.CompletedTask;
     }
 }

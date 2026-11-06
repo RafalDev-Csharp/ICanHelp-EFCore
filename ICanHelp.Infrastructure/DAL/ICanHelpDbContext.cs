@@ -16,6 +16,7 @@ public sealed class ICanHelpDbContext : DbContext
     public DbSet<Offer> Offers => Set<Offer>();
     public DbSet<Image> Images => Set<Image>();
     public DbSet<AnnouncementChange> AnnouncementChanges => Set<AnnouncementChange>();
+    public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Subcategory> Subcategories => Set<Subcategory>();
     public DbSet<Rating> Ratings => Set<Rating>();

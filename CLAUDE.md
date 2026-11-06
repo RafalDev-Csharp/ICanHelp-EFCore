@@ -45,7 +45,8 @@ Jeden użytkownik może być raz klientem, raz pomocnikiem (rola w transakcji, n
   Location (VO lat/lon), Status, CreatedAt, AcceptedOfferId?, **Offers**, **Images** (max 5),
   **Revision** (0 = opublikowane, +1 przy realnej edycji; token współbieżności), UpdatedAt?, **Changes** (`AnnouncementChange`: rewizja, czas, `AnnouncementFields` [Flags])
   - metody: `Update(actor, ..., at)` (tylko właściciel, `Open`), `GetChangesSince(rev)`, `AddOffer`, `CounterOffer`, `AcceptOffer`, `RejectOffer`, `WithdrawOffer`, `AddImage(actor,…,at)`, `RemoveImage(actor, id, at)`, `GetThumbnail()`,
-    `Start(actor)`, `Complete(actor)`, `Cancel(actor)`, `GetAcceptedHelperId()`, `IsParticipant(user)`, `CreateRating(...)`
+    `Start(actor)`, `Complete(actor)`, `Cancel(actor)`, `GetAcceptedHelperId()`, `IsParticipant(user)`, `CreateRating(...)`,
+    `GetOffersVisibleTo(viewer?)`, `StartConversation(...)`, `AllowsConversationWith(helper)`
   - `Offer` (część agregatu): HelperId, ProposedBy (Client/Helper), Price, ProposedStart/End, Message?, Status, ParentOfferId?
     (kontroferta = nowy `Offer` wskazujący poprzedni; poprzedni dostaje status `Countered`)
   - `Image` (część agregatu): FileName (do wyświetlania), FileExtension, FilePath (ścieżka w magazynie, nie trafia do DTO), AddedAt
@@ -53,6 +54,11 @@ Jeden użytkownik może być raz klientem, raz pomocnikiem (rola w transakcji, n
 - `Category` (agregat) → `Subcategory` (część agregatu, unikalna nazwa w kategorii)
 - `Rating`: AnnouncementId, RaterId, RateeId, Rate (1–5), Comment?; unikalne (AnnouncementId, RaterId)
 - `LikedAnnouncement` (UserId, AnnouncementId) i `LikedUser` (LikerId, LikedId) – klucze złożone, istnienie wiersza = polubione
+- `Conversation` (agregat, `Entities/Negotiations`): AnnouncementId, ClientId (= właściciel), HelperId, CreatedAt, `Client/HelperLastReadAt`,
+  **Messages** (`ConversationMessage`: SenderId, Text (Description ≤ 500), SentAt, AnnouncementRevision). Jeden na parę (AnnouncementId, HelperId).
+  Tworzy go `announcement.StartConversation` (tylko Open, nie właściciel); `SendMessage(..., announcement, at)` sprawdza
+  `announcement.AllowsConversationWith(HelperId)`: Open – każdy, Accepted/InProgress/Completed – tylko zaakceptowany pomocnik, Cancelled – nikt.
+  `MarkAsRead` (znacznik nie cofa się; wysłanie = przeczytane), `CountUnread`. Rozmowa ≠ oferta (wiadomości nie da się zaakceptować).
 - Później: `HelperProfile` z obszarem działania / trasą dojazdu (punkt + promień) → wyszukiwanie „po drodze”
 
 ## Przepływ statusów
@@ -73,10 +79,10 @@ Application     Abstractions (ICommand/IQuery + handlery), DTO, Queries, Command
 Infrastructure  DAL/ICanHelpDbContext, DAL/Converters, DAL/Configurations, DAL/Repositories,
                 DAL/Handlers (query handlery + mapowanie AsDto), SqlUnitOfWork, DbInitializer, Security (JWT, hasła), Time,
                 Extensions.AddInfrastructure()
-Api             Program.cs, Controllers (Announcements, Categories, Users), ErrorHandling/DomainExceptionHandler,
+Api             Program.cs, Controllers (Announcements, Categories, Conversations, Users), ErrorHandling/DomainExceptionHandler,
                 appsettings*.json, Properties/launchSettings.json, ICanHelp.Api.http (przykładowe żądania)
 Api.Tests       Infrastructure/ApiFactory (kontener + ApiCollection), Infrastructure/TestApi (CreateUserAsync, ShouldBeProblemAsync…),
-                testy per obszar: ApiBasics, Users, AnnouncementFlow, DistanceSearch
+                testy per obszar: ApiBasics, Users, AnnouncementFlow, AnnouncementEdit, AnnouncementImage, Conversation, DistanceSearch
 .github/workflows/ci.yml   build + testy jednostkowe + integracyjne (ubuntu-latest, Docker)
 ```
 Testy integracyjne: jeden kontener i baza `ICanHelpTests` na cały przebieg, środowisko `Testing`, config przez `UseSetting`.
@@ -127,6 +133,17 @@ Wspólne: `RepositoryExtensions` (`GetOrThrowAsync` → `AnnouncementNotFound`, 
   (`IsSelfOrAdmin` w kontrolerze, inaczej 403). Oceny, ogłoszenia, kategorie – publiczne.
   Kontakt drugiej strony: `GET api/announcements/{id}/contact` (query `GetAnnouncementContact`) – tylko uczestnik, status
   Accepted/InProgress/Completed, inaczej 404. Id aktora w komendach zawsze z tokenu (`User.TryGetUserId`, `Api/Security`), pola `[JsonIgnore]`.
+  Oferty w `GET api/announcements/{id}` (token opcjonalny → `GetAnnouncementById.ViewerId`): właściciel – wszystkie, pomocnik – swoje,
+  reszta (też anonim) – pusta lista + `HelperCount` (ilu pomocników złożyło ofertę). Reguła w `Announcement.GetOffersVisibleTo`.
+
+## Rozmowa (Krok 11)
+- `POST api/announcements/{id}/conversations` – pomocnik zakłada wątek (201 + Location `api/conversations/{id}`; istniał → 200 z jego id;
+  kontroler po komendzie czyta id query `GetConversationId`). `MakeOffer` zakłada wątek automatycznie (`GetOrStartAsync` w `RepositoryExtensions`).
+- `api/conversations` (`[Authorize]`): `GET {id}` (`ConversationDto`: `Timeline` = Message/Offer/AnnouncementChanged od najstarszych – oferty
+  tego pomocnika, zmiany ogłoszenia po `CreatedAt` wątku; `MyRole`, `UnreadCount`, `CanWrite`; obcy → 404), `POST {id}/messages` (201),
+  `POST {id}/read` (204). Obcy przy zapisie → 409 (DomainRule), brak wątku → 404 `ConversationNotFound`.
+- Tabele `Conversations` (unikalny indeks AnnouncementId+HelperId, indeksy ClientId/HelperId) i `ConversationMessages` (indeks ConversationId+SentAt),
+  Cascade z ogłoszenia. Migracja `Conversations` zakłada wątki dla istniejących ofert.
 
 ## Api (jak jest zbudowane)
 - Kontrolery `[ApiController]`, trasy `api/<zasób>`. Handler wstrzykiwany do akcji przez `[FromServices] IQueryHandler<TQuery, TResult>`
@@ -136,7 +153,7 @@ Wspólne: `RepositoryExtensions` (`GetOrThrowAsync` → `AnnouncementNotFound`, 
   `POST {id}/offers/{offerId}/counter|accept|reject|withdraw`, `POST {id}/start|complete|cancel` (204), `POST {id}/ratings` (201).
   Akcje bez body idą przez prywatne `Execute(userId => komenda, ...)` w kontrolerze. Przykłady całego przepływu w `ICanHelp.Api.http`.
 - Błędy zawsze jako ProblemDetails: `AddProblemDetails` + `UseExceptionHandler` + `UseStatusCodePages`.
-  `DomainExceptionHandler`: `OfferNotFound`/`AnnouncementNotFound`/`UserNotFound` → 404, `DomainRuleException`, `AlreadyRated` → 409,
+  `DomainExceptionHandler`: `OfferNotFound`/`AnnouncementNotFound`/`UserNotFound`/`ImageNotFound`/`ConversationNotFound` → 404, `DomainRuleException`, `AlreadyRated` → 409,
   wyjątki auth (wyżej), inne `CustomExceptions` (np. `InvalidCategory`) → 400
   (pole `errorCode` = nazwa wyjątku bez „Exception”), reszta → 500 bez szczegółów. Każda odpowiedź ma `traceId`.
 - Enumy w JSON jako string (`JsonStringEnumConverter`). Swagger (Swashbuckle) tylko w Development, z komentarzy `///`.
@@ -185,7 +202,10 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
 - [x] Krok 10 – zdjęcia (sekcja „Zdjęcia”), migracja `ImageAddedAt` (20261106150000, ręczna). Testy: `Core.Tests/.../AnnouncementImageTests.cs`,
   `Application.Tests/Commands/ImageHandlersTests.cs`, `Api.Tests/AnnouncementImageTests.cs`. 6.11.2026: build + 241/241 testów zielone
   (w tym integracyjne z migracją; potwierdza też test `LaterEdit_CannotHideEarlierPriceChange` z Kroku 9).
-- [ ] Kroki 11–13 – wątek wiadomości + prywatność ofert, „moje negocjacje”, powiadomienia: `docs/PLAN-NEGOCJACJE.md`
+- [x] Krok 11 – wątek negocjacji + prywatność ofert (sekcja „Rozmowa”), migracja `Conversations` (20261106170000, ręczna, z backfillem
+  wątków dla istniejących ofert). Testy: `Core.Tests/.../ConversationTests.cs`, `Application.Tests/Commands/ConversationHandlersTests.cs`,
+  `Api.Tests/ConversationTests.cs`. Pisane bez kompilatora (sesja w chmurze) – **do zrobienia u autora: `dotnet build` + `dotnet test`, commit.**
+- [ ] Kroki 12–13 – „moje negocjacje”, powiadomienia: `docs/PLAN-NEGOCJACJE.md`
 
 ## Jak pracować z AI (oszczędnie)
 - Jedna sesja = jeden krok z listy. Na start: „Przeczytaj CLAUDE.md, zrób Krok N”.

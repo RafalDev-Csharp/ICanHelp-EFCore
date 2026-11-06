@@ -318,6 +318,52 @@ public class Announcement
         offer.Withdraw();
     }
 
+    /// <summary>
+    /// Who can see which offers: the owner – all of them, a helper – only his own negotiation, anybody else – none
+    /// (prices and messages of other helpers are not public; only their number is).
+    /// </summary>
+    public IEnumerable<Offer> GetOffersVisibleTo(UserId? viewerId)
+    {
+        if (viewerId is null)
+        {
+            return [];
+        }
+
+        return viewerId == OwnerId ? _offers : _offers.Where(o => o.HelperId == viewerId);
+    }
+
+    // ---------- conversation ----------
+
+    /// <summary>
+    /// A helper opens a conversation with the owner – e.g. to ask a question before making an offer
+    /// (making an offer opens it automatically). Only while the announcement is open, never by the owner.
+    /// "One conversation per helper" is checked by the application layer (and a unique index).
+    /// </summary>
+    public Conversation StartConversation(Id conversationId, UserId helperId, DateTime createdAtUtc)
+    {
+        EnsureStatus(AnnouncementStatus.Open, "start a conversation");
+
+        if (helperId == OwnerId)
+        {
+            throw new DomainRuleException("The owner cannot start a conversation on his own announcement.");
+        }
+
+        return new Conversation(conversationId, Id, OwnerId, helperId, createdAtUtc);
+    }
+
+    /// <summary>
+    /// Can the owner and this helper (still) write to each other? While open – every helper. After acceptance only
+    /// the accepted helper (details of the job, later of the rating). Cancelled – nobody.
+    /// </summary>
+    public bool AllowsConversationWith(UserId helperId)
+        => Status switch
+        {
+            AnnouncementStatus.Open => true,
+            AnnouncementStatus.Accepted or AnnouncementStatus.InProgress or AnnouncementStatus.Completed
+                => helperId == GetAcceptedHelperId(),
+            _ => false
+        };
+
     // ---------- lifecycle ----------
 
     /// <summary>Work begins. Either participant can mark it: the owner or the helper of the accepted offer.</summary>

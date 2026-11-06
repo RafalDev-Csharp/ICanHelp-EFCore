@@ -70,21 +70,30 @@
 
 ## Krok 11 – wątek negocjacji (wiadomości) + prywatność ofert
 
-- [ ] Core: agregat `Conversation` (Id, AnnouncementId, ClientId = właściciel, HelperId, CreatedAt, `ClientLastReadAt`, `HelperLastReadAt`,
+- [x] Core: agregat `Conversation` (Id, AnnouncementId, ClientId = właściciel, HelperId, CreatedAt, `ClientLastReadAt`, `HelperLastReadAt`,
       `Messages`); część agregatu `ConversationMessage` (Id, SenderId, Text (Description, max 500), SentAt, `AnnouncementRevision`).
       Jeden wątek na parę (AnnouncementId, HelperId) – unikalny indeks.
-- [ ] Reguły: wątek zakłada pomocnik (może pytać **przed** złożeniem oferty) albo powstaje automatycznie przy `MakeOffer`;
+- [x] Reguły: wątek zakłada pomocnik (może pytać **przed** złożeniem oferty) albo powstaje automatycznie przy `MakeOffer`;
       pisać mogą tylko te dwie osoby; pisanie dozwolone w `Open`, a po akceptacji tylko w wątku zaakceptowanego pomocnika
-      (status ogłoszenia handler czyta z repozytorium ogłoszeń); `MarkAsRead(userId, atUtc)`
-- [ ] Api: `POST api/announcements/{id}/conversations` (pomocnik zakłada wątek, 201 albo 200 z istniejącym id),
+      (status ogłoszenia handler czyta z repozytorium ogłoszeń); `MarkAsRead(userId, atUtc)`.
+      **Realizacja:** reguła „czy wolno pisać” jest w domenie – `Announcement.AllowsConversationWith(helperId)`
+      (po akceptacji: Accepted/InProgress/Completed – tylko zaakceptowany pomocnik; Cancelled – nikt), `Conversation.SendMessage`
+      dostaje ogłoszenie parametrem. Wysłanie wiadomości = nadawca przeczytał wątek do teraz.
+- [x] Api: `POST api/announcements/{id}/conversations` (pomocnik zakłada wątek, 201 albo 200 z istniejącym id),
       `GET api/conversations/{id}` (wątek: wiadomości + oferty tego pomocnika + zmiany ogłoszenia jako jedna oś czasu),
       `POST api/conversations/{id}/messages`, `POST api/conversations/{id}/read`
-- [ ] Oś czasu w odczycie: wiadomości, oferty (`HelperId` = pomocnik wątku) i wpisy „ogłoszenie zmienione (opis, zdjęcia)”
-      z `AnnouncementChanges` – posortowane po czasie; to są te „systemowe” znaki ostrzegawcze w rozmowie
-- [ ] **Prywatność ofert:** `GET api/announcements/{id}` dla obcych i niezalogowanych – bez ofert (tylko liczba);
+- [x] Oś czasu w odczycie: wiadomości, oferty (`HelperId` = pomocnik wątku) i wpisy „ogłoszenie zmienione (opis, zdjęcia)”
+      z `AnnouncementChanges` – posortowane po czasie; to są te „systemowe” znaki ostrzegawcze w rozmowie.
+      **Realizacja:** `ConversationDto.Timeline[]` = `{ type: Message|Offer|AnnouncementChanged, at, message?, offer?, change? }`;
+      zmiany tylko po `CreatedAt` wątku; dodatkowo `myRole`, `unreadCount`, `canWrite`
+- [x] **Prywatność ofert:** `GET api/announcements/{id}` dla obcych i niezalogowanych – bez ofert (tylko liczba);
       właściciel widzi wszystkie; pomocnik – tylko swoje. (Dziś każdy widzi ceny i wiadomości wszystkich pomocników.)
       Popraw istniejące testy Api, które czytają `Offers` jako właściciel/pomocnik – powinny dalej przechodzić.
-- [ ] Testy Core (reguły wątku) + Application + Api
+      **Realizacja:** `Announcement.GetOffersVisibleTo(viewer)`, liczba jako `AnnouncementDetailsDto.HelperCount` (ilu pomocników);
+      istniejące testy czytają oferty jako właściciel albo autor – bez zmian.
+- [x] Migracja `20261106170000_Conversations` napisana ręcznie (+ snapshot, Designer); zakłada wątki dla istniejących par (ogłoszenie, pomocnik) z ofert
+- [x] Testy Core (`ConversationTests`), Application (`ConversationHandlersTests`), Api (`ConversationTests`, w tym prywatność ofert)
+- [ ] `dotnet build` + `dotnet test` (kod pisany bez kompilatora), commit
 
 ## Krok 12 – „Moje negocjacje” (lista rozmów z podglądem ogłoszenia)
 

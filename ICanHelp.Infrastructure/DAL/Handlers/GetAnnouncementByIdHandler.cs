@@ -28,6 +28,7 @@ internal sealed class GetAnnouncementByIdHandler : IQueryHandler<GetAnnouncement
             .AsSplitQuery()
             .SingleOrDefaultAsync(a => a.Id == id, cancellationToken);
 
-        return announcement?.AsDetailsDto();
+        var viewerId = query.ViewerId is { } viewer ? new UserId(viewer) : null;
+        return announcement?.AsDetailsDto(viewerId);
     }
 }

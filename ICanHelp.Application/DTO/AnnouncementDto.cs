@@ -29,10 +29,16 @@ public record AnnouncementDto
     public double? DistanceKm { get; init; }
 }
 
-/// <summary>An announcement with the whole negotiation and images (oldest first).</summary>
+/// <summary>An announcement with the negotiation and images (oldest first).</summary>
 public sealed record AnnouncementDetailsDto : AnnouncementDto
 {
+    /// <summary>
+    /// Offers visible to the reader: the owner sees all of them, a helper only his own, anybody else (also anonymous) none.
+    /// </summary>
     public IReadOnlyList<OfferDto> Offers { get; init; } = [];
+
+    /// <summary>How many helpers have made an offer (public – the offers themselves are not).</summary>
+    public int HelperCount { get; init; }
     public IReadOnlyList<ImageDto> Images { get; init; } = [];
 
     /// <summary>History of edits, oldest first.</summary>

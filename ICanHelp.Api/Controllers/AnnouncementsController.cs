@@ -36,7 +36,11 @@ public sealed class AnnouncementsController : ControllerBase
         CancellationToken cancellationToken)
         => Ok(await handler.HandleAsync(query, cancellationToken));
 
-    /// <summary>Ogłoszenie z całą negocjacją (oferty) i zdjęciami (od najstarszego; pierwsze = miniatura).</summary>
+    /// <summary>
+    /// Ogłoszenie ze zdjęciami (od najstarszego; pierwsze = miniatura) i ofertami – te widzi tylko właściciel (wszystkie)
+    /// i pomocnik (swoje). Pozostali, także niezalogowani, dostają pustą listę i <c>helperCount</c>.
+    /// Endpoint jest publiczny – token jest opcjonalny.
+    /// </summary>
     [HttpGet("{announcementId:guid}")]
     [ProducesResponseType<AnnouncementDetailsDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
@@ -45,8 +49,10 @@ public sealed class AnnouncementsController : ControllerBase
         [FromServices] IQueryHandler<GetAnnouncementById, AnnouncementDetailsDto?> handler,
         CancellationToken cancellationToken)
     {
+        // Token jest opcjonalny: zalogowany właściciel/pomocnik widzi oferty, reszta – tylko ich liczbę.
+        Guid? viewerId = User.TryGetUserId(out var userId) ? userId : null;
         var announcement = await handler.HandleAsync(
-            new GetAnnouncementById { AnnouncementId = announcementId }, cancellationToken);
+            new GetAnnouncementById { AnnouncementId = announcementId, ViewerId = viewerId }, cancellationToken);
 
         return announcement is null ? NotFound() : Ok(announcement);
     }
@@ -268,9 +274,50 @@ public sealed class AnnouncementsController : ControllerBase
         return CreatedAtAction(nameof(GetRatings), new { announcementId }, new CreatedDto(ratingId));
     }
 
+    // ---------- rozmowa ----------
+
+    /// <summary>
+    /// Pomocnik zakłada wątek z właścicielem (np. żeby zapytać przed złożeniem oferty). Jeden wątek na pomocnika:
+    /// nowy → 201 + Location, już istniał → 200 z jego id. Właściciel / ogłoszenie nie Open → 409.
+    /// </summary>
+    [HttpPost("{announcementId:guid}/conversations")]
+    [Authorize]
+    [ProducesResponseType<CreatedDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType<CreatedDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<CreatedDto>> PostConversation(
+        Guid announcementId,
+        [FromServices] ICommandHandler<StartConversation> handler,
+        [FromServices] IQueryHandler<GetConversationId, Guid?> conversationIdHandler,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+        {
+            return Unauthorized();
+        }
+
+        // Komenda nic nie zwraca: jeśli wątek już był, nie tworzy nowego – jego id czytamy po niej.
+        var newConversationId = Guid.NewGuid();
+        await handler.HandleAsync(new StartConversation(announcementId, newConversationId, userId), cancellationToken);
+
+        var conversationId = await conversationIdHandler.HandleAsync(
+            new GetConversationId { AnnouncementId = announcementId, HelperId = userId }, cancellationToken)
+            ?? newConversationId;
+
+        var body = new CreatedDto(conversationId);
+        if (conversationId != newConversationId)
+        {
+            return Ok(body);
+        }
+
+        return CreatedAtAction(nameof(ConversationsController.GetById), "Conversations", new { conversationId }, body);
+    }
+
     // ---------- oferty ----------
 
-    /// <summary>Oferta pomocnika (zalogowany użytkownik, nie właściciel). Zwraca id oferty.</summary>
+    /// <summary>Oferta pomocnika (zalogowany użytkownik, nie właściciel). Zakłada też wątek rozmowy, jeśli go nie było. Zwraca id oferty.</summary>
     [HttpPost("{announcementId:guid}/offers")]
     [Authorize]
     [ProducesResponseType<CreatedDto>(StatusCodes.Status201Created)]

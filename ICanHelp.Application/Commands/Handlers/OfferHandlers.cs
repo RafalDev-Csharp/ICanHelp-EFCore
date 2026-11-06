@@ -9,14 +9,16 @@ internal sealed class MakeOfferHandler : ICommandHandler<MakeOffer>
 {
     private readonly IAnnouncementRepository _announcements;
     private readonly IUserRepository _users;
+    private readonly IConversationRepository _conversations;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClock _clock;
 
-    public MakeOfferHandler(IAnnouncementRepository announcements, IUserRepository users, IUnitOfWork unitOfWork,
-        IClock clock)
+    public MakeOfferHandler(IAnnouncementRepository announcements, IUserRepository users,
+        IConversationRepository conversations, IUnitOfWork unitOfWork, IClock clock)
     {
         _announcements = announcements;
         _users = users;
+        _conversations = conversations;
         _unitOfWork = unitOfWork;
         _clock = clock;
     }
@@ -31,8 +33,14 @@ internal sealed class MakeOfferHandler : ICommandHandler<MakeOffer>
             await _users.GetActiveOrThrowAsync(command.HelperId, cancellationToken);
             var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
 
-            announcement.AddOffer(new Id(command.OfferId), new UserId(command.HelperId), price,
-                command.ProposedStart.AsUtc(), command.ProposedEnd.AsUtc(), message, _clock.UtcNow);
+            var now = _clock.UtcNow;
+            var helperId = new UserId(command.HelperId);
+
+            announcement.AddOffer(new Id(command.OfferId), helperId, price,
+                command.ProposedStart.AsUtc(), command.ProposedEnd.AsUtc(), message, now);
+
+            // Oferta bez rozmowy nie istnieje: pierwszy krok negocjacji zakłada wątek (jeśli pomocnik nie pytał wcześniej).
+            await _conversations.GetOrStartAsync(announcement, helperId, Id.New(), now, cancellationToken);
         }, cancellationToken);
     }
 }

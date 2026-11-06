@@ -228,6 +228,72 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                     b.ToTable("LikedUsers");
                 });
 
+            modelBuilder.Entity("ICanHelp.Core.Entities.Negotiations.Conversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AnnouncementId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ClientLastReadAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("HelperId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("HelperLastReadAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("HelperId");
+
+                    b.HasIndex("AnnouncementId", "HelperId")
+                        .IsUnique();
+
+                    b.ToTable("Conversations");
+                });
+
+            modelBuilder.Entity("ICanHelp.Core.Entities.Negotiations.ConversationMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AnnouncementRevision")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SenderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SenderId");
+
+                    b.HasIndex("ConversationId", "SentAt");
+
+                    b.ToTable("ConversationMessages");
+                });
+
             modelBuilder.Entity("ICanHelp.Core.Entities.Negotiations.Offer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -499,6 +565,42 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ICanHelp.Core.Entities.Negotiations.Conversation", b =>
+                {
+                    b.HasOne("ICanHelp.Core.Entities.Announcement", null)
+                        .WithMany()
+                        .HasForeignKey("AnnouncementId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ICanHelp.Core.Entities.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ICanHelp.Core.Entities.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("HelperId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ICanHelp.Core.Entities.Negotiations.ConversationMessage", b =>
+                {
+                    b.HasOne("ICanHelp.Core.Entities.Negotiations.Conversation", null)
+                        .WithMany("Messages")
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ICanHelp.Core.Entities.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("ICanHelp.Core.Entities.Negotiations.Offer", b =>
                 {
                     b.HasOne("ICanHelp.Core.Entities.Announcement", null)
@@ -613,6 +715,11 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
             modelBuilder.Entity("ICanHelp.Core.Entities.Category", b =>
                 {
                     b.Navigation("Subcategories");
+                });
+
+            modelBuilder.Entity("ICanHelp.Core.Entities.Negotiations.Conversation", b =>
+                {
+                    b.Navigation("Messages");
                 });
 #pragma warning restore 612, 618
         }
