@@ -15,6 +15,7 @@ namespace ICanHelp.Infrastructure.DAL;
 public sealed class ICanHelpDbContext : DbContext
 {
     public DbSet<User> Users => Set<User>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Announcement> Announcements => Set<Announcement>();
     public DbSet<Offer> Offers => Set<Offer>();
     public DbSet<Image> Images => Set<Image>();

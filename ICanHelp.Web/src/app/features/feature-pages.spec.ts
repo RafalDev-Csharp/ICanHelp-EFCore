@@ -1,5 +1,7 @@
+import { provideHttpClient } from '@angular/common/http';
 import type { Type } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 
 import { AddAnnouncementPage } from './announcements/add-announcement.page';
 import { AnnouncementsPage } from './announcements/announcements.page';
@@ -17,6 +19,11 @@ const pages: [string, Type<unknown>, string][] = [
 ];
 
 describe.each(pages)('%s', (_name, page, title) => {
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideRouter([]), provideHttpClient()] });
+  });
+
   it('renders its title', () => {
     const fixture = TestBed.createComponent(page);
     fixture.detectChanges();

@@ -13,7 +13,7 @@ namespace ICanHelp.Api.ErrorHandling;
 /// <see cref="NotificationNotFoundException"/>, <see cref="AlertNotFoundException"/> → 404</item>
 /// <item><see cref="DomainRuleException"/> (złamana reguła biznesowa), zajęta nazwa/e-mail, ponowna ocena,
 /// <see cref="ConcurrencyConflictException"/> (równoczesna zmiana) → 409</item>
-/// <item><see cref="InvalidCredentialsException"/> → 401, <see cref="UserLockedException"/> → 403</item>
+/// <item><see cref="InvalidCredentialsException"/>, <see cref="InvalidRefreshTokenException"/> → 401, <see cref="UserLockedException"/> → 403</item>
 /// <item>pozostałe <see cref="CustomExceptions"/> (błędne dane, np. e-mail, <see cref="InvalidImageException"/>) → 400</item>
 /// </list>
 /// Inne wyjątki nie są tu obsługiwane – middleware zwróci 500 bez szczegółów.
@@ -46,7 +46,7 @@ internal sealed class DomainExceptionHandler : IExceptionHandler
             ConcurrencyConflictException => (StatusCodes.Status409Conflict, "Concurrent change"),
             UserNameAlreadyInUseException or EmailAlreadyInUseException or AlreadyRatedException
                 => (StatusCodes.Status409Conflict, "Resource already exists"),
-            InvalidCredentialsException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
+            InvalidCredentialsException or InvalidRefreshTokenException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
             UserLockedException => (StatusCodes.Status403Forbidden, "Forbidden"),
             _ => (StatusCodes.Status400BadRequest, "Invalid data")
         };

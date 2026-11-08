@@ -32,7 +32,10 @@ public sealed class UsersController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { userId }, null);
     }
 
-    /// <summary>Logowanie e-mailem i hasłem. Zwraca JWT do nagłówka <c>Authorization: Bearer ...</c>.</summary>
+    /// <summary>
+    /// Logowanie e-mailem i hasłem. Zwraca JWT do nagłówka <c>Authorization: Bearer ...</c> (ważny 1 h)
+    /// i refresh token do <c>POST api/users/refresh</c> (ważny 30 dni).
+    /// </summary>
     [HttpPost("sign-in")]
     [AllowAnonymous]
     [ProducesResponseType<JwtDto>(StatusCodes.Status200OK)]
@@ -47,6 +50,44 @@ public sealed class UsersController : ControllerBase
         await handler.HandleAsync(command, cancellationToken);
 
         return Ok(tokenStorage.Get());
+    }
+
+    /// <summary>
+    /// Nowa para tokenów za refresh token z logowania (bez hasła). Użyty token przestaje działać – zapisz nowy.
+    /// 401 <c>InvalidRefreshToken</c> = trzeba zalogować się ponownie.
+    /// </summary>
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    [ProducesResponseType<JwtDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<JwtDto>> Refresh(
+        [FromBody] RefreshSession command,
+        [FromServices] ICommandHandler<RefreshSession> handler,
+        [FromServices] ITokenStorage tokenStorage,
+        CancellationToken cancellationToken)
+    {
+        await handler.HandleAsync(command, cancellationToken);
+
+        return Ok(tokenStorage.Get());
+    }
+
+    /// <summary>
+    /// Wylogowanie: unieważnia refresh token (token dostępu wygaśnie sam). Nie wymaga ważnego tokenu dostępu –
+    /// wystarczy refresh token. Zawsze 204, także dla nieznanego tokenu.
+    /// </summary>
+    [HttpPost("sign-out")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Logout(
+        [FromBody] EndSession command,
+        [FromServices] ICommandHandler<EndSession> handler,
+        CancellationToken cancellationToken)
+    {
+        await handler.HandleAsync(command, cancellationToken);
+
+        return NoContent();
     }
 
     /// <summary>Profil zalogowanego użytkownika (wymaga tokenu).</summary>

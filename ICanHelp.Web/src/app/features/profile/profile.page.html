@@ -11,9 +11,56 @@
     </ion-toolbar>
   </ion-header>
 
+  @if (!auth.isAuthenticated()) {
   <app-empty-state
     icon="person-circle-outline"
-    heading="Twój profil"
-    message="Wkrótce zalogujesz się tu i zobaczysz swoje dane oraz oceny."
-  ></app-empty-state>
+    heading="Nie jesteś zalogowany"
+    message="Zaloguj się, żeby dodawać ogłoszenia, składać oferty i rozmawiać z sąsiadami."
+  >
+    <ion-button routerLink="/login" [queryParams]="{ returnUrl: '/profile' }">Zaloguj się</ion-button>
+    <ion-button fill="clear" routerLink="/register" [queryParams]="{ returnUrl: '/profile' }"> Załóż konto </ion-button>
+  </app-empty-state>
+  } @else { @let user = auth.currentUser(); @if (user) {
+  <ion-list inset="true">
+    <ion-list-header>
+      <ion-label>
+        <h1>{{ user.fullName }}</h1>
+        <p>&#64;{{ user.userName }}</p>
+      </ion-label>
+    </ion-list-header>
+    @if (user.description) {
+    <ion-item lines="none">
+      <ion-label class="ion-text-wrap">{{ user.description }}</ion-label>
+    </ion-item>
+    }
+  </ion-list>
+
+  <ion-list inset="true">
+    <ion-item>
+      <ion-label>E-mail</ion-label>
+      <ion-note slot="end">{{ user.contactData.email }}</ion-note>
+    </ion-item>
+    <ion-item>
+      <ion-label>Telefon</ion-label>
+      <ion-note slot="end">{{ user.contactData.phoneNumber }}</ion-note>
+    </ion-item>
+    <ion-item>
+      <ion-label>Miejscowość</ion-label>
+      <ion-note slot="end">{{ user.contactData.postalCode }} {{ user.contactData.city }}</ion-note>
+    </ion-item>
+    <ion-item lines="none">
+      <ion-label>Konto od</ion-label>
+      <ion-note slot="end">{{ parseApiDate(user.createdAt) | date: 'longDate' }}</ion-note>
+    </ion-item>
+  </ion-list>
+  } @else if (loading()) {
+  <div class="ion-text-center ion-padding">
+    <ion-spinner name="crescent"></ion-spinner>
+  </div>
+  }
+
+  <div class="ion-padding">
+    <ion-button expand="block" fill="outline" color="danger" (click)="signOut()">Wyloguj się</ion-button>
+  </div>
+  }
 </ion-content>

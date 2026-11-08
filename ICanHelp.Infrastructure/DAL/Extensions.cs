@@ -22,6 +22,7 @@ internal static class Extensions
         services.AddScoped<IAnnouncementRepository, AnnouncementRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IRatingRepository, RatingRepository>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<ILikedAnnouncementRepository, LikedAnnouncementRepository>();

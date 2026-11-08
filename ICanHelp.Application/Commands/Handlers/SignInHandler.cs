@@ -1,6 +1,7 @@
 using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.Exceptions;
 using ICanHelp.Application.Security;
+using ICanHelp.Application.Time;
 using ICanHelp.Core.Repositories;
 using ICanHelp.Core.ValueObjects;
 
@@ -12,14 +13,23 @@ internal sealed class SignInHandler : ICommandHandler<SignIn>
     private readonly IPasswordManager _passwordManager;
     private readonly IAuthenticator _authenticator;
     private readonly ITokenStorage _tokenStorage;
+    private readonly IRefreshTokenRepository _refreshTokens;
+    private readonly IRefreshTokenService _refreshTokenService;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IClock _clock;
 
     public SignInHandler(IUserRepository users, IPasswordManager passwordManager, IAuthenticator authenticator,
-        ITokenStorage tokenStorage)
+        ITokenStorage tokenStorage, IRefreshTokenRepository refreshTokens, IRefreshTokenService refreshTokenService,
+        IUnitOfWork unitOfWork, IClock clock)
     {
         _users = users;
         _passwordManager = passwordManager;
         _authenticator = authenticator;
         _tokenStorage = tokenStorage;
+        _refreshTokens = refreshTokens;
+        _refreshTokenService = refreshTokenService;
+        _unitOfWork = unitOfWork;
+        _clock = clock;
     }
 
     public async Task HandleAsync(SignIn command, CancellationToken cancellationToken = default)
@@ -42,7 +52,12 @@ internal sealed class SignInHandler : ICommandHandler<SignIn>
             throw new UserLockedException();
         }
 
-        var jwt = _authenticator.CreateToken(user.Id, user.UserName, user.Role);
-        _tokenStorage.Set(jwt);
+        // Krok F2: oprócz JWT – refresh token (każde logowanie = osobna sesja, np. telefon i komputer).
+        await _unitOfWork.ExecuteAsync(async () =>
+        {
+            var jwt = await _refreshTokens.IssueAsync(_refreshTokenService, _authenticator, user, _clock.UtcNow,
+                cancellationToken);
+            _tokenStorage.Set(jwt);
+        }, cancellationToken);
     }
 }

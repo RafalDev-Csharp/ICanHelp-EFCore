@@ -38,6 +38,14 @@ builder.Services.AddSwaggerGen(o =>
 {
     o.SwaggerDoc("v1", new() { Title = "ICanHelp API", Version = "v1" });
 
+    // Niepuste stringi w DTO nie są „nullable” – klient TS dostaje `userName: string`, a nie `string | undefined`.
+    o.SupportNonNullableReferenceTypes();
+
+    // Stałe operationId "Kontroler_Akcja" (np. "Users_Login") – NSwag (frontend, npm run api) robi z nich
+    // klasy i metody klienta: UsersClient.login(...).
+    o.CustomOperationIds(api =>
+        $"{api.ActionDescriptor.RouteValues["controller"]}_{api.ActionDescriptor.RouteValues["action"]}");
+
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     o.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFile));
 

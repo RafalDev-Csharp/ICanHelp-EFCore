@@ -5,7 +5,8 @@ const { defineConfig } = require('eslint/config');
 
 module.exports = defineConfig([
   {
-    ignores: ['www/**', 'dist/**', 'coverage/**', '.angular/**', 'android/**', 'ios/**'],
+    // api-client.ts generuje NSwag (npm run api) – nie poprawiamy go ręcznie.
+    ignores: ['www/**', 'dist/**', 'coverage/**', '.angular/**', 'android/**', 'ios/**', 'src/app/core/api/api-client.ts'],
   },
   ionic,
   {

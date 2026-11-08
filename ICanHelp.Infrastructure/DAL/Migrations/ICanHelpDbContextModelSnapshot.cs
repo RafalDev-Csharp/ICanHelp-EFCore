@@ -532,6 +532,42 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                     b.ToTable("Subcategories");
                 });
 
+            modelBuilder.Entity("ICanHelp.Core.Entities.Users.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ReplacedByTokenId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .IsConcurrencyToken()
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "RevokedAt");
+
+                    b.ToTable("RefreshTokens");
+                });
+
             modelBuilder.Entity("ICanHelp.Core.Entities.Users.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -820,6 +856,15 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                         .WithMany("Subcategories")
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ICanHelp.Core.Entities.Users.RefreshToken", b =>
+                {
+                    b.HasOne("ICanHelp.Core.Entities.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

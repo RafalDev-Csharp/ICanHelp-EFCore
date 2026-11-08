@@ -22,12 +22,14 @@ internal static class Extensions
             .Validate(o => Encoding.UTF8.GetByteCount(o.SigningKey ?? string.Empty) >= 32,
                 "Auth:SigningKey must be at least 32 bytes long (set it e.g. with the Auth__SigningKey variable).")
             .Validate(o => o.Expiry > TimeSpan.Zero, "Auth:Expiry must be positive.")
+            .Validate(o => o.RefreshTokenExpiry > o.Expiry, "Auth:RefreshTokenExpiry must be longer than Auth:Expiry.")
             // Zły config wywala aplikację przy starcie, a nie przy pierwszym logowaniu.
             .ValidateOnStart();
 
         services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddSingleton<IPasswordManager, PasswordManager>();
         services.AddSingleton<IAuthenticator, Authenticator>();
+        services.AddSingleton<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<ITokenStorage, TokenStorage>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();

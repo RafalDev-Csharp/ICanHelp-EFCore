@@ -42,7 +42,7 @@ Content-Type: application/json
 }
 
 ###
-# Logowanie -> { accessToken, expiresAtUtc }
+# Logowanie -> { accessToken, expiresAtUtc, refreshToken, refreshTokenExpiresAtUtc }
 # @name signIn
 POST {{baseUrl}}/api/users/sign-in
 Content-Type: application/json
@@ -56,6 +56,25 @@ Content-Type: application/json
 # Profil zalogowanego (bez tokenu -> 401)
 GET {{baseUrl}}/api/users/me
 Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+###
+# Krok F2: nowa para tokenów za refresh token (jednorazowy – drugie użycie tego samego -> 401 InvalidRefreshToken)
+# @name refresh
+POST {{baseUrl}}/api/users/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{signIn.response.body.$.refreshToken}}"
+}
+
+###
+# Wylogowanie: unieważnia refresh token (zawsze 204)
+POST {{baseUrl}}/api/users/sign-out
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refresh.response.body.$.refreshToken}}"
+}
 
 ###
 # Publiczny profil – bez danych kontaktowych (podmień id na swoje z nagłówka Location po sign-up)

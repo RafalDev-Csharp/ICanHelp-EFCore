@@ -14,13 +14,19 @@
 ```
 app.config.ts     providery (router, Ionic, locale) · app.routes.ts → tabs/tabs.routes.ts (zakładki bez prefiksu: /announcements, /add,
                   /conversations, /notifications, /profile; nieznany adres → /announcements)
-core/             jedno miejsce na całą aplikację: config/locale.ts (pl-PL, PLN); od F2: api/ (NSwag), auth/ (AuthService, guard),
-                  interceptors/ (token, ProblemDetails → toast)
+core/             jedno miejsce na całą aplikację: config/locale.ts (pl-PL, PLN);
+                  api/ – `api-client.ts` (NSwag, generowany), `provideApi()` (API_BASE_URL), `isApiUrl`, `errorStatus`;
+                  auth/ – `AuthService` (sygnały `currentUser`, `isAuthenticated`; tokeny w localStorage `icanhelp.auth`, synchronizacja kart,
+                  jedno odświeżenie naraz), `authGuard` (+ `loginUrlTree`, `safeReturnUrl`);
+                  interceptors/ – `authInterceptor` (Bearer, odświeżenie przed wygaśnięciem i raz po 401), `errorInterceptor`
+                  (ProblemDetails → toast, mapa `error-messages.ts`, `SKIP_ERROR_TOAST`); ui/ – `ToastService`; testing/ – helpery do specs
 shared/           components/ (EmptyStateComponent), pipes/ (`price`, `distance` – km z API, `timeAgo` – „2 h temu”)
-features/<obszar>/ strony i serwisy obszaru: announcements (lista + „Dodaj”), conversations, notifications, profile;
+features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poza zakładkami, `?returnUrl=`), announcements (lista + „Dodaj”),
+                  conversations, notifications, profile (bez logowania: „Zaloguj się”);
                   offers i alerts dojdą w F5/F8
 tabs/             TabsPage – dolny pasek zakładek, rejestruje ikony zakładek (`addIcons`)
 ```
+Trasy `/add`, `/conversations`, `/notifications` mają `authGuard`; ogłoszenia i profil są publiczne.
 `src/environments/environment*.ts`: `apiUrl` – pusty = ta sama domena (dev przez proxy, produkcja: API serwuje frontend, F10).
 
 ## Zasady (z `docs/PLAN-FRONTEND.md` „Dlaczego tak”)
@@ -42,6 +48,9 @@ npm run lint           # ESLint + typecheck e2e + Prettier --check   (npm run li
 npm test               # testy jednostkowe (Vitest, jednorazowo)     (npm run test:watch – w trakcie pracy)
 npm run test:e2e       # Playwright (pierwszy raz: npx playwright install chromium)
 npm run build          # produkcyjny build do www/
+npm run api            # regeneracja core/api/api-client.ts z http://localhost:5080/swagger (backend musi działać, wymaga .NET 9)
 ```
+Testy z HTTP: `provideHttpClientTesting()` + `HttpTestingController`; klient NSwag chce odpowiedzi jako Blob → `jsonBlob()` /
+`problemBlob()` z `core/testing/api-testing.ts`, a kolejne żądanie (po FileReader) łap przez `await vi.waitFor(() => http.expectOne(...))`.
 Test na telefonie: `npm start -- --host 0.0.0.0` w tej samej sieci Wi-Fi, a gdy potrzebny HTTPS (geolokalizacja, PWA, push) –
 tunel (Dev Tunnels / ngrok) na port 4200. CI: job `frontend` w `../.github/workflows/ci.yml` (`npm ci`, lint, test, build).

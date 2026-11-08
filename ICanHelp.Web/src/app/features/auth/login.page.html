@@ -1,0 +1,50 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/announcements"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Logowanie</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <form class="auth-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <p class="auth-lead">Zaloguj się, żeby dodawać ogłoszenia, składać oferty i rozmawiać.</p>
+
+    <ion-input
+      formControlName="email"
+      type="email"
+      label="E-mail"
+      labelPlacement="floating"
+      fill="outline"
+      autocomplete="email"
+      inputmode="email"
+      errorText="Podaj poprawny adres e-mail."
+    ></ion-input>
+
+    <ion-input
+      formControlName="password"
+      type="password"
+      label="Hasło"
+      labelPlacement="floating"
+      fill="outline"
+      autocomplete="current-password"
+      errorText="Podaj hasło."
+    >
+      <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+    </ion-input>
+
+    <ion-button type="submit" expand="block" [disabled]="submitting()">
+      @if (submitting()) {
+      <ion-spinner name="crescent"></ion-spinner>
+      } @else { Zaloguj się }
+    </ion-button>
+
+    <ion-text color="medium">
+      <p class="auth-switch">
+        Nie masz konta?
+        <a routerLink="/register" [queryParams]="{ returnUrl: returnUrl() }">Załóż konto</a>
+      </p>
+    </ion-text>
+  </form>
+</ion-content>

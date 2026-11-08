@@ -1,0 +1,127 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/login"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Nowe konto</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <form class="auth-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <p class="auth-lead">
+      Jedno konto wystarczy, żeby prosić o pomoc i pomagać innym. Telefon i e-mail zobaczy tylko druga strona
+      zaakceptowanego zlecenia.
+    </p>
+
+    <ion-input
+      formControlName="userName"
+      label="Nazwa użytkownika"
+      labelPlacement="floating"
+      fill="outline"
+      autocomplete="username"
+      [counter]="true"
+      [maxlength]="rules.userName.max"
+      [helperText]="'Widoczna dla innych, ' + rules.userName.min + '–' + rules.userName.max + ' znaków.'"
+      [errorText]="'Od ' + rules.userName.min + ' do ' + rules.userName.max + ' znaków.'"
+    ></ion-input>
+
+    <ion-input
+      formControlName="fullName"
+      label="Imię i nazwisko"
+      labelPlacement="floating"
+      fill="outline"
+      autocomplete="name"
+      [errorText]="'Od ' + rules.fullName.min + ' do ' + rules.fullName.max + ' znaków.'"
+    ></ion-input>
+
+    <ion-input
+      formControlName="email"
+      type="email"
+      label="E-mail"
+      labelPlacement="floating"
+      fill="outline"
+      autocomplete="email"
+      inputmode="email"
+      errorText="Podaj poprawny adres e-mail."
+    ></ion-input>
+
+    <ion-input
+      formControlName="password"
+      type="password"
+      label="Hasło"
+      labelPlacement="floating"
+      fill="outline"
+      autocomplete="new-password"
+      [helperText]="'Co najmniej ' + rules.password.min + ' znaków.'"
+      [errorText]="'Hasło musi mieć od ' + rules.password.min + ' do ' + rules.password.max + ' znaków.'"
+    >
+      <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+    </ion-input>
+
+    <ion-input
+      formControlName="phoneNumber"
+      type="tel"
+      label="Telefon"
+      labelPlacement="floating"
+      fill="outline"
+      autocomplete="tel"
+      inputmode="tel"
+      helperText="Np. +48600100200"
+      errorText="Podaj 8–15 cyfr, opcjonalnie z + na początku."
+      (ionBlur)="normalizePhone()"
+    ></ion-input>
+
+    <ion-input
+      formControlName="city"
+      label="Miejscowość"
+      labelPlacement="floating"
+      fill="outline"
+      autocomplete="address-level2"
+      errorText="Podaj miejscowość."
+    ></ion-input>
+
+    <ion-input
+      formControlName="postalCode"
+      label="Kod pocztowy"
+      labelPlacement="floating"
+      fill="outline"
+      autocomplete="postal-code"
+      errorText="Podaj kod pocztowy."
+    ></ion-input>
+
+    <ion-input
+      formControlName="country"
+      label="Kraj"
+      labelPlacement="floating"
+      fill="outline"
+      autocomplete="country-name"
+      errorText="Podaj kraj."
+    ></ion-input>
+
+    <ion-textarea
+      formControlName="description"
+      label="O mnie (opcjonalnie)"
+      labelPlacement="floating"
+      fill="outline"
+      [autoGrow]="true"
+      [counter]="true"
+      [maxlength]="rules.description.max"
+      helperText="Np. czym się zajmujesz, w czym możesz pomóc."
+      [errorText]="'Od ' + rules.description.min + ' do ' + rules.description.max + ' znaków.'"
+    ></ion-textarea>
+
+    <ion-button type="submit" expand="block" [disabled]="submitting()">
+      @if (submitting()) {
+      <ion-spinner name="crescent"></ion-spinner>
+      } @else { Załóż konto }
+    </ion-button>
+
+    <ion-text color="medium">
+      <p class="auth-switch">
+        Masz już konto?
+        <a routerLink="/login" [queryParams]="{ returnUrl: returnUrl() }">Zaloguj się</a>
+      </p>
+    </ion-text>
+  </form>
+</ion-content>

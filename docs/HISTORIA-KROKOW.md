@@ -63,6 +63,20 @@
   job `frontend` w CI. Testy: `tabs.page.spec.ts` (atrybuty zakładek – teksty etykiet w jsdom są puste, sprawdza je e2e), `features/feature-pages.spec.ts`, `shared/pipes/pipes.spec.ts`,
   `empty-state.component.spec.ts`, e2e `e2e/app.spec.ts`. Pisane bez `npm` (brak dostępu do rejestru w sesji AI) –
   do potwierdzenia u autora: lint + test + build.
+- [x] Krok F2 (frontend + backend, 8.11.2026) – logowanie i rejestracja.
+  Backend: agregat `RefreshToken` (hash SHA-256, `Rotate`/`Revoke`, `RevokedAt` = token współbieżności), `IRefreshTokenRepository`,
+  `IRefreshTokenService` (Infrastructure: 32 losowe bajty Base64Url), `TokenIssuer`, komendy `RefreshSession` / `EndSession`,
+  `SignInHandler` zapisuje refresh token (`IUnitOfWork`), `JwtDto` + `RefreshToken`/`RefreshTokenExpiresAtUtc`, `Auth:RefreshTokenExpiry`
+  (30 dni), wyjątek `InvalidRefreshToken` → 401, endpointy `POST api/users/refresh` i `POST api/users/sign-out`, migracja `RefreshTokens`
+  (20261108200000, ręczna). Swagger: operationId `Kontroler_Akcja`, `SupportNonNullableReferenceTypes` (pod NSwag).
+  Testy: `Core.Tests/.../RefreshTokenTests.cs`, `Application.Tests/Commands/SessionHandlersTests.cs` (+ `SignInHandlerTests`),
+  `Api.Tests/SessionTests.cs`.
+  Frontend: `nswag.json` + `npm run api` → `core/api/api-client.ts` (Angular, HttpClient, DTO-interfejsy, daty jako string),
+  `AuthService`, `authInterceptor`, `errorInterceptor` (+ `error-messages.ts`), `ToastService`, `authGuard`, strony `/login`, `/register`,
+  profil (dane z `/me`, wylogowanie). Testy Vitest: auth.service, interceptory, guard, login/register; e2e: przekierowanie na logowanie.
+  Pisane bez .NET i bez rejestru npm w sesji AI; jedyna poprawka po uruchomieniu: test logowania (e-mail ze spacjami nie przechodzi
+  `Validators.email`). 8.11.2026 u autora: dotnet build + 400/400 testów (186 Core, 136 Application, 78 Api, w tym migracja),
+  `npm run api` (NSwag 14.7, wygenerowany klient pasuje do kodu bez zmian), lint + 65/65 testów Vitest + build zielone.
 - [ ] Krok 15 – kanał push (FCM): `docs/PLAN-POWIADOMIENIA.md`
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

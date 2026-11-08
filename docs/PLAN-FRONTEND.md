@@ -61,16 +61,19 @@ zostają; `npm test` = jednostkowe, `npm run test:e2e` = Playwright lokalnie. Sk
 
 ## Krok F2 – klient API, logowanie i rejestracja
 
-- [ ] NSwag: `nswag.json` (wejście: `http://localhost:5080/swagger/v1/swagger.json`, wyjście: `src/app/core/api/api-client.ts`,
+- [x] NSwag: `nswag.json` (wejście: `http://localhost:5080/swagger/v1/swagger.json`, wyjście: `src/app/core/api/api-client.ts`,
       szablon Angular, `HttpClient`, daty jako `string`), `npm run api`. Wygenerowany plik w repo (CI nie musi uruchamiać API).
-- [ ] `AuthService` (sygnał `currentUser`, token w `localStorage`), interceptor `Authorization: Bearer`, guard tras wymagających logowania.
+- [x] `AuthService` (sygnał `currentUser`, token w `localStorage`), interceptor `Authorization: Bearer`, guard tras wymagających logowania.
       Przeglądanie ogłoszeń działa bez logowania (API pozwala) – logowanie dopiero przy akcji („Złóż ofertę” → ekran logowania → powrót).
-- [ ] Ekrany: logowanie, rejestracja (walidacja jak w backendzie), profil (`GET api/users/me`, wylogowanie).
-- [ ] Interceptor błędów (ProblemDetails → toast po polsku, `errorCode` → tekst).
-- [ ] **Backend:** token wygasa po 1 h (`Auth:Expiry`) – na telefonie to wylogowanie co godzinę. Dodać odświeżanie:
+- [x] Ekrany: logowanie, rejestracja (walidacja jak w backendzie), profil (`GET api/users/me`, wylogowanie).
+- [x] Interceptor błędów (ProblemDetails → toast po polsku, `errorCode` → tekst).
+- [x] **Backend:** token wygasa po 1 h (`Auth:Expiry`) – na telefonie to wylogowanie co godzinę. Dodać odświeżanie:
       `POST api/users/refresh` + tabela `RefreshTokens` (hash, UserId, ExpiresAt, RevokedAt, rotacja przy każdym użyciu, ważny np. 30 dni),
       `POST api/users/sign-out` (unieważnienie). Testy integracyjne. Frontend odświeża przy 401 (jedno odświeżenie naraz).
-- [ ] Testy: `AuthService`, interceptory (Jasmine/Karma albo Jest – co da szablon).
+- [x] Testy: `AuthService`, interceptory (Vitest – co dał szablon), guard, ekrany logowania i rejestracji, e2e przekierowania na logowanie.
+
+Zrobione 8.11.2026 (szczegóły: `docs/HISTORIA-KROKOW.md`). Nazwy klientów z operationId `Kontroler_Akcja` (backend `CustomOperationIds`),
+DTO jako interfejsy. Zakładki Dodaj / Rozmowy / Powiadomienia za `authGuard`, Profil bez logowania pokazuje „Zaloguj się”.
 
 ## Krok F3 – przeglądanie ogłoszeń
 

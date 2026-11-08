@@ -274,3 +274,44 @@ internal sealed class RecordingNotificationSender : INotificationSender
         return Task.CompletedTask;
     }
 }
+
+internal sealed class InMemoryRefreshTokenRepository : IRefreshTokenRepository
+{
+    public List<RefreshToken> Tokens { get; } = new();
+
+    public Task<RefreshToken?> GetByHashAsync(string tokenHash, CancellationToken cancellationToken = default)
+        => Task.FromResult(Tokens.SingleOrDefault(t => t.TokenHash == tokenHash));
+
+    public Task<IReadOnlyList<RefreshToken>> GetActiveAsync(UserId userId, DateTime nowUtc,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<RefreshToken>>(
+            Tokens.Where(t => t.UserId == userId && t.IsActive(nowUtc)).ToList());
+
+    public Task AddAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default)
+    {
+        Tokens.Add(refreshToken);
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>Kolejne tokeny "refresh-1", "refresh-2"…; hash = "h:" + token.</summary>
+internal sealed class FakeRefreshTokenService : IRefreshTokenService
+{
+    private int _counter;
+
+    public TimeSpan Lifetime => TimeSpan.FromDays(30);
+
+    public GeneratedRefreshToken Generate()
+    {
+        var token = $"refresh-{++_counter}";
+        return new GeneratedRefreshToken(token, Hash(token));
+    }
+
+    public string Hash(string token) => "h:" + token;
+}
+
+/// <summary>Zegar, który można przesuwać w teście.</summary>
+internal sealed class MutableClock : IClock
+{
+    public DateTime UtcNow { get; set; } = new(2026, 1, 10, 12, 0, 0, DateTimeKind.Utc);
+}

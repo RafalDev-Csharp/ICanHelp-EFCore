@@ -1,0 +1,21 @@
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.auth-lead {
+  margin: 0 0 8px;
+  color: var(--ion-color-medium);
+}
+
+.auth-switch {
+  text-align: center;
+}
+
+ion-button ion-spinner {
+  width: 20px;
+  height: 20px;
+}

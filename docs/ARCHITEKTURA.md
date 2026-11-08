@@ -47,7 +47,16 @@
   Dev-klucz w `appsettings.Development.json`; poza Development **trzeba** ustawić `Auth__SigningKey`, inaczej API nie wstanie.
 - Błędy: `UserNameAlreadyInUse`/`EmailAlreadyInUse` → 409, `InvalidCredentials` → 401 (bez zdradzania, czy konto istnieje),
   `UserLocked` → 403 (dopiero po poprawnym haśle). Infrastructure ma `FrameworkReference Microsoft.AspNetCore.App` + pakiet JwtBearer.
-- Swagger: przycisk Authorize (Bearer). Przykłady w `ICanHelp.Api.http`.
+- Swagger: przycisk Authorize (Bearer). Przykłady w `ICanHelp.Api.http`. OperationId = `Kontroler_Akcja` (`CustomOperationIds`),
+  `SupportNonNullableReferenceTypes` – z tego NSwag generuje klienta frontendu (`UsersClient.login(...)`).
+- Refresh tokeny (Krok F2): `sign-in` zwraca też `refreshToken` (+ `refreshTokenExpiresAtUtc`, `Auth:RefreshTokenExpiry`, domyślnie 30 dni).
+  Agregat `RefreshToken` (`Core/Entities/Users`, tabela `RefreshTokens`, migracja 20261108200000): w bazie tylko SHA-256 (hex) losowych
+  32 bajtów (`Infrastructure/Security/RefreshTokenService`), każde logowanie = osobna sesja. `POST api/users/refresh` (`RefreshSession`,
+  anonimowo) – rotacja: stary token `Rotate` → `RevokedAt` + `ReplacedByTokenId`, nowa para w odpowiedzi; `RevokedAt` to token
+  współbieżności (dwa równoczesne użycia → 409). Ponowne użycie zrotowanego tokenu: do 1 min (`ReuseGracePeriod`, wyścig kart) – tylko 401,
+  później = wyciek → unieważnienie wszystkich aktywnych sesji użytkownika (zapis przed rzuceniem wyjątku). Nieznany/wygasły/unieważniony
+  → 401 `InvalidRefreshToken`; zablokowany użytkownik → 403. `POST api/users/sign-out` (`EndSession`, anonimowo, zawsze 204) unieważnia
+  podany token. Wspólne wystawianie: `Application/Security/TokenIssuer.IssueAsync`.
 - Prywatność: `GET api/users/{id}` zwraca `UserPublicDto` (bez kontaktu, roli, blokady; query `GetUserPublicById`).
   Pełny `UserDto` tylko w `/me` i w `GET api/users` (`[Authorize(Roles = "Admin")]`). `liked-*` – tylko właściciel lub admin
   (`IsSelfOrAdmin` w kontrolerze, inaczej 403). Oceny, ogłoszenia, kategorie – publiczne.

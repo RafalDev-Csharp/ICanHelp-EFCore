@@ -53,6 +53,7 @@ Jeden użytkownik może być raz klientem, raz pomocnikiem (rola w transakcji, n
   - `Image` (część agregatu): FileName (do wyświetlania), FileExtension, FilePath (ścieżka w magazynie, nie trafia do DTO), AddedAt
     (najstarsze = miniatura). Dodanie/usunięcie = nowa rewizja z flagą `Images` (stare/nowe = lista id zdjęć „id1, id2”).
 - `Category` (agregat) → `Subcategory` (część agregatu, unikalna nazwa w kategorii)
+- `RefreshToken` (agregat, `Entities/Users`): UserId, TokenHash (SHA-256), ExpiresAt, RevokedAt?, ReplacedByTokenId? – `Rotate`, `Revoke`.
 - `Rating`: AnnouncementId, RaterId, RateeId, Rate (1–5), Comment?; unikalne (AnnouncementId, RaterId)
 - `LikedAnnouncement` (UserId, AnnouncementId) i `LikedUser` (LikerId, LikedId) – klucze złożone, istnienie wiersza = polubione
 - `Conversation` (agregat, `Entities/Negotiations`): AnnouncementId, ClientId (= właściciel), HelperId, CreatedAt, `Client/HelperLastReadAt`,
@@ -95,7 +96,7 @@ Api             Program.cs, Controllers (Alerts, Announcements, Categories, Conv
                 appsettings*.json, Properties/launchSettings.json, ICanHelp.Api.http (przykładowe żądania)
 Web             frontend PWA (Angular + Ionic) – własny `ICanHelp.Web/CLAUDE.md` (stack, struktura, komendy npm)
 Api.Tests       Infrastructure/ApiFactory (kontener + ApiCollection), Infrastructure/TestApi (CreateUserAsync, ShouldBeProblemAsync…),
-                testy per obszar: ApiBasics, Users, AnnouncementFlow, AnnouncementEdit, AnnouncementImage, Conversation, DistanceSearch,
+                testy per obszar: ApiBasics, Users, Session, AnnouncementFlow, AnnouncementEdit, AnnouncementImage, Conversation, DistanceSearch,
                 Notification (outbox wyłączony, `ProcessOutboxAsync()`), Alert
 .github/workflows/ci.yml   job backendu: build + testy jednostkowe + integracyjne (ubuntu-latest, Docker); job `frontend`: npm ci, lint, test, build
 ```
@@ -118,7 +119,8 @@ Wspólne: `RepositoryExtensions` (`GetOrThrowAsync` → `AnnouncementNotFound`, 
   inne `CustomExceptions` → 400, `InvalidCredentials` → 401, `UserLocked` → 403; `errorCode` = nazwa wyjątku bez „Exception”, zawsze `traceId`.
 - Auth: JWT HS256 (`Auth:SigningKey` ≥ 32 bajty, poza Development wymagany z env). Prywatność: oferty widzi właściciel (wszystkie)
   i pomocnik (swoje), reszta tylko `HelperCount`; kontakt po akceptacji; wątki tylko dla dwóch uczestników (obcy → 404).
-- Endpointy: `api/users`, `api/categories`, `api/announcements` (+ offers, images, conversations, contact, ratings),
+- Refresh tokeny (F2): `RefreshToken` (tylko hash), rotacja przy każdym `refresh`, wykrycie ponownego użycia → `docs/ARCHITEKTURA.md`.
+- Endpointy: `api/users` (+ `refresh`, `sign-out`), `api/categories`, `api/announcements` (+ offers, images, conversations, contact, ratings),
   `api/conversations/{id}`, `api/me/conversations`, `api/me/notifications` (+ hub `/hubs/notifications`), `api/me/alerts`. Przykłady wszystkich w `ICanHelp.Api.http`. Porty 5080/7080, `/health`, Swagger w Development.
 
 ## Komendy
@@ -153,6 +155,9 @@ cd ICanHelp.Web && npm ci && npm start   # frontend http://localhost:4200 (proxy
 - [ ] Frontend (PWA, Angular + Ionic): Kroki F1–F10 i kolejność z backendem – `docs/PLAN-FRONTEND.md`
   - [x] F1 – szkielet `ICanHelp.Web` (Angular 22 + Ionic 9, 5 zakładek, core/shared/features, pipe'y pl-PL, proxy, job CI `frontend`).
     8.11.2026: lint + test + build zielone, aplikacja uruchomiona.
+  - [x] F2 – klient NSwag (`npm run api`), `AuthService` + interceptory (Bearer/odświeżanie, ProblemDetails → toast) + `authGuard`,
+    ekrany logowania/rejestracji/profilu; backend: refresh tokeny (`api/users/refresh`, `sign-out`, migracja `RefreshTokens`).
+    8.11.2026: dotnet 400/400, lint + 65/65 Vitest + build zielone.
 
 ## Jak pracować z AI (oszczędnie)
 - Jedna sesja = jeden krok z listy. Na start: „Przeczytaj CLAUDE.md i docs/PLAN-…md, zrób Krok N” (frontend: Krok FN).
