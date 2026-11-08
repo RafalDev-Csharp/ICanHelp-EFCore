@@ -92,7 +92,7 @@ z Hydrauliki do 5 km od domu albo do 5 km od drogi Suwałki → Augustów.
 - [x] Testy: Core (walidacja, limity), Api (punkt w promieniu → powiadomienie, poza → brak; trasa: punkt 3 km od linii →
       jest, 10 km → brak; zła kategoria → brak; własne ogłoszenie → brak; dwa pasujące alerty → jedno powiadomienie).
       Współrzędne testowe: Augustów ~ (53.84, 22.98), Suwałki ~ (54.10, 22.93).
-- [ ] `dotnet build` + `dotnet test`, commit – kod z 8.11.2026 pisany bez kompilatora, czeka na weryfikację
+- [x] `dotnet build` + `dotnet test`, commit – 8.11.2026: 371/371 zielone (po poprawce aliasu `Location` w Infrastructure)
 
 Zrobione w Kroku 14 (odstępstwa od planu / decyzje):
 - `Zone` liczy **trigger** `TR_AnnouncementAlerts_Zone` (AFTER INSERT, UPDATE; tylko gdy zmienia się `Shape` albo `RadiusKm`):

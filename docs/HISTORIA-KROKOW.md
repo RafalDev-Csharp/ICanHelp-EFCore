@@ -47,5 +47,7 @@
   limit dzienny, cisza nocna), `api/me/alerts` (CRUD, enable/disable, preview). Migracja `AnnouncementAlerts` (20261108140000, ręczna:
   tabela + trigger `TR_AnnouncementAlerts_Zone` + indeks `IX_AnnouncementAlerts_Zone`). Testy: `Core.Tests/.../AnnouncementAlertTests.cs`,
   `Application.Tests/Commands/AlertHandlersTests.cs`, `Application.Tests/Notifications/NewAnnouncementAlertHandlerTests.cs`,
-  `Api.Tests/AlertTests.cs`. Pisane 8.11.2026 bez kompilatora – czeka na `dotnet build` + `dotnet test`.
+  `Api.Tests/AlertTests.cs`. Pisane 8.11.2026 bez kompilatora; jedyna poprawka: konflikt nazw `Location` (NTS vs domena) – alias
+  `using Location = ICanHelp.Core.ValueObjects.Location;` w plikach z NetTopologySuite. Tego samego dnia: build + 371/371 testów zielone
+  (w tym integracyjne z migracją, triggerem i indeksem przestrzennym).
 - [ ] Krok 15 – „jestem teraz w okolicy” (z aplikacją mobilną): `docs/PLAN-POWIADOMIENIA.md`

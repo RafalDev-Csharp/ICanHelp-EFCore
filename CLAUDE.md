@@ -144,7 +144,7 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
 - [x] Krok 13 – powiadomienia: zdarzenia domenowe, outbox, `Notifications`, SignalR, `api/me/notifications`, migracja `Notifications`.
   8.11.2026: build + 320/320 testów zielone.
 - [x] Krok 14 – alerty o nowych ogłoszeniach: obszar i trasa, `api/me/alerts`, migracja `AnnouncementAlerts` (trigger + indeks przestrzenny).
-  8.11.2026 pisane bez kompilatora – **do weryfikacji: `dotnet build` + `dotnet test`**.
+  8.11.2026: build + 371/371 testów zielone.
 - [ ] Krok 15 (później, z aplikacją mobilną) – „jestem teraz w okolicy” (bieżąca lokalizacja, opt-in) – `docs/PLAN-POWIADOMIENIA.md`
 
 ## Jak pracować z AI (oszczędnie)
