@@ -1,0 +1,5 @@
+# Frontend: zawsze LF (Prettier w `npm run lint` sprawdza końce linii, CI działa na Linuksie).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary

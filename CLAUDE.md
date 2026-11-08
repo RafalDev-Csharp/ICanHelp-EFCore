@@ -93,10 +93,11 @@ Infrastructure  DAL/ICanHelpDbContext, DAL/Converters, DAL/Configurations, DAL/R
 Api             Program.cs, Controllers (Alerts, Announcements, Categories, Conversations, Notifications, Users), ErrorHandling/DomainExceptionHandler,
                 Notifications (NotificationsHub /hubs/notifications, SignalRNotificationSender),
                 appsettings*.json, Properties/launchSettings.json, ICanHelp.Api.http (przykładowe żądania)
+Web             frontend PWA (Angular + Ionic) – własny `ICanHelp.Web/CLAUDE.md` (stack, struktura, komendy npm)
 Api.Tests       Infrastructure/ApiFactory (kontener + ApiCollection), Infrastructure/TestApi (CreateUserAsync, ShouldBeProblemAsync…),
                 testy per obszar: ApiBasics, Users, AnnouncementFlow, AnnouncementEdit, AnnouncementImage, Conversation, DistanceSearch,
                 Notification (outbox wyłączony, `ProcessOutboxAsync()`), Alert
-.github/workflows/ci.yml   build + testy jednostkowe + integracyjne (ubuntu-latest, Docker)
+.github/workflows/ci.yml   job backendu: build + testy jednostkowe + integracyjne (ubuntu-latest, Docker); job `frontend`: npm ci, lint, test, build
 ```
 Testy integracyjne: jeden kontener i baza `ICanHelpTests` na cały przebieg, środowisko `Testing`, config przez `UseSetting`.
 Bazy nie czyścimy – każdy test tworzy własnych użytkowników (unikalny e-mail) i filtruje po swoich danych (`ownerId`).
@@ -130,6 +131,7 @@ dotnet tool restore                 # instaluje dotnet-ef z manifestu
 dotnet run --project ICanHelp.Api   # Swagger: http://localhost:5080/swagger; przy starcie DbInitializer robi migracje + seed
 dotnet ef migrations add <Name> -p ICanHelp.Infrastructure -s ICanHelp.Api -o DAL/Migrations
 dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
+cd ICanHelp.Web && npm ci && npm start   # frontend http://localhost:4200 (proxy /api, /hubs → :5080); npm run lint / npm test / npm run build
 ```
 
 ## Stan prac (aktualizuj!) – pełna historia: `docs/HISTORIA-KROKOW.md`
@@ -149,6 +151,8 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
 - [ ] Krok 16 – „jestem w okolicy” na żądanie (alert `Presence` z wygaśnięciem, trasa „aktywuj teraz”), bez śledzenia w tle
 - [ ] Krok 17 (później) – Capacitor (sklepy) + opcjonalna lokalizacja w tle
 - [ ] Frontend (PWA, Angular + Ionic): Kroki F1–F10 i kolejność z backendem – `docs/PLAN-FRONTEND.md`
+  - [x] F1 – szkielet `ICanHelp.Web` (Angular 22 + Ionic 9, 5 zakładek, core/shared/features, pipe'y pl-PL, proxy, job CI `frontend`).
+    8.11.2026: lint + test + build zielone, aplikacja uruchomiona.
 
 ## Jak pracować z AI (oszczędnie)
 - Jedna sesja = jeden krok z listy. Na start: „Przeczytaj CLAUDE.md i docs/PLAN-…md, zrób Krok N” (frontend: Krok FN).

@@ -44,17 +44,20 @@ F10 (wdrożenie) można zrobić wcześniej, jeśli chcesz pokazać aplikację zn
 
 ## Krok F1 – szkielet aplikacji
 
-- [ ] `ICanHelp.Web/`: projekt Ionic + Angular (standalone, szablon `tabs`), TypeScript strict, ESLint + Prettier.
-- [ ] Zakładki: **Ogłoszenia**, **Dodaj**, **Rozmowy**, **Powiadomienia**, **Profil** (na razie puste strony).
-- [ ] Struktura: `src/app/core/` (auth, api, interceptory, konfiguracja), `src/app/shared/` (komponenty wspólne, pipe'y: cena, odległość,
+- [x] `ICanHelp.Web/`: projekt Ionic + Angular (standalone, szablon `tabs`), TypeScript strict, ESLint + Prettier.
+- [x] Zakładki: **Ogłoszenia**, **Dodaj**, **Rozmowy**, **Powiadomienia**, **Profil** (na razie puste strony).
+- [x] Struktura: `src/app/core/` (auth, api, interceptory, konfiguracja), `src/app/shared/` (komponenty wspólne, pipe'y: cena, odległość,
       data „2 h temu”), `src/app/features/<obszar>/` (strony i serwisy obszaru: announcements, offers, conversations, notifications,
       alerts, profile). Język interfejsu: polski (`pl-PL` dla dat i walut).
-- [ ] Proxy w dev (`proxy.conf.json`): `/api` i `/hubs` (z WebSocketami) → `http://localhost:5080` – bez CORS w trakcie pracy.
+- [x] Proxy w dev (`proxy.conf.json`): `/api` i `/hubs` (z WebSocketami) → `http://localhost:5080` – bez CORS w trakcie pracy.
       CORS w backendzie dopiero, gdy frontend i API będą na różnych domenach (F10).
-- [ ] Skrypty npm: `start`, `build`, `test`, `lint`, `api` (ostatni dodaje F2).
-- [ ] CI: w `.github/workflows/ci.yml` nowy job `frontend` (`npm ci`, `lint`, `test --watch=false`, `build`).
-- [ ] `ICanHelp.Web/CLAUDE.md` (krótki: stack, struktura, komendy, zasady z „Dlaczego tak”) + wzmianka w głównym CLAUDE.md
+- [x] Skrypty npm: `start`, `build`, `test`, `lint`, `api` (ostatni dodaje F2).
+- [x] CI: w `.github/workflows/ci.yml` nowy job `frontend` (`npm ci`, `lint`, `test --watch=false`, `build`).
+- [x] `ICanHelp.Web/CLAUDE.md` (krótki: stack, struktura, komendy, zasady z „Dlaczego tak”) + wzmianka w głównym CLAUDE.md
       („Gdzie co leży”, „Komendy”).
+
+Zrobione 8.11.2026 (szczegóły: `docs/HISTORIA-KROKOW.md`). Szablon dał też Vitest (testy jednostkowe) i Playwright (e2e) –
+zostają; `npm test` = jednostkowe, `npm run test:e2e` = Playwright lokalnie. Skrypt `api` dochodzi w F2.
 
 ## Krok F2 – klient API, logowanie i rejestracja
 

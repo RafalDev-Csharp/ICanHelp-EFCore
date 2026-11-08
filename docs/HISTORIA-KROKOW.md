@@ -52,6 +52,17 @@
   (w tym integracyjne z migracją, triggerem i indeksem przestrzennym).
 - 8.11.2026 – decyzja: klient najpierw jako PWA (Angular + Ionic), później Capacitor; push przez FCM; „jestem w okolicy”
   na żądanie zamiast śledzenia w tle. Stary Krok 15 rozbity na 15 (push), 16 (dostępność na żądanie), 17 (sklepy, tło).
+- [x] Krok F1 (frontend, 8.11.2026) – `ICanHelp.Web/` w tym samym repo (decyzja nr 2 z `docs/PLAN-FRONTEND.md`; rozważany osobny
+  folder/repo – zostaje monorepo: jeden commit = endpoint + ekran, NSwag czyta Swaggera z repo, jedno CI). Szablon:
+  `ionic start icanhelp-web tabs --type=angular-standalone --no-git --capacitor=false` (Angular 22.2, Ionic 9, TS 6, Vitest, Playwright,
+  ESLint 10 + Prettier), folder przemianowany na `ICanHelp.Web`. Zmiany względem szablonu: zakładki Ogłoszenia / Dodaj / Rozmowy /
+  Powiadomienia / Profil pod krótkimi adresami (`/announcements`, `/add`, …, bez `/tabs`), puste strony z `EmptyStateComponent`,
+  `app.config.ts`, `core/config/locale.ts` (`LOCALE_ID` pl-PL, waluta PLN), pipe'y `price`, `distance`, `timeAgo` (+ `parseApiDate`:
+  data z API bez strefy = UTC), `environment.apiUrl`, `proxy.conf.json` (`/api`, `/hubs` z WebSocketami → :5080),
+  `npm test` = tylko jednostkowe (bez e2e), `.gitattributes` (LF), `capacitor.config.ts` (appId `pl.icanhelp.app`),
+  job `frontend` w CI. Testy: `tabs.page.spec.ts` (atrybuty zakładek – teksty etykiet w jsdom są puste, sprawdza je e2e), `features/feature-pages.spec.ts`, `shared/pipes/pipes.spec.ts`,
+  `empty-state.component.spec.ts`, e2e `e2e/app.spec.ts`. Pisane bez `npm` (brak dostępu do rejestru w sesji AI) –
+  do potwierdzenia u autora: lint + test + build.
 - [ ] Krok 15 – kanał push (FCM): `docs/PLAN-POWIADOMIENIA.md`
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny
