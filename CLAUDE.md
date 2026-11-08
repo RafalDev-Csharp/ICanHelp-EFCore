@@ -79,7 +79,7 @@ zaakceptować** – trzeba kontroferty. Plan dalszych kroków i uzasadnienie: `d
 przez uczestnika; ocenianego (druga strona) wybiera domena. „Raz na ogłoszenie” – handler (`AlreadyRatedException`) + unikalny indeks.
 
 ## Gdzie co leży
-`docs/`: `ARCHITEKTURA.md` (szczegóły obszarów), `PLAN-NEGOCJACJE.md` (Kroki 9–12), `PLAN-POWIADOMIENIA.md` (Kroki 13–15), `HISTORIA-KROKOW.md` (pełny stan prac).
+`docs/`: `ARCHITEKTURA.md` (szczegóły obszarów), `PLAN-NEGOCJACJE.md` (Kroki 9–12), `PLAN-POWIADOMIENIA.md` (Kroki 13–17, decyzja o kliencie: PWA), `PLAN-FRONTEND.md` (Kroki F1–F10), `HISTORIA-KROKOW.md` (pełny stan prac).
 ```
 Core            Entities, ValueObjects, Enums, Events, Exceptions, Repositories (interfejsy + IUnitOfWork)
 Application     Abstractions (ICommand/IQuery + handlery), DTO, Queries, Commands (+ Commands/Handlers), Exceptions,
@@ -145,9 +145,12 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
   8.11.2026: build + 320/320 testów zielone.
 - [x] Krok 14 – alerty o nowych ogłoszeniach: obszar i trasa, `api/me/alerts`, migracja `AnnouncementAlerts` (trigger + indeks przestrzenny).
   8.11.2026: build + 371/371 testów zielone.
-- [ ] Krok 15 (później, z aplikacją mobilną) – „jestem teraz w okolicy” (bieżąca lokalizacja, opt-in) – `docs/PLAN-POWIADOMIENIA.md`
+- [ ] Krok 15 – kanał push (FCM) + `api/me/devices` – `docs/PLAN-POWIADOMIENIA.md`
+- [ ] Krok 16 – „jestem w okolicy” na żądanie (alert `Presence` z wygaśnięciem, trasa „aktywuj teraz”), bez śledzenia w tle
+- [ ] Krok 17 (później) – Capacitor (sklepy) + opcjonalna lokalizacja w tle
+- [ ] Frontend (PWA, Angular + Ionic): Kroki F1–F10 i kolejność z backendem – `docs/PLAN-FRONTEND.md`
 
 ## Jak pracować z AI (oszczędnie)
-- Jedna sesja = jeden krok z listy. Na start: „Przeczytaj CLAUDE.md, zrób Krok N”.
+- Jedna sesja = jeden krok z listy. Na start: „Przeczytaj CLAUDE.md i docs/PLAN-…md, zrób Krok N” (frontend: Krok FN).
 - Podawaj konkretne pliki, zamiast prosić o przeszukanie repo.
 - Po kroku: jedna linia w „Stan prac”, szczegóły w `docs/HISTORIA-KROKOW.md` (i `docs/ARCHITEKTURA.md`, jeśli doszedł obszar), commit.

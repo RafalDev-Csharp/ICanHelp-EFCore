@@ -1,6 +1,6 @@
 # Plan: powiadomienia (oferty i wiadomości, alerty o nowych ogłoszeniach „w okolicy” i „po drodze”)
 
-> Plan na Kroki 13–15. Każdy krok to osobna sesja: „Przeczytaj CLAUDE.md i docs/PLAN-POWIADOMIENIA.md, zrób Krok N”.
+> Plan na Kroki 13–17. Każdy krok to osobna sesja: „Przeczytaj CLAUDE.md i docs/PLAN-POWIADOMIENIA.md, zrób Krok N”.
 > Po kroku: odhacz punkty tutaj, zaktualizuj „Stan prac” w CLAUDE.md, `dotnet build` + `dotnet test`, commit.
 > Kontekst negocjacji (oferty, wątki, rewizje): `docs/PLAN-NEGOCJACJE.md`.
 
@@ -25,7 +25,9 @@
    istnieje tylko w bazie / Infrastructure (`DAL/Spatial.cs`).
 7. **Nie spamujemy:** brak powiadomień o własnych ogłoszeniach i własnych akcjach, jedno powiadomienie na parę
    (ogłoszenie, użytkownik) nawet przy kilku pasujących alertach, dzienny limit (powyżej – skrót), cisza nocna.
-8. **Bieżąca lokalizacja (Krok 15) tylko jako opt-in**, przechowujemy wyłącznie ostatnią pozycję z czasem, bez historii.
+8. **Bieżąca lokalizacja (Krok 16) tylko na żądanie**: użytkownik sam włącza dostępność na określony czas, przechowujemy
+   wyłącznie ostatnią pozycję z czasem wygaśnięcia, bez historii. Śledzenie w tle – najwcześniej w Kroku 17 (aplikacja ze sklepu).
+9. **Klient: najpierw PWA (Angular + Ionic), potem Capacitor; push przez FCM** – szczegóły niżej, „Klient i kanał push”.
 
 ## Krok 13 – powiadomienia o ofertach, wiadomościach i edycji (infrastruktura powiadomień)
 
@@ -111,12 +113,82 @@ Zrobione w Kroku 14 (odstępstwa od planu / decyzje):
   Ponowienie tego samego zdarzenia może podbić licznik skrótu drugi raz (rzadkie, świadomie pominięte).
 - Ogłoszenie już nie `Open`, gdy outbox doszedł (np. anulowane) → bez powiadomień.
 
-## Krok 15 (później, z aplikacją mobilną) – „jestem teraz w okolicy”
+## Klient i kanał push – decyzja z 8.11.2026 (dotyczy Kroków 15–17)
 
-- [ ] `UserLocation` (UserId, Location, `GeoPoint`, ReportedAt) – tylko ostatnia pozycja, bez historii; zgoda w ustawieniach (opt-in),
-      wyłączenie = usunięcie wiersza.
-- [ ] `POST api/me/location` (aplikacja mobilna, API „znaczącej zmiany lokalizacji” – oszczędza baterię; ograniczenie częstotliwości).
-- [ ] Alert `Kind = CurrentLocation` (promień wokół bieżącej pozycji, tylko gdy pozycja świeża, np. < 30 min).
-- [ ] Dopasowanie w obie strony: nowe ogłoszenie → użytkownicy ze świeżą pozycją w promieniu; nowa pozycja → ogłoszenia `Open`
-      z ostatnich 24 h w promieniu (o których jeszcze nie powiadomiono).
-- [ ] Push na telefon (FCM/APNs) jako kanał `INotificationSender`.
+- **Najpierw PWA, potem sklep.** Pierwszy frontend to aplikacja webowa „instalowana” na ekranie głównym (PWA): działa na telefonie
+  i komputerze, bez sklepów i recenzji, z powiadomieniami push. Później ten sam kod owijamy **Capacitorem** → aplikacja Android/iOS
+  w sklepach. Stack: **Angular + Ionic** (komponenty o wyglądzie aplikacji mobilnej) + `@angular/pwa` (service worker).
+  Angular, bo przypomina .NET: TypeScript, wstrzykiwanie zależności, serwisy, jedna „oficjalna” struktura projektu.
+  Plan kroków frontendu i wspólna kolejność z Krokami 15–17: `docs/PLAN-FRONTEND.md`.
+- **Push przez Firebase Cloud Messaging (FCM)** – jeden kanał dla przeglądarki (Web Push), Androida i iOS. Backend się nie zmieni,
+  gdy dojdzie aplikacja ze sklepu (inny `Platform` tokenu, ten sam wysyłacz).
+- **Czego przeglądarka nie umie:** lokalizacji w tle (pozycja tylko przy otwartej aplikacji). Na iPhonie push w PWA tylko po dodaniu
+  do ekranu głównego (iOS 16.4+). Huawei bez usług Google – FCM nie działa (nisza, pomijamy na start).
+- **„Jestem w okolicy” na żądanie zamiast śledzenia.** Użytkownik sam włącza dostępność („jestem tu przez 2 h”, „wracam teraz
+  trasą Suwałki → Augustów”); pozycję bierzemy raz, przy otwartej aplikacji. Działa w PWA, bez zgody na lokalizację w tle,
+  bez problemów z RODO i recenzją w sklepach, a sygnał „mam teraz czas” jest cenniejszy niż samo „przejeżdżam”.
+  Automatyczne śledzenie w tle – dopiero w aplikacji ze sklepu, jako opcja (Krok 17).
+
+## Krok 15 – kanał push (FCM) i urządzenia użytkownika
+
+- [ ] Core: agregat `UserDevice` (Id, UserId, Token (FCM, unikalny), Platform: `Web` | `Android` | `Ios`, CreatedAt, LastSeenAt).
+      Ten sam token zgłoszony ponownie → odświeżenie `LastSeenAt` (i właściciela, jeśli na urządzeniu zalogował się ktoś inny).
+      Limit urządzeń na użytkownika (np. 10, najstarsze wypada).
+- [ ] Application: `IPushSender` (wysyłka na listę tokenów, wynik: które tokeny są nieważne). `NotificationTextFormatter` – tytuł
+      i treść po polsku z `Type` + `Payload` (np. „Nowa oferta: 150 zł – *Cieknący kran*”). Te same teksty przyda się frontend
+      (albo backend zwraca je w `NotificationDto`).
+- [ ] Application: `CompositeNotificationSender` – woła wszystkie kanały (SignalR + push); błąd jednego nie blokuje drugiego
+      (dziś w `Program.cs` jest jeden `INotificationSender` – zamienić na listę kanałów). Push wysyłamy zawsze; gdy aplikacja jest
+      otwarta, frontend nie pokazuje systemowego dymka (FCM w aktywnej karcie trafia do `onMessage`) – bez podwójnych powiadomień.
+      Cisza nocna jak dziś (alerty w ciszy nie idą na żywo, więc nie idą też pushem); powiadomienia o transakcji – zawsze.
+- [ ] Infrastructure: `FcmPushSender` (NuGet `FirebaseAdmin`, HTTP v1). Klucz konta serwisowego **poza repo** (env / user-secrets,
+      `Push:Fcm:CredentialsJson`), `Push:Enabled` – w Testing i bez klucza: implementacja logująca. Odpowiedź `UNREGISTERED` /
+      `INVALID_ARGUMENT` → usunięcie `UserDevice`. W wiadomości `data`: `notificationId`, `announcementId?`, `conversationId?`,
+      `url` (głęboki link, np. `/announcements/{id}`) – kliknięcie otwiera właściwy ekran.
+- [ ] Api: `POST api/me/devices` (token + platforma, zwraca id; idempotentne), `DELETE api/me/devices/{id}` (wylogowanie /
+      wyłączenie powiadomień), `GET api/me/devices`. Cudze urządzenie → 404.
+- [ ] Migracja `UserDevices` (unikalny indeks na `Token`, indeks na `UserId`).
+- [ ] Testy: Core (rejestracja, ponowne zgłoszenie, limit), Application (formatter dla każdego `NotificationType`, composite –
+      awaria kanału, nieważny token usuwa urządzenie), Api (rejestracja/usuwanie, obcy → 404, oferta → fake `IPushSender`
+      dostał wysyłkę do właściciela, nie do autora).
+- [ ] Ręcznie (po starcie frontendu): projekt w konsoli Firebase, klucz VAPID dla Web, test na Androidzie i iPhonie (PWA na ekranie głównym).
+- [ ] `dotnet build` + `dotnet test`, commit.
+
+## Krok 16 – „Jestem w okolicy” (dostępność na żądanie)
+
+Przykład: hydraulik kończy pracę w Suwałkach o 16:00, klika „Wracam teraz trasą do domu (2 h)” albo, będąc w Augustowie,
+„Jestem tu przez 3 h, 5 km, Hydraulika”. Od razu widzi otwarte ogłoszenia, które pasują, a przez ten czas dostaje push o nowych.
+
+- [ ] Core: alert z czasem wygaśnięcia zamiast nowego mechanizmu – w `AnnouncementAlert`:
+      - nowy `Kind = Presence` (punkt = bieżąca pozycja), pole `ExpiresAt?`; najwyżej **jeden** na użytkownika (ponowne włączenie
+        nadpisuje pozycję/promień/kategorie/czas), nie wlicza się do limitu 10; czas trwania 0,5–8 h; harmonogram dni/godzin nie dotyczy;
+      - dla `Route`: `ActiveUntil?` – „aktywuj teraz na N godzin” (pomija harmonogram dni/godzin, ale nie ciszę nocną);
+      - `IsActiveAt(at)` uwzględnia `ExpiresAt`/`ActiveUntil` (czas parametrem, jak wszędzie).
+      Ponowne użycie: trigger `Zone`, indeks przestrzenny, `FindCandidatesAsync`, antyspam i `NewAnnouncementNearby` z Kroku 14 –
+      bez nowych zapytań dopasowania. Przypadek „kategorie”: wybrane przy włączeniu (domyślnie jak ostatnio); puste = wszystkie.
+- [ ] Application/Infrastructure: zapytanie `FindCandidatesAsync` pomija wygasłe (`ExpiresAt > @now`, także w SQL – mniej wierszy).
+      Sprzątanie: wygasłe `Presence` usuwane w tle (np. w `OutboxBackgroundService` albo osobnym serwisie, co 15 min) –
+      **nie trzymamy historii pozycji**.
+- [ ] Dopasowanie w drugą stronę: odpowiedź na włączenie dostępności = lista ogłoszeń `Open` z ostatnich 24 h w strefie
+      (jak `preview` z Kroku 14, posortowana po odległości) – pokazana na ekranie, bez powiadomień.
+- [ ] Odświeżanie pozycji, póki aplikacja jest otwarta: `PUT api/me/presence` z nową pozycją – nie częściej niż co 1 min i tylko
+      przy przesunięciu > 200 m (sprawdza backend, nadmiarowe żądania → 204 bez zapisu). Bez śledzenia w tle.
+- [ ] Api: `POST api/me/presence` (lat/lon, promień, kategoria/podkategorie, czas trwania) → lista ogłoszeń w okolicy,
+      `PUT api/me/presence` (nowa pozycja), `DELETE api/me/presence` (koniec dostępności = usunięcie wiersza),
+      `GET api/me/presence`; `POST api/me/alerts/{id}/activate-now` (body: liczba godzin) dla trasy.
+- [ ] Dla zleceniodawcy (opcjonalnie, buduje atrakcyjność): `GET api/announcements/{id}/helpers-nearby` – **tylko liczba**
+      pomocników z aktywną dostępnością/trasą pasującą do ogłoszenia, tylko dla właściciela. Nigdy pozycji ani nazwisk.
+- [ ] Prywatność: dokładna pozycja nie wychodzi poza użytkownika; zgoda wyrażana kliknięciem przy każdym włączeniu
+      (informacja w polityce prywatności – lokalizacja to dane osobowe).
+- [ ] Migracja (kolumny `ExpiresAt`, `ActiveUntil`, ewentualnie filtr w indeksach) – ręcznie, bez linii o `GeoPoint`.
+- [ ] Testy: Core (jeden `Presence` na użytkownika, limity czasu, `IsActiveAt` z wygaśnięciem, `ActiveUntil` pomija harmonogram),
+      Api (włączenie → lista ogłoszeń w promieniu; nowe ogłoszenie w promieniu → powiadomienie; po wygaśnięciu → brak;
+      `DELETE` → brak; trasa aktywowana poza harmonogramem → powiadomienie; licznik pomocników tylko dla właściciela).
+- [ ] `dotnet build` + `dotnet test`, commit.
+
+## Krok 17 (później, z aplikacją w sklepach) – tryb automatyczny
+
+- [ ] Capacitor: aplikacja Android/iOS z kodu PWA; natywny push (FCM, `Platform = Android/Ios` w `UserDevice` – backend bez zmian).
+- [ ] Opcjonalnie lokalizacja w tle (API „znaczącej zmiany lokalizacji” – oszczędza baterię) zasilająca `PUT api/me/presence`
+      tylko w oknie włączonej dostępności albo w godzinach alertu trasy. Wymaga zgody „zawsze” i uzasadnienia przy recenzji
+      (Google Play: formularz + wideo, Apple: opis użycia) – robimy dopiero, gdy będą użytkownicy i dane, że to potrzebne.

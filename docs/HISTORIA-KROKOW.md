@@ -50,4 +50,8 @@
   `Api.Tests/AlertTests.cs`. Pisane 8.11.2026 bez kompilatora; jedyna poprawka: konflikt nazw `Location` (NTS vs domena) – alias
   `using Location = ICanHelp.Core.ValueObjects.Location;` w plikach z NetTopologySuite. Tego samego dnia: build + 371/371 testów zielone
   (w tym integracyjne z migracją, triggerem i indeksem przestrzennym).
-- [ ] Krok 15 – „jestem teraz w okolicy” (z aplikacją mobilną): `docs/PLAN-POWIADOMIENIA.md`
+- 8.11.2026 – decyzja: klient najpierw jako PWA (Angular + Ionic), później Capacitor; push przez FCM; „jestem w okolicy”
+  na żądanie zamiast śledzenia w tle. Stary Krok 15 rozbity na 15 (push), 16 (dostępność na żądanie), 17 (sklepy, tło).
+- [ ] Krok 15 – kanał push (FCM): `docs/PLAN-POWIADOMIENIA.md`
+- [ ] Krok 16 – „jestem w okolicy” na żądanie
+- [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny
