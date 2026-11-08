@@ -1,4 +1,5 @@
 using ICanHelp.Core.Entities;
+using ICanHelp.Core.Entities.Alerts;
 using ICanHelp.Core.Entities.Liked;
 using ICanHelp.Core.Entities.Negotiations;
 using ICanHelp.Core.Entities.Notifications;
@@ -26,6 +27,7 @@ public sealed class ICanHelpDbContext : DbContext
     public DbSet<LikedUser> LikedUsers => Set<LikedUser>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<AnnouncementAlert> AnnouncementAlerts => Set<AnnouncementAlert>();
 
     public ICanHelpDbContext(DbContextOptions<ICanHelpDbContext> options) : base(options)
     {
@@ -41,6 +43,38 @@ public sealed class ICanHelpDbContext : DbContext
                      .ToList())
         {
             modelBuilder.Entity(entityType.ClrType).Ignore(nameof(AggregateRoot.DomainEvents));
+        }
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        ApplyAlertShapes();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
+    {
+        ApplyAlertShapes();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>
+    /// Krok 14: the geography shape of a new alert or of an alert with changed points (point or LINESTRING). The zone
+    /// (shape + radius in metres) is computed afterwards by the trigger in SQL Server, in the same transaction.
+    /// </summary>
+    private void ApplyAlertShapes()
+    {
+        // Entries() runs DetectChanges, so IsModified is up to date.
+        foreach (var entry in ChangeTracker.Entries<AnnouncementAlert>())
+        {
+            var pointsChanged = entry.State == EntityState.Added
+                                || (entry.State == EntityState.Modified && entry.Property(a => a.Points).IsModified);
+
+            if (pointsChanged)
+            {
+                entry.Property(Spatial.AlertShape).CurrentValue = Spatial.CreateShape(entry.Entity.Points);
+            }
         }
     }
 
@@ -66,6 +100,9 @@ public sealed class ICanHelpDbContext : DbContext
         configurationBuilder.Properties<DifficultyLevel>().HaveConversion<string>().HaveMaxLength(20);
         configurationBuilder.Properties<UserRole>().HaveConversion<string>().HaveMaxLength(20);
         configurationBuilder.Properties<NotificationType>().HaveConversion<string>().HaveMaxLength(40);
+        configurationBuilder.Properties<AlertKind>().HaveConversion<string>().HaveMaxLength(20);
+        // [Flags] as text, e.g. "Workdays" or "Monday, Saturday".
+        configurationBuilder.Properties<WeekDays>().HaveConversion<string>().HaveMaxLength(100);
         // [Flags] enum as text, e.g. "Description, Budget" (Enum.Parse reads it back).
         configurationBuilder.Properties<AnnouncementFields>().HaveConversion<string>().HaveMaxLength(200);
     }

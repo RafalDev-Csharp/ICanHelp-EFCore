@@ -68,31 +68,48 @@ Szczegóły: `docs/ARCHITEKTURA.md`, sekcja „Powiadomienia”.
 Przykład: mieszkam w Augustowie, pracuję w Suwałkach jako hydraulik, wracam do domu. Chcę wiedzieć o ogłoszeniach
 z Hydrauliki do 5 km od domu albo do 5 km od drogi Suwałki → Augustów.
 
-- [ ] Core: agregat `AnnouncementAlert` (UserId, Name, `CategoryId`, `SubcategoryIds` (puste = cała kategoria), Kind: `Area` | `Route`,
+- [x] Core: agregat `AnnouncementAlert` (UserId, Name, `CategoryId`, `SubcategoryIds` (puste = cała kategoria), Kind: `Area` | `Route`,
       `Center` (Location, dla Area), `RoutePoints` (lista Location, dla Route, min. 2), `RadiusKm` (np. 0,5–50),
       `ActiveDays`/`ActiveFrom`/`ActiveTo` (opcjonalnie), IsEnabled, CreatedAt). Limit alertów na użytkownika (np. 10).
       `Matches(categoryId, subcategoryId)` w domenie; geometria w bazie.
-- [ ] Trasa: frontend wysyła punkty (start, cel) albo gotową polilinię. Wariant 1 (prosty): frontend pobiera trasę z serwisu
+- [x] Trasa: frontend wysyła punkty (start, cel) albo gotową polilinię. Wariant 1 (prosty): frontend pobiera trasę z serwisu
       routingu i wysyła polilinię. Wariant 2: backend `IRoutingService` (OSRM/ORS). Zacznij od wariantu 1; polilinię upraszczamy
       (`Reduce` w SQL Server / NTS `DouglasPeuckerSimplifier`), limit liczby punktów.
-- [ ] Infrastructure: kolumny `Shape geography` (punkt albo LINESTRING) i `Zone geography` (bufor) + indeks przestrzenny na `Zone`
+- [x] Infrastructure: kolumny `Shape geography` (punkt albo LINESTRING) i `Zone geography` (bufor) + indeks przestrzenny na `Zone`
       (w migracji ręcznie, jak `IX_Announcements_GeoPoint`). **Bufor w metrach:** NTS buforuje w stopniach, więc `Zone` liczy
       SQL Server: `UPDATE AnnouncementAlerts SET Zone = Shape.STBuffer(RadiusKm * 1000) WHERE Id = @id` w tej samej transakcji
       (kolumna obliczana z metodą geography nie może być PERSISTED → nie miałaby indeksu). Sprawdź przy implementacji.
-- [ ] Application: handler zdarzenia `AnnouncementPublished` (z outboksa) → query dopasowania:
+- [x] Application: handler zdarzenia `AnnouncementPublished` (z outboksa) → query dopasowania:
       `WHERE IsEnabled AND CategoryId = @c AND (podkategoria pasuje) AND Zone.STIntersects(@point) = 1 AND UserId <> @owner`
       + filtr dni/godzin → `Notification` typu `NewAnnouncementNearby` z odległością i nazwą alertu
       („Nowe ogłoszenie w kategorii Hydraulika: *Cieknący kran* – 3 km od Twojej trasy Suwałki → Augustów”;
       odległość = `Shape.STDistance(@point)`).
-- [ ] Reguły antyspamowe: jedno powiadomienie na (ogłoszenie, użytkownik), dzienny limit alertów na użytkownika
+- [x] Reguły antyspamowe: jedno powiadomienie na (ogłoszenie, użytkownik), dzienny limit alertów na użytkownika
       (powyżej – jeden skrót „i jeszcze N nowych”), cisza nocna (kolejkujemy na rano albo pomijamy push, zostaje wpis na liście).
-- [ ] Api: CRUD `api/me/alerts` (GET lista, POST, PATCH – zmiana promienia/kategorii/trasy przelicza `Zone`, DELETE,
+- [x] Api: CRUD `api/me/alerts` (GET lista, POST, PATCH – zmiana promienia/kategorii/trasy przelicza `Zone`, DELETE,
       POST `{id}/enable|disable`); opcjonalnie `GET api/me/alerts/{id}/preview` – ogłoszenia `Open`, które pasują teraz.
-- [ ] Migracja `AnnouncementAlerts` (+ indeks przestrzenny ręcznie).
-- [ ] Testy: Core (walidacja, limity), Api (punkt w promieniu → powiadomienie, poza → brak; trasa: punkt 3 km od linii →
+- [x] Migracja `AnnouncementAlerts` (+ indeks przestrzenny ręcznie).
+- [x] Testy: Core (walidacja, limity), Api (punkt w promieniu → powiadomienie, poza → brak; trasa: punkt 3 km od linii →
       jest, 10 km → brak; zła kategoria → brak; własne ogłoszenie → brak; dwa pasujące alerty → jedno powiadomienie).
       Współrzędne testowe: Augustów ~ (53.84, 22.98), Suwałki ~ (54.10, 22.93).
-- [ ] `dotnet build` + `dotnet test`, commit
+- [ ] `dotnet build` + `dotnet test`, commit – kod z 8.11.2026 pisany bez kompilatora, czeka na weryfikację
+
+Zrobione w Kroku 14 (odstępstwa od planu / decyzje):
+- `Zone` liczy **trigger** `TR_AnnouncementAlerts_Zone` (AFTER INSERT, UPDATE; tylko gdy zmienia się `Shape` albo `RadiusKm`):
+  `Shape.MakeValid().Reduce(25).STBuffer(RadiusKm * 1000)`. Zamiast osobnego `UPDATE` po `SaveChanges` – działa przy każdym zapisie,
+  w tej samej transakcji, a EF wie o nim (`HasTrigger`, bez `OUTPUT`). `Zone` jest w modelu (do zapytań), ale EF go nie zapisuje
+  (`PropertySaveBehavior.Ignore`). `Shape` ustawia `ICanHelpDbContext` przed zapisem z `Points` (`Spatial.CreateShape`).
+- Upraszczanie trasy: `Reduce(25)` w SQL (tolerancja 25 m przy min. promieniu 500 m) zamiast NTS; limit 1000 punktów w domenie.
+  Wariant 2 (`IRoutingService` w backendzie) – nie robiony.
+- Punkty i podkategorie alertu – kolumny JSON (`Points` `[[lat,lon],…]`, `SubcategoryIds`). Podkategorie i harmonogram sprawdza
+  domena po zapytaniu przestrzennym (`IAnnouncementAlertRepository.FindCandidatesAsync` → `Matches` + `IsActiveAt`).
+- Harmonogram: `ActiveDays` (`WeekDays` [Flags]) + opcjonalne godziny (też przez północ). Strefa czasowa jedna dla aplikacji
+  (`Alerts:TimeZone` = Europe/Warsaw) – użytkownik nie ma jeszcze własnej.
+- Antyspam (`AlertOptions`): jedno powiadomienie na (ogłoszenie, użytkownik) – najbliższy z jego alertów; dzienny limit
+  (`DailyLimit` = 20, doba lokalna), powyżej jeden `NewAnnouncementsDigest` na dzień z `count`, aktualizowany (`Notification.Renew` –
+  znów nieprzeczytany, na górze listy); cisza nocna 22–7 – wpis zapisany, bez dostarczenia na żywo („kolejkowanie na rano” – nie).
+  Ponowienie tego samego zdarzenia może podbić licznik skrótu drugi raz (rzadkie, świadomie pominięte).
+- Ogłoszenie już nie `Open`, gdy outbox doszedł (np. anulowane) → bez powiadomień.
 
 ## Krok 15 (później, z aplikacją mobilną) – „jestem teraz w okolicy”
 

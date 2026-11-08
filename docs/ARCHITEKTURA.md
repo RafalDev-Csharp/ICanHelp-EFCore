@@ -101,3 +101,23 @@
   UserId+ReadAt+CreatedAt) i `OutboxMessages` (indeks ProcessedAt+OccurredAt). Migracja `Notifications` (20261108100000, ręczna).
 - Testy integracyjne: `Outbox:Enabled=false`, outbox przetwarza `TestApi.ProcessOutboxAsync()` (`IOutboxProcessor`, semafor – nie biegnie
   równolegle z pętlą). Kilka instancji API wymagałoby blokowania wierszy (`UPDLOCK, READPAST`) – na razie niepotrzebne.
+
+## Alerty (Krok 14)
+- `Core/Entities/Alerts/AnnouncementAlert`: obszar (1 punkt) albo trasa (2–1000 punktów), promień 0,5–50 km, kategoria + podkategorie
+  (puste = cała), `ActiveDays`/`ActiveFrom`/`ActiveTo` (czas lokalny, przez północ OK), `IsEnabled`, max 10 na użytkownika.
+  Błędne dane → `InvalidAlertException` (400), limit → `DomainRuleException` (409), cudzy alert → `AlertNotFoundException` (404).
+- Tabela `AnnouncementAlerts`: `Points`/`SubcategoryIds` jako JSON (`DAL/Converters/AlertConverters.cs`, porównanie po zawartości),
+  `Shape geography` (punkt / LINESTRING – ustawia `ICanHelpDbContext.ApplyAlertShapes()` przed zapisem, gdy alert nowy albo zmieniły się
+  punkty), `Zone geography` (liczy trigger `TR_AnnouncementAlerts_Zone`: `Shape.MakeValid().Reduce(25).STBuffer(RadiusKm*1000)`,
+  EF go nie zapisuje) + `IX_AnnouncementAlerts_Zone` (spatial, w migracji). Trigger zadeklarowany w EF (`HasTrigger`) – bez `OUTPUT`.
+- Dopasowanie (`AnnouncementAlertRepository.FindCandidatesAsync`): `IsEnabled AND CategoryId AND UserId <> właściciel AND
+  Zone.STIntersects(@punkt) = 1`, odległość `Shape.STDistance(@punkt)` (od środka albo od linii trasy). Podkategorie i harmonogram –
+  domena (`Matches`, `IsActiveAt`).
+- `Application/Notifications/NewAnnouncementAlertHandler` (`AnnouncementPublished`): tylko ogłoszenie wciąż `Open`; jeden wpis na
+  użytkownika (najbliższy alert); `NewAnnouncementNearby` (announcementTitle, categoryName, alertName, alertKind, distanceKm „3.2”);
+  powyżej `Alerts:DailyLimit` w dobie lokalnej – jeden `NewAnnouncementsDigest` (count) aktualizowany przez `Notification.Renew`;
+  w ciszy nocnej (`Alerts:QuietHours*`) zapis bez `INotificationSender`. Ustawienia: `Application/Alerts/AlertOptions`
+  (rejestruje Infrastructure z sekcji `Alerts`).
+- Api (`AlertsController`, `api/me/alerts`): GET lista, GET `{id}`, POST (201), PATCH (null = bez zmian; nowa kategoria bez
+  podkategorii = cała kategoria; `schedule` zastępuje harmonogram), DELETE, POST `{id}/enable|disable`, GET `{id}/preview?limit=`
+  (otwarte ogłoszenia w strefie teraz – `GeoPoint.STIntersects(@zone)`, podkategorie w pamięci z max 500 najnowszych).

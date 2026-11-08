@@ -24,6 +24,77 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("ICanHelp.Core.Entities.Alerts.AnnouncementAlert", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActiveDays")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<TimeOnly?>("ActiveFrom")
+                        .HasColumnType("time");
+
+                    b.Property<TimeOnly?>("ActiveTo")
+                        .HasColumnType("time");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Points")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<double>("RadiusKm")
+                        .HasColumnType("float");
+
+                    b.Property<Geometry>("Shape")
+                        .IsRequired()
+                        .HasColumnType("geography");
+
+                    b.Property<string>("SubcategoryIds")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Geometry>("Zone")
+                        .HasColumnType("geography");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AnnouncementAlerts", t =>
+                        {
+                            t.HasTrigger("TR_AnnouncementAlerts_Zone");
+                        });
+                });
+
             modelBuilder.Entity("ICanHelp.Core.Entities.Announcement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -536,6 +607,21 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                     b.HasIndex("ProcessedAt", "OccurredAt");
 
                     b.ToTable("OutboxMessages");
+                });
+
+            modelBuilder.Entity("ICanHelp.Core.Entities.Alerts.AnnouncementAlert", b =>
+                {
+                    b.HasOne("ICanHelp.Core.Entities.Category", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ICanHelp.Core.Entities.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("ICanHelp.Core.Entities.Announcement", b =>

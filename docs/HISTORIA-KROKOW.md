@@ -41,4 +41,11 @@
   Migracja `Notifications` (20261108100000, ręczna). Testy: `Core.Tests/.../DomainEventsTests.cs`,
   `Application.Tests/Notifications/TransactionNotificationHandlerTests.cs`, `Api.Tests/NotificationTests.cs`.
   Pisane 8.11.2026 bez kompilatora; tego samego dnia u autora: build + 320/320 testów zielone (w tym integracyjne z migracją).
-- [ ] Krok 14 – alerty o nowych ogłoszeniach (obszar / trasa): `docs/PLAN-POWIADOMIENIA.md`
+- [x] Krok 14 – alerty o nowych ogłoszeniach (sekcja „Alerty” w `docs/ARCHITEKTURA.md`, decyzje: `docs/PLAN-POWIADOMIENIA.md`):
+  agregat `AnnouncementAlert` (obszar / trasa, kategoria + podkategorie, promień, dni/godziny, włącz/wyłącz, max 10),
+  `NewAnnouncementAlertHandler` (`AnnouncementPublished` z outboksa → `NewAnnouncementNearby` / skrót `NewAnnouncementsDigest`,
+  limit dzienny, cisza nocna), `api/me/alerts` (CRUD, enable/disable, preview). Migracja `AnnouncementAlerts` (20261108140000, ręczna:
+  tabela + trigger `TR_AnnouncementAlerts_Zone` + indeks `IX_AnnouncementAlerts_Zone`). Testy: `Core.Tests/.../AnnouncementAlertTests.cs`,
+  `Application.Tests/Commands/AlertHandlersTests.cs`, `Application.Tests/Notifications/NewAnnouncementAlertHandlerTests.cs`,
+  `Api.Tests/AlertTests.cs`. Pisane 8.11.2026 bez kompilatora – czeka na `dotnet build` + `dotnet test`.
+- [ ] Krok 15 – „jestem teraz w okolicy” (z aplikacją mobilną): `docs/PLAN-POWIADOMIENIA.md`

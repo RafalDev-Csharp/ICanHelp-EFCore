@@ -272,3 +272,75 @@ Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
 # Wszystkie przeczytane -> 204
 POST {{baseUrl}}/api/me/notifications/read-all
 Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# ---------- Alerty o nowych ogłoszeniach (Krok 14) ----------
+# Pasujące nowe ogłoszenie (strefa + kategoria/podkategoria, nie własne) -> powiadomienie NewAnnouncementNearby
+# (announcementTitle, categoryName, alertName, alertKind, distanceKm). Powyżej Alerts:DailyLimit dziennie -> jeden skrót
+# NewAnnouncementsDigest (count). Cisza nocna (Alerts:QuietHours*) -> wpis na liście, bez SignalR.
+# Obszar: 5 km od domu w Augustowie, tylko w dni robocze 15-18 -> 201 (11. alert -> 409, promień spoza 0,5-50 km -> 400)
+# @name createAreaAlert
+POST {{baseUrl}}/api/me/alerts
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Dom – Augustów",
+  "kind": "Area",
+  "categoryId": "{{categoryId}}",
+  "subcategoryIds": [],
+  "center": { "latitude": 53.84, "longitude": 22.98 },
+  "radiusKm": 5,
+  "schedule": { "days": "Workdays", "from": "15:00:00", "to": "18:00:00" }
+}
+
+###
+# Trasa: 5 km od drogi Suwałki -> Augustów (polilinię daje serwis routingu po stronie aplikacji, 2-1000 punktów)
+# @name createRouteAlert
+POST {{baseUrl}}/api/me/alerts
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Suwałki → Augustów",
+  "kind": "Route",
+  "categoryId": "{{categoryId}}",
+  "routePoints": [
+    { "latitude": 54.10, "longitude": 22.93 },
+    { "latitude": 53.97, "longitude": 22.95 },
+    { "latitude": 53.84, "longitude": 22.98 }
+  ],
+  "radiusKm": 5
+}
+
+###
+GET {{baseUrl}}/api/me/alerts
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# Zmiana promienia / punktów przelicza strefę w bazie (trigger). Rodzaju (Area/Route) zmienić się nie da.
+PATCH {{baseUrl}}/api/me/alerts/{{createAreaAlert.response.body.$.id}}
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "radiusKm": 10,
+  "schedule": { "days": "All" }
+}
+
+###
+# Podgląd: otwarte ogłoszenia, które pasują teraz (z distanceKm od punktu / trasy)
+GET {{baseUrl}}/api/me/alerts/{{createRouteAlert.response.body.$.id}}/preview?limit=20
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+POST {{baseUrl}}/api/me/alerts/{{createAreaAlert.response.body.$.id}}/disable
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+POST {{baseUrl}}/api/me/alerts/{{createAreaAlert.response.body.$.id}}/enable
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+DELETE {{baseUrl}}/api/me/alerts/{{createAreaAlert.response.body.$.id}}
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}

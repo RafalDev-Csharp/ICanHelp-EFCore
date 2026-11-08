@@ -22,5 +22,11 @@ public enum NotificationType
     MessageReceived,
 
     /// <summary>The owner changed an announcement I am negotiating about.</summary>
-    AnnouncementEdited
+    AnnouncementEdited,
+
+    /// <summary>Krok 14: a new announcement matches one of my alerts (area / route).</summary>
+    NewAnnouncementNearby,
+
+    /// <summary>Krok 14: over the daily limit of alerts – one digest a day ("and N more new announcements").</summary>
+    NewAnnouncementsDigest
 }

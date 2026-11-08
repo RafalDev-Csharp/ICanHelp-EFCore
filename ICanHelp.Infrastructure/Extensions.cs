@@ -1,4 +1,5 @@
 using ICanHelp.Application.Abstractions;
+using ICanHelp.Application.Alerts;
 using ICanHelp.Application.Notifications;
 using ICanHelp.Application.Storage;
 using ICanHelp.Application.Time;
@@ -43,6 +44,9 @@ public static class Extensions
         services.AddSingleton<IOutboxProcessor, OutboxProcessor>();
         services.AddHostedService<OutboxBackgroundService>();
         services.AddSingleton<IEmailSender, LoggingEmailSender>();
+
+        // Krok 14: alerts about new announcements – daily limit, quiet hours, time zone (section "Alerts").
+        services.AddSingleton(configuration.GetSection(AlertOptions.SectionName).Get<AlertOptions>() ?? new AlertOptions());
 
         return services;
     }

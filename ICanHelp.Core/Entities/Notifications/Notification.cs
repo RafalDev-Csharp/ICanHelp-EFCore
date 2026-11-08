@@ -67,6 +67,22 @@ public class Notification
         CreatedAt = createdAtUtc;
     }
 
+    /// <summary>
+    /// A digest (Krok 14) gets new parameters (e.g. a higher count) instead of a new notification: it becomes unread
+    /// again and moves to the top of the list.
+    /// </summary>
+    public void Renew(string payload, DateTime renewedAtUtc)
+    {
+        if (string.IsNullOrWhiteSpace(payload) || payload.Length > MaxPayloadLength)
+        {
+            throw new DomainRuleException($"Notification payload must have 1–{MaxPayloadLength} characters.");
+        }
+
+        Payload = payload;
+        CreatedAt = renewedAtUtc;
+        ReadAt = null;
+    }
+
     /// <summary>Only the recipient can mark it as read; the first read time stays.</summary>
     public void MarkAsRead(UserId userId, DateTime readAtUtc)
     {

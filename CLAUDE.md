@@ -65,7 +65,8 @@ Jeden użytkownik może być raz klientem, raz pomocnikiem (rola w transakcji, n
   `OfferMade/Countered/Accepted/Rejected/Withdrawn`, `MessageSent`), czas = parametr metody. `SqlUnitOfWork` przenosi je do outboksa.
 - `Notification` (agregat, `Entities/Notifications`): UserId (odbiorca), Type, Payload (JSON parametrów), AnnouncementId?, ConversationId?,
   CreatedAt, ReadAt?, SourceEventId (unikalne z UserId). Powstaje w tle z outboksa → `docs/ARCHITEKTURA.md` „Powiadomienia”.
-- Później: alerty o nowych ogłoszeniach w okolicy / „po drodze” (`AnnouncementAlert`: punkt albo trasa + promień) → `docs/PLAN-POWIADOMIENIA.md`
+- `AnnouncementAlert` (agregat, `Entities/Alerts`): Area (1 punkt) | Route (2–1000), kategoria + podkategorie, RadiusKm 0,5–50, dni/godziny,
+  IsEnabled, max 10/użytkownik. Geometria tylko w bazie (`Shape` z EF, `Zone` z triggera SQL) → `docs/ARCHITEKTURA.md` „Alerty”.
 
 ## Przepływ statusów
 Announcement: `Open` → (AcceptOffer) `Accepted` → (Start) `InProgress` → (Complete) `Completed`; `Open`/`Accepted` → `Cancelled`
@@ -82,18 +83,19 @@ przez uczestnika; ocenianego (druga strona) wybiera domena. „Raz na ogłoszeni
 ```
 Core            Entities, ValueObjects, Enums, Events, Exceptions, Repositories (interfejsy + IUnitOfWork)
 Application     Abstractions (ICommand/IQuery + handlery), DTO, Queries, Commands (+ Commands/Handlers), Exceptions,
-                Events (IDomainEventHandler), Notifications (handlery zdarzeń, NotificationPublisher, INotificationSender, IEmailSender),
+                Events (IDomainEventHandler), Notifications (handlery zdarzeń, NotificationPublisher, INotificationSender, IEmailSender,
+                NewAnnouncementAlertHandler), Alerts (AlertOptions: limit dzienny, cisza nocna, strefa czasowa),
                 Security (IPasswordManager, IAuthenticator, ITokenStorage), Time (IClock), Extensions.AddApplication()
 Infrastructure  DAL/ICanHelpDbContext, DAL/Converters, DAL/Configurations, DAL/Repositories,
                 DAL/Handlers (query handlery + mapowanie AsDto), SqlUnitOfWork, DbInitializer, Security (JWT, hasła), Time,
                 Outbox (OutboxMessage, OutboxProcessor, OutboxBackgroundService), Notifications (LoggingEmailSender),
                 Extensions.AddInfrastructure()
-Api             Program.cs, Controllers (Announcements, Categories, Conversations, Notifications, Users), ErrorHandling/DomainExceptionHandler,
+Api             Program.cs, Controllers (Alerts, Announcements, Categories, Conversations, Notifications, Users), ErrorHandling/DomainExceptionHandler,
                 Notifications (NotificationsHub /hubs/notifications, SignalRNotificationSender),
                 appsettings*.json, Properties/launchSettings.json, ICanHelp.Api.http (przykładowe żądania)
 Api.Tests       Infrastructure/ApiFactory (kontener + ApiCollection), Infrastructure/TestApi (CreateUserAsync, ShouldBeProblemAsync…),
                 testy per obszar: ApiBasics, Users, AnnouncementFlow, AnnouncementEdit, AnnouncementImage, Conversation, DistanceSearch,
-                Notification (outbox wyłączony, `ProcessOutboxAsync()`)
+                Notification (outbox wyłączony, `ProcessOutboxAsync()`), Alert
 .github/workflows/ci.yml   build + testy jednostkowe + integracyjne (ubuntu-latest, Docker)
 ```
 Testy integracyjne: jeden kontener i baza `ICanHelpTests` na cały przebieg, środowisko `Testing`, config przez `UseSetting`.
@@ -116,7 +118,7 @@ Wspólne: `RepositoryExtensions` (`GetOrThrowAsync` → `AnnouncementNotFound`, 
 - Auth: JWT HS256 (`Auth:SigningKey` ≥ 32 bajty, poza Development wymagany z env). Prywatność: oferty widzi właściciel (wszystkie)
   i pomocnik (swoje), reszta tylko `HelperCount`; kontakt po akceptacji; wątki tylko dla dwóch uczestników (obcy → 404).
 - Endpointy: `api/users`, `api/categories`, `api/announcements` (+ offers, images, conversations, contact, ratings),
-  `api/conversations/{id}`, `api/me/conversations`, `api/me/notifications` (+ hub `/hubs/notifications`). Przykłady wszystkich w `ICanHelp.Api.http`. Porty 5080/7080, `/health`, Swagger w Development.
+  `api/conversations/{id}`, `api/me/conversations`, `api/me/notifications` (+ hub `/hubs/notifications`), `api/me/alerts`. Przykłady wszystkich w `ICanHelp.Api.http`. Porty 5080/7080, `/health`, Swagger w Development.
 
 ## Komendy
 ```bash
@@ -141,7 +143,8 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
   (potwierdza też Krok 11).
 - [x] Krok 13 – powiadomienia: zdarzenia domenowe, outbox, `Notifications`, SignalR, `api/me/notifications`, migracja `Notifications`.
   8.11.2026: build + 320/320 testów zielone.
-- [ ] Krok 14 – alerty o nowych ogłoszeniach: obszar (punkt + promień) i trasa (LINESTRING + bufor) – `docs/PLAN-POWIADOMIENIA.md`
+- [x] Krok 14 – alerty o nowych ogłoszeniach: obszar i trasa, `api/me/alerts`, migracja `AnnouncementAlerts` (trigger + indeks przestrzenny).
+  8.11.2026 pisane bez kompilatora – **do weryfikacji: `dotnet build` + `dotnet test`**.
 - [ ] Krok 15 (później, z aplikacją mobilną) – „jestem teraz w okolicy” (bieżąca lokalizacja, opt-in) – `docs/PLAN-POWIADOMIENIA.md`
 
 ## Jak pracować z AI (oszczędnie)

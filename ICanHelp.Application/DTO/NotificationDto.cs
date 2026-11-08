@@ -8,10 +8,14 @@ public sealed record NotificationDto
 {
     public Guid Id { get; init; }
 
-    /// <summary>OfferReceived, OfferCountered, OfferAccepted, OfferRejected, OfferWithdrawn, MessageReceived, AnnouncementEdited.</summary>
+    /// <summary>
+    /// OfferReceived, OfferCountered, OfferAccepted, OfferRejected, OfferWithdrawn, MessageReceived, AnnouncementEdited,
+    /// NewAnnouncementNearby (alert: announcementTitle, categoryName, alertName, alertKind, distanceKm),
+    /// NewAnnouncementsDigest (over the daily limit: count).
+    /// </summary>
     public string Type { get; init; } = string.Empty;
 
-    /// <summary>Text parameters, e.g. announcementTitle, price, messagePreview, changedFields.</summary>
+    /// <summary>Text parameters, e.g. announcementTitle, price, messagePreview, changedFields, distanceKm, count.</summary>
     public IReadOnlyDictionary<string, string> Parameters { get; init; } = new Dictionary<string, string>();
 
     public Guid? AnnouncementId { get; init; }

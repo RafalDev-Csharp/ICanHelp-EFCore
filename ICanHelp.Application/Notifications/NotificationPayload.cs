@@ -13,6 +13,13 @@ public static class NotificationPayload
     public const string Revision = "revision";
     public const string ChangedFields = "changedFields";
 
+    // Krok 14: alerts about new announcements.
+    public const string CategoryName = "categoryName";
+    public const string AlertName = "alertName";
+    public const string AlertKind = "alertKind";
+    public const string DistanceKm = "distanceKm";
+    public const string Count = "count";
+
     /// <summary>Value of <see cref="Reason"/> when an offer was rejected because the owner chose another helper.</summary>
     public const string AnotherOfferAccepted = "AnotherOfferAccepted";
 

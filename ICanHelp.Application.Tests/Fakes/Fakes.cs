@@ -4,6 +4,7 @@ using ICanHelp.Application.Security;
 using ICanHelp.Application.Storage;
 using ICanHelp.Application.Time;
 using ICanHelp.Core.Entities;
+using ICanHelp.Core.Entities.Alerts;
 using ICanHelp.Core.Entities.Negotiations;
 using ICanHelp.Core.Entities.Notifications;
 using ICanHelp.Core.Entities.Users;
@@ -210,11 +211,56 @@ internal sealed class InMemoryNotificationRepository : INotificationRepository
     public Task<bool> ExistsAsync(UserId userId, Guid sourceEventId, CancellationToken cancellationToken = default)
         => Task.FromResult(Notifications.Any(n => n.UserId == userId && n.SourceEventId == sourceEventId));
 
+    public Task<int> CountSinceAsync(UserId userId, NotificationType type, DateTime sinceUtc,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(Notifications.Count(n => n.UserId == userId && n.Type == type && n.CreatedAt >= sinceUtc));
+
+    public Task<Notification?> GetLatestSinceAsync(UserId userId, NotificationType type, DateTime sinceUtc,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(Notifications
+            .Where(n => n.UserId == userId && n.Type == type && n.CreatedAt >= sinceUtc)
+            .OrderByDescending(n => n.CreatedAt)
+            .FirstOrDefault());
+
     public Task AddAsync(Notification notification, CancellationToken cancellationToken = default)
     {
         Notifications.Add(notification);
         return Task.CompletedTask;
     }
+}
+
+/// <summary>
+/// Alerty w liście. Geometrii nie ma (to robi SQL Server) – kandydatami są włączone alerty kategorii bez alertów
+/// właściciela, a odległość podaje test (<see cref="Distances"/>, domyślnie 1 km).
+/// </summary>
+internal sealed class InMemoryAnnouncementAlertRepository : IAnnouncementAlertRepository
+{
+    public List<AnnouncementAlert> Alerts { get; } = new();
+
+    /// <summary>„Odległość od kształtu” alertu w metrach; brak wpisu = 1000 m. Alert z <c>double.NaN</c> = poza strefą.</summary>
+    public Dictionary<Id, double> Distances { get; } = new();
+
+    public Task<AnnouncementAlert?> GetByIdAsync(Id id, CancellationToken cancellationToken = default)
+        => Task.FromResult(Alerts.SingleOrDefault(a => a.Id == id));
+
+    public Task<int> CountByUserAsync(UserId userId, CancellationToken cancellationToken = default)
+        => Task.FromResult(Alerts.Count(a => a.UserId == userId));
+
+    public Task<IReadOnlyList<AlertCandidate>> FindCandidatesAsync(Id categoryId, UserId excludedUserId,
+        Location point, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<AlertCandidate>>(Alerts
+            .Where(a => a.IsEnabled && a.CategoryId == categoryId && a.UserId != excludedUserId)
+            .Select(a => new AlertCandidate(a, Distances.TryGetValue(a.Id, out var d) ? d : 1000))
+            .Where(c => !double.IsNaN(c.DistanceMeters))
+            .ToList());
+
+    public Task AddAsync(AnnouncementAlert alert, CancellationToken cancellationToken = default)
+    {
+        Alerts.Add(alert);
+        return Task.CompletedTask;
+    }
+
+    public void Remove(AnnouncementAlert alert) => Alerts.Remove(alert);
 }
 
 /// <summary>Zapamiętuje, co i do kogo „wysłano” (kanał SignalR w testach Application).</summary>

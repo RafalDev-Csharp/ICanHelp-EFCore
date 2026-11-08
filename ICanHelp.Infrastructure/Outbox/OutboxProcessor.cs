@@ -121,7 +121,7 @@ internal sealed class OutboxProcessor : IOutboxProcessor
         var handlerType = typeof(IDomainEventHandler<>).MakeGenericType(domainEvent.GetType());
         var handle = handlerType.GetMethod(nameof(IDomainEventHandler<IDomainEvent>.HandleAsync))!;
 
-        // No handler (e.g. AnnouncementPublished until Krok 14) = nothing to do, the message is still processed.
+        // No handler = nothing to do, the message is still processed. One event can have several handlers.
         foreach (var handler in services.GetServices(handlerType))
         {
             await (Task)handle.Invoke(handler, [eventId, domainEvent, cancellationToken])!;
