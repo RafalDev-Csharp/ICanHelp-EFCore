@@ -61,7 +61,7 @@ Jeden użytkownik może być raz klientem, raz pomocnikiem (rola w transakcji, n
   `announcement.AllowsConversationWith(HelperId)`: Open – każdy, Accepted/InProgress – tylko zaakceptowany pomocnik, Completed/Cancelled – nikt
   (wątek tylko do odczytu; po Completed zostają oceny).
   `MarkAsRead` (znacznik nie cofa się; wysłanie = przeczytane), `CountUnread`. Rozmowa ≠ oferta (wiadomości nie da się zaakceptować).
-- Później: `HelperProfile` z obszarem działania / trasą dojazdu (punkt + promień) → wyszukiwanie „po drodze”
+- Później: powiadomienia + alerty o nowych ogłoszeniach w okolicy / „po drodze” (`AnnouncementAlert`: punkt albo trasa + promień) → `docs/PLAN-POWIADOMIENIA.md`
 
 ## Przepływ statusów
 Announcement: `Open` → (AcceptOffer) `Accepted` → (Start) `InProgress` → (Complete) `Completed`; `Open`/`Accepted` → `Cancelled`
@@ -74,7 +74,7 @@ zaakceptować** – trzeba kontroferty. Plan dalszych kroków i uzasadnienie: `d
 przez uczestnika; ocenianego (druga strona) wybiera domena. „Raz na ogłoszenie” – handler (`AlreadyRatedException`) + unikalny indeks.
 
 ## Gdzie co leży
-`docs/`: `ARCHITEKTURA.md` (szczegóły obszarów), `PLAN-NEGOCJACJE.md` (Kroki 9–13), `HISTORIA-KROKOW.md` (pełny stan prac).
+`docs/`: `ARCHITEKTURA.md` (szczegóły obszarów), `PLAN-NEGOCJACJE.md` (Kroki 9–12), `PLAN-POWIADOMIENIA.md` (Kroki 13–15), `HISTORIA-KROKOW.md` (pełny stan prac).
 ```
 Core            Entities, ValueObjects, Enums, Exceptions, Repositories (interfejsy + IUnitOfWork)
 Application     Abstractions (ICommand/IQuery + handlery), DTO, Queries, Commands (+ Commands/Handlers), Exceptions,
@@ -131,7 +131,9 @@ dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
 - [x] Krok 11 – wątek negocjacji + prywatność ofert, migracja `Conversations`.
 - [x] Krok 12 – „moje negocjacje”: `GET api/me/conversations`, bez migracji. 6.11.2026: build + 286/286 testów zielone
   (potwierdza też Krok 11).
-- [ ] Krok 13 – powiadomienia (opcjonalnie): `docs/PLAN-NEGOCJACJE.md`
+- [ ] Krok 13 – powiadomienia o ofertach/wiadomościach/edycji: zdarzenia domenowe, outbox, `Notifications`, SignalR – `docs/PLAN-POWIADOMIENIA.md`
+- [ ] Krok 14 – alerty o nowych ogłoszeniach: obszar (punkt + promień) i trasa (LINESTRING + bufor) – `docs/PLAN-POWIADOMIENIA.md`
+- [ ] Krok 15 (później, z aplikacją mobilną) – „jestem teraz w okolicy” (bieżąca lokalizacja, opt-in) – `docs/PLAN-POWIADOMIENIA.md`
 
 ## Jak pracować z AI (oszczędnie)
 - Jedna sesja = jeden krok z listy. Na start: „Przeczytaj CLAUDE.md, zrób Krok N”.

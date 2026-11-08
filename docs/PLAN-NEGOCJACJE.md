@@ -1,6 +1,6 @@
 # Plan: edycja ogłoszenia, rozmowa w negocjacji, lista „moje negocjacje”
 
-> Plan na Kroki 9–13. Każdy krok to osobna sesja: „Przeczytaj CLAUDE.md i docs/PLAN-NEGOCJACJE.md, zrób Krok N”.
+> Plan na Kroki 9–12 (Kroki 13–15 – powiadomienia: `docs/PLAN-POWIADOMIENIA.md`). Każdy krok to osobna sesja: „Przeczytaj CLAUDE.md i docs/PLAN-NEGOCJACJE.md, zrób Krok N”.
 > Po kroku: odhacz punkty tutaj, zaktualizuj „Stan prac” w CLAUDE.md, `dotnet build` + `dotnet test`, commit.
 
 ## Dlaczego tak (decyzje, których nie zmieniamy bez powodu)
@@ -117,8 +117,6 @@
       (`MyConversationPreviewTests`)
 - [x] `dotnet build` + `dotnet test` – 286/286 zielone (6.11.2026), commit 77f0e73
 
-## Krok 13 (opcjonalnie) – powiadomienia
+## Krok 13 – powiadomienia
 
-- [ ] Zdarzenia domenowe (`AnnouncementEdited`, `OfferMade`, `OfferCountered`, `OfferAccepted`, `MessageSent`) zbierane w agregatach
-- [ ] Outbox w tej samej transakcji (`SqlUnitOfWork`) + `BackgroundService` wysyłający dalej
-- [ ] Kanał: SignalR (na żywo w aplikacji) i/lub e-mail; tabela `Notifications` + `GET api/me/notifications`
+Przeniesione i rozszerzone (alerty „w okolicy” / „po drodze”): `docs/PLAN-POWIADOMIENIA.md`.
