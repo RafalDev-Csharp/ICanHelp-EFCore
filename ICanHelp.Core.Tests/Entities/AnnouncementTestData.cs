@@ -71,7 +71,7 @@ internal static class AnnouncementTestData
         }
 
         var offer = announcement.AddHelperOffer(Helper);
-        announcement.AcceptOffer(offer.Id, OwnerId);
+        announcement.AcceptOffer(offer.Id, OwnerId, Now);
         if (status == AnnouncementStatus.Accepted)
         {
             return announcement;

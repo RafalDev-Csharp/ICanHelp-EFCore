@@ -1,9 +1,11 @@
 using ICanHelp.Application.DTO;
+using ICanHelp.Application.Notifications;
 using ICanHelp.Application.Security;
 using ICanHelp.Application.Storage;
 using ICanHelp.Application.Time;
 using ICanHelp.Core.Entities;
 using ICanHelp.Core.Entities.Negotiations;
+using ICanHelp.Core.Entities.Notifications;
 using ICanHelp.Core.Entities.Users;
 using ICanHelp.Core.Enums;
 using ICanHelp.Core.Repositories;
@@ -148,6 +150,13 @@ internal sealed class InMemoryConversationRepository : IConversationRepository
         CancellationToken cancellationToken = default)
         => Task.FromResult(Conversations.SingleOrDefault(c => c.AnnouncementId == announcementId && c.HelperId == helperId));
 
+    public Task<IReadOnlyList<(Id ConversationId, UserId HelperId)>> GetParticipantsAsync(Id announcementId,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<(Id ConversationId, UserId HelperId)>>(Conversations
+            .Where(c => c.AnnouncementId == announcementId)
+            .Select(c => (c.Id, c.HelperId))
+            .ToList());
+
     public Task AddAsync(Conversation conversation, CancellationToken cancellationToken = default)
     {
         Conversations.Add(conversation);
@@ -184,5 +193,38 @@ internal sealed class FailingUnitOfWork : IUnitOfWork
     {
         await action();
         throw new InvalidOperationException("SaveChanges failed.");
+    }
+}
+
+internal sealed class InMemoryNotificationRepository : INotificationRepository
+{
+    public List<Notification> Notifications { get; } = new();
+
+    public Task<Notification?> GetByIdAsync(Id id, CancellationToken cancellationToken = default)
+        => Task.FromResult(Notifications.SingleOrDefault(n => n.Id == id));
+
+    public Task<IReadOnlyList<Notification>> GetUnreadAsync(UserId userId, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<Notification>>(
+            Notifications.Where(n => n.UserId == userId && n.ReadAt == null).ToList());
+
+    public Task<bool> ExistsAsync(UserId userId, Guid sourceEventId, CancellationToken cancellationToken = default)
+        => Task.FromResult(Notifications.Any(n => n.UserId == userId && n.SourceEventId == sourceEventId));
+
+    public Task AddAsync(Notification notification, CancellationToken cancellationToken = default)
+    {
+        Notifications.Add(notification);
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>Zapamiętuje, co i do kogo „wysłano” (kanał SignalR w testach Application).</summary>
+internal sealed class RecordingNotificationSender : INotificationSender
+{
+    public List<(Guid UserId, NotificationDto Notification)> Sent { get; } = new();
+
+    public Task SendAsync(Guid userId, NotificationDto notification, CancellationToken cancellationToken = default)
+    {
+        Sent.Add((userId, notification));
+        return Task.CompletedTask;
     }
 }

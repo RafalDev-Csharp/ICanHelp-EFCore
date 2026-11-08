@@ -159,7 +159,7 @@ public class AnnouncementTests
         var announcement = CreateAnnouncement();
         var offer = announcement.AddHelperOffer(Helper);
 
-        announcement.AcceptOffer(offer.Id, OwnerId);
+        announcement.AcceptOffer(offer.Id, OwnerId, Now);
         announcement.Status.ShouldBe(AnnouncementStatus.Accepted);
 
         announcement.Start(Helper);

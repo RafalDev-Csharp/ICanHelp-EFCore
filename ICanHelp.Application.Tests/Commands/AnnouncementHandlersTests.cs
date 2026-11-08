@@ -178,7 +178,7 @@ public class AnnouncementHandlersTests
         var announcement = await CreateAnnouncementAsync();
         var offerId = await MakeOfferAsync(announcement);
 
-        await new AcceptOfferHandler(_announcements, _unitOfWork)
+        await new AcceptOfferHandler(_announcements, _unitOfWork, _clock)
             .HandleAsync(new AcceptOffer(announcement.Id, offerId, _owner.Id));
 
         announcement.Status.ShouldBe(AnnouncementStatus.Accepted);
@@ -191,7 +191,7 @@ public class AnnouncementHandlersTests
         var announcement = await CreateAnnouncementAsync();
         var offerId = await MakeOfferAsync(announcement);
 
-        await Should.ThrowAsync<DomainRuleException>(() => new AcceptOfferHandler(_announcements, _unitOfWork)
+        await Should.ThrowAsync<DomainRuleException>(() => new AcceptOfferHandler(_announcements, _unitOfWork, _clock)
             .HandleAsync(new AcceptOffer(announcement.Id, offerId, _helper.Id)));
         announcement.Status.ShouldBe(AnnouncementStatus.Open);
     }
@@ -201,7 +201,7 @@ public class AnnouncementHandlersTests
     {
         var announcement = await CreateAnnouncementAsync();
 
-        await Should.ThrowAsync<OfferNotFoundException>(() => new AcceptOfferHandler(_announcements, _unitOfWork)
+        await Should.ThrowAsync<OfferNotFoundException>(() => new AcceptOfferHandler(_announcements, _unitOfWork, _clock)
             .HandleAsync(new AcceptOffer(announcement.Id, Guid.NewGuid(), _owner.Id)));
     }
 
@@ -211,10 +211,10 @@ public class AnnouncementHandlersTests
         var announcement = await CreateAnnouncementAsync();
         var rejectedId = await MakeOfferAsync(announcement);
 
-        await new RejectOfferHandler(_announcements, _unitOfWork)
+        await new RejectOfferHandler(_announcements, _unitOfWork, _clock)
             .HandleAsync(new RejectOffer(announcement.Id, rejectedId, _owner.Id));
         var withdrawnId = await MakeOfferAsync(announcement);
-        await new WithdrawOfferHandler(_announcements, _unitOfWork)
+        await new WithdrawOfferHandler(_announcements, _unitOfWork, _clock)
             .HandleAsync(new WithdrawOffer(announcement.Id, withdrawnId, _helper.Id));
 
         announcement.Offers.Single(o => o.Id == new Id(rejectedId)).Status.ShouldBe(OfferStatus.Rejected);
@@ -377,7 +377,7 @@ public class AnnouncementHandlersTests
     {
         var announcement = await CreateAnnouncementAsync();
         var offerId = await MakeOfferAsync(announcement);
-        await new AcceptOfferHandler(_announcements, _unitOfWork)
+        await new AcceptOfferHandler(_announcements, _unitOfWork, _clock)
             .HandleAsync(new AcceptOffer(announcement.Id, offerId, _owner.Id));
         return announcement;
     }

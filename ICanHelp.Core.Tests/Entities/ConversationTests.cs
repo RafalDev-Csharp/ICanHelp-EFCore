@@ -113,7 +113,7 @@ public class ConversationTests
         var accepted = Start(announcement, Helper);
         var other = Start(announcement, OtherHelper);
         var offer = announcement.AddHelperOffer(Helper);
-        announcement.AcceptOffer(offer.Id, OwnerId);
+        announcement.AcceptOffer(offer.Id, OwnerId, Now);
         if (status == AnnouncementStatus.InProgress)
         {
             announcement.Start(OwnerId);
@@ -133,7 +133,7 @@ public class ConversationTests
         var announcement = CreateAnnouncement();
         var conversation = Start(announcement);
         var offer = announcement.AddHelperOffer(Helper);
-        announcement.AcceptOffer(offer.Id, OwnerId);
+        announcement.AcceptOffer(offer.Id, OwnerId, Now);
         Send(conversation, announcement, Helper);
         announcement.Start(OwnerId);
         announcement.Complete(OwnerId);
@@ -162,7 +162,7 @@ public class ConversationTests
         announcement.AllowsConversationWith(OtherHelper).ShouldBeTrue();
 
         var offer = announcement.AddHelperOffer(Helper);
-        announcement.AcceptOffer(offer.Id, OwnerId);
+        announcement.AcceptOffer(offer.Id, OwnerId, Now);
 
         announcement.AllowsConversationWith(Helper).ShouldBeTrue();
         announcement.AllowsConversationWith(OtherHelper).ShouldBeFalse();

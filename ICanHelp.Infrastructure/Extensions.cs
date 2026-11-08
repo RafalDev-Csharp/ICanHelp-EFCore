@@ -1,7 +1,10 @@
 using ICanHelp.Application.Abstractions;
+using ICanHelp.Application.Notifications;
 using ICanHelp.Application.Storage;
 using ICanHelp.Application.Time;
 using ICanHelp.Infrastructure.DAL;
+using ICanHelp.Infrastructure.Notifications;
+using ICanHelp.Infrastructure.Outbox;
 using ICanHelp.Infrastructure.Security;
 using ICanHelp.Infrastructure.Storage;
 using ICanHelp.Infrastructure.Time;
@@ -12,7 +15,10 @@ namespace ICanHelp.Infrastructure;
 
 public static class Extensions
 {
-    /// <summary>Registers the database, repositories, query handlers, clock, file storage and security (JWT). Called from the Api project.</summary>
+    /// <summary>
+    /// Registers the database, repositories, query handlers, clock, file storage, security (JWT) and the outbox.
+    /// Called from the Api project.
+    /// </summary>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddSql(configuration);
@@ -30,6 +36,13 @@ public static class Extensions
             .WithScopedLifetime());
 
         services.AddHostedService<DbInitializer>();
+
+        // Krok 13: outbox (events saved with the change → handled in the background → notifications).
+        // Registered after DbInitializer: hosted services start in order, so migrations run first.
+        services.Configure<OutboxOptions>(configuration.GetSection(OutboxOptions.SectionName));
+        services.AddSingleton<IOutboxProcessor, OutboxProcessor>();
+        services.AddHostedService<OutboxBackgroundService>();
+        services.AddSingleton<IEmailSender, LoggingEmailSender>();
 
         return services;
     }

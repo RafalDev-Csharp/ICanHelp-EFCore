@@ -77,18 +77,20 @@ internal sealed class AcceptOfferHandler : ICommandHandler<AcceptOffer>
 {
     private readonly IAnnouncementRepository _announcements;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IClock _clock;
 
-    public AcceptOfferHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork)
+    public AcceptOfferHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
     {
         _announcements = announcements;
         _unitOfWork = unitOfWork;
+        _clock = clock;
     }
 
     public Task HandleAsync(AcceptOffer command, CancellationToken cancellationToken = default)
         => _unitOfWork.ExecuteAsync(async () =>
         {
             var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
-            announcement.AcceptOffer(new Id(command.OfferId), new UserId(command.ActorId));
+            announcement.AcceptOffer(new Id(command.OfferId), new UserId(command.ActorId), _clock.UtcNow);
         }, cancellationToken);
 }
 
@@ -96,18 +98,20 @@ internal sealed class RejectOfferHandler : ICommandHandler<RejectOffer>
 {
     private readonly IAnnouncementRepository _announcements;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IClock _clock;
 
-    public RejectOfferHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork)
+    public RejectOfferHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
     {
         _announcements = announcements;
         _unitOfWork = unitOfWork;
+        _clock = clock;
     }
 
     public Task HandleAsync(RejectOffer command, CancellationToken cancellationToken = default)
         => _unitOfWork.ExecuteAsync(async () =>
         {
             var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
-            announcement.RejectOffer(new Id(command.OfferId), new UserId(command.ActorId));
+            announcement.RejectOffer(new Id(command.OfferId), new UserId(command.ActorId), _clock.UtcNow);
         }, cancellationToken);
 }
 
@@ -115,18 +119,20 @@ internal sealed class WithdrawOfferHandler : ICommandHandler<WithdrawOffer>
 {
     private readonly IAnnouncementRepository _announcements;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IClock _clock;
 
-    public WithdrawOfferHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork)
+    public WithdrawOfferHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
     {
         _announcements = announcements;
         _unitOfWork = unitOfWork;
+        _clock = clock;
     }
 
     public Task HandleAsync(WithdrawOffer command, CancellationToken cancellationToken = default)
         => _unitOfWork.ExecuteAsync(async () =>
         {
             var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
-            announcement.WithdrawOffer(new Id(command.OfferId), new UserId(command.ActorId));
+            announcement.WithdrawOffer(new Id(command.OfferId), new UserId(command.ActorId), _clock.UtcNow);
         }, cancellationToken);
 }
 

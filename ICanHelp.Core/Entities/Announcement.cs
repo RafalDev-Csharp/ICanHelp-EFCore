@@ -1,6 +1,7 @@
 using System.Globalization;
 using ICanHelp.Core.Entities.Negotiations;
 using ICanHelp.Core.Enums;
+using ICanHelp.Core.Events;
 using ICanHelp.Core.Exceptions;
 using ICanHelp.Core.ValueObjects;
 
@@ -10,8 +11,9 @@ namespace ICanHelp.Core.Entities;
 /// Aggregate root: a problem published by a user together with the negotiation (offers) about it.
 /// All changes of offers go through this class, so the rules are enforced in one place.
 /// Other aggregates (user, category) are referenced by id only.
+/// Raises domain events (published, edited, offers) – the unit of work saves them to the outbox.
 /// </summary>
-public class Announcement
+public class Announcement : AggregateRoot
 {
     public const int MaxImages = 5;
 
@@ -78,6 +80,9 @@ public class Announcement
         CreatedAt = createdAtUtc;
         Status = AnnouncementStatus.Open;
         Revision = 0;
+
+        AddDomainEvent(new AnnouncementPublished(Id, OwnerId, CategoryId, SubcategoryId, Location.Latitude,
+            Location.Longitude, createdAtUtc));
     }
 
     /// <summary>
@@ -227,6 +232,7 @@ public class Announcement
             message, createdAtUtc, parentOfferId: null, Revision);
 
         _offers.Add(offer);
+        AddDomainEvent(new OfferMade(Id, offer.Id, OwnerId, helperId, price.Amount, price.Currency, createdAtUtc));
         return offer;
     }
 
@@ -251,6 +257,8 @@ public class Announcement
 
         original.MarkAsCountered();
         _offers.Add(counter);
+        AddDomainEvent(new OfferCountered(Id, counter.Id, original.Id, OwnerId, original.HelperId, party,
+            price.Amount, price.Currency, createdAtUtc));
         return counter;
     }
 
@@ -259,7 +267,7 @@ public class Announcement
     /// An offer made before the last edit of the announcement cannot be accepted – the terms were agreed for
     /// a different description. Either side can make a counter-offer instead (it is made on the current revision).
     /// </summary>
-    public void AcceptOffer(Id offerId, UserId actorId)
+    public void AcceptOffer(Id offerId, UserId actorId, DateTime acceptedAtUtc)
     {
         EnsureStatus(AnnouncementStatus.Open, "accept an offer");
 
@@ -278,17 +286,21 @@ public class Announcement
         }
 
         offer.Accept();
+        AddDomainEvent(new OfferAccepted(Id, offer.Id, OwnerId, offer.HelperId, offer.ProposedBy, acceptedAtUtc));
 
-        foreach (var other in _offers.Where(o => o.Id != offer.Id && o.Status == OfferStatus.Pending))
+        // ToList: the statuses change in the loop.
+        foreach (var other in _offers.Where(o => o.Id != offer.Id && o.Status == OfferStatus.Pending).ToList())
         {
             other.Reject();
+            AddDomainEvent(new OfferRejected(Id, other.Id, OwnerId, other.HelperId, other.ProposedBy,
+                AnotherOfferAccepted: true, acceptedAtUtc));
         }
 
         AcceptedOfferId = offer.Id;
         Status = AnnouncementStatus.Accepted;
     }
 
-    public void RejectOffer(Id offerId, UserId actorId)
+    public void RejectOffer(Id offerId, UserId actorId, DateTime rejectedAtUtc)
     {
         EnsureStatus(AnnouncementStatus.Open, "reject an offer");
 
@@ -301,9 +313,11 @@ public class Announcement
         }
 
         offer.Reject();
+        AddDomainEvent(new OfferRejected(Id, offer.Id, OwnerId, offer.HelperId, offer.ProposedBy,
+            AnotherOfferAccepted: false, rejectedAtUtc));
     }
 
-    public void WithdrawOffer(Id offerId, UserId actorId)
+    public void WithdrawOffer(Id offerId, UserId actorId, DateTime withdrawnAtUtc)
     {
         EnsureStatus(AnnouncementStatus.Open, "have an offer withdrawn");
 
@@ -316,6 +330,7 @@ public class Announcement
         }
 
         offer.Withdraw();
+        AddDomainEvent(new OfferWithdrawn(Id, offer.Id, OwnerId, offer.HelperId, offer.ProposedBy, withdrawnAtUtc));
     }
 
     /// <summary>
@@ -422,13 +437,14 @@ public class Announcement
 
     // ---------- helpers ----------
 
-    // Every real change of the content (edit, image added/removed): new revision + history entry.
+    // Every real change of the content (edit, image added/removed): new revision + history entry + event.
     private AnnouncementFields RecordChange(IReadOnlyCollection<AnnouncementFieldChange> fields, DateTime changedAtUtc)
     {
         Revision++;
         UpdatedAt = changedAtUtc;
         var change = new AnnouncementChange(Id, Revision, changedAtUtc, fields);
         _changes.Add(change);
+        AddDomainEvent(new AnnouncementEdited(Id, OwnerId, Revision, change.ChangedFields, changedAtUtc));
         return change.ChangedFields;
     }
 

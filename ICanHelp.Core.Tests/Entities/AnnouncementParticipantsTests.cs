@@ -37,7 +37,7 @@ public class AnnouncementParticipantsTests
         var announcement = CreateAnnouncement();
         var accepted = announcement.AddHelperOffer(Helper);
         announcement.AddHelperOffer(OtherHelper);
-        announcement.AcceptOffer(accepted.Id, OwnerId);
+        announcement.AcceptOffer(accepted.Id, OwnerId, Now);
 
         Should.Throw<DomainRuleException>(() => announcement.Start(OtherHelper));
     }
@@ -73,7 +73,7 @@ public class AnnouncementParticipantsTests
         announcement.GetAcceptedHelperId().ShouldBeNull();
         announcement.IsParticipant(Helper).ShouldBeFalse();
 
-        announcement.AcceptOffer(offer.Id, OwnerId);
+        announcement.AcceptOffer(offer.Id, OwnerId, Now);
 
         announcement.GetAcceptedHelperId().ShouldBe(Helper);
         announcement.IsParticipant(Helper).ShouldBeTrue();
@@ -88,7 +88,7 @@ public class AnnouncementParticipantsTests
         var offer = announcement.AddHelperOffer(Helper);
         var counter = announcement.Counter(offer, OwnerId);
 
-        announcement.AcceptOffer(counter.Id, Helper);
+        announcement.AcceptOffer(counter.Id, Helper, Now);
 
         announcement.GetAcceptedHelperId().ShouldBe(Helper);
     }

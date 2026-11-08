@@ -118,7 +118,7 @@ public class AnnouncementImageTests
         var diff = announcement.GetFieldChangesSince(offer.AnnouncementRevision).ShouldHaveSingleItem();
         diff.OldValue.ShouldBe(string.Empty);
         diff.NewValue.ShouldBe(image.Id.Value.ToString());
-        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, OwnerId));
+        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, OwnerId, Now));
     }
 
     // ---------- usuwanie ----------
@@ -187,7 +187,7 @@ public class AnnouncementImageTests
         // (pomocnik widzi „edytowano 2 razy po Twojej ofercie”).
         announcement.GetFieldChangesSince(offer.AnnouncementRevision).ShouldBeEmpty();
         announcement.GetEditsSince(offer.AnnouncementRevision).ShouldBe(2);
-        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, OwnerId));
+        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, OwnerId, Now));
     }
 
     // ---------- miniatura ----------

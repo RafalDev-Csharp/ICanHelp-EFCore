@@ -154,7 +154,7 @@ public class AnnouncementRevisionTests
         diff.NewValue.ShouldBe("500.00 PLN");
         announcement.GetEditsSince(offer.AnnouncementRevision).ShouldBe(2);
         announcement.Changes.Count.ShouldBe(2);
-        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, OwnerId));
+        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, OwnerId, Now));
     }
 
     [Fact]
@@ -184,7 +184,7 @@ public class AnnouncementRevisionTests
         announcement.GetChangesSince(offer.AnnouncementRevision).ShouldBe(AnnouncementFields.None);
         announcement.GetEditsSince(offer.AnnouncementRevision).ShouldBe(2);
         // Blokada zostaje (decyzja z planu): potwierdzenie = kontroferta na bieżącej rewizji.
-        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, OwnerId));
+        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, OwnerId, Now));
     }
 
     [Fact]
@@ -221,7 +221,7 @@ public class AnnouncementRevisionTests
         var offer = announcement.AddHelperOffer(Helper);
         ChangeDescription(announcement, "Przy okazji pomalować ścianę.");
 
-        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, OwnerId));
+        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, OwnerId, Now));
 
         offer.Status.ShouldBe(OfferStatus.Pending);
         announcement.Status.ShouldBe(AnnouncementStatus.Open);
@@ -237,7 +237,7 @@ public class AnnouncementRevisionTests
 
         // Kontroferta powstaje na bieżącej rewizji – to sposób na „odświeżenie” nieaktualnej oferty.
         var counter = announcement.Counter(offer, OwnerId, price: 160m);
-        announcement.AcceptOffer(counter.Id, Helper);
+        announcement.AcceptOffer(counter.Id, Helper, Now);
 
         counter.AnnouncementRevision.ShouldBe(1);
         counter.Status.ShouldBe(OfferStatus.Accepted);
@@ -251,7 +251,7 @@ public class AnnouncementRevisionTests
         var offer = announcement.AddHelperOffer(Helper);
         ChangeDescription(announcement, announcement.Description);
 
-        announcement.AcceptOffer(offer.Id, OwnerId);
+        announcement.AcceptOffer(offer.Id, OwnerId, Now);
 
         offer.Status.ShouldBe(OfferStatus.Accepted);
     }

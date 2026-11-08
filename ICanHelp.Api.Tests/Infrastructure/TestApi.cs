@@ -1,5 +1,7 @@
 using System.Net.Http.Headers;
 using ICanHelp.Application.DTO;
+using ICanHelp.Infrastructure.Outbox;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ICanHelp.Api.Tests.Infrastructure;
 
@@ -104,6 +106,24 @@ public static class TestApi
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
         return (await response.ReadAsync<CreatedDto>()).Id;
     }
+
+    /// <summary>
+    /// Przetwarza wszystko, co czeka w outboksie (zdarzenia → powiadomienia) – synchronicznie, zamiast czekać na pętlę
+    /// w tle (w testach wyłączona). Przetwarza też zdarzenia innych testów – nieszkodliwe, każdy ma swoich użytkowników.
+    /// </summary>
+    public static Task<int> ProcessOutboxAsync(this ApiFactory factory)
+        => factory.Services.GetRequiredService<IOutboxProcessor>().ProcessPendingAsync();
+
+    public static async Task<List<NotificationDto>> GetNotificationsAsync(this TestUser user, bool unreadOnly = false)
+    {
+        var notifications = await user.Client.GetFromJsonAsync<List<NotificationDto>>(
+            $"/api/me/notifications?unreadOnly={unreadOnly}&pageSize=100");
+        notifications.ShouldNotBeNull();
+        return notifications;
+    }
+
+    public static async Task<int> GetUnreadNotificationCountAsync(this TestUser user)
+        => (await user.Client.GetFromJsonAsync<UnreadCountDto>("/api/me/notifications/unread-count"))!.Count;
 
     /// <summary>POST bez body (accept/reject/withdraw/start/complete/cancel).</summary>
     public static Task<HttpResponseMessage> PostEmptyAsync(this HttpClient client, string url)

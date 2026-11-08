@@ -77,3 +77,27 @@
   Jedno zapytanie SQL z podzapytaniami, sort/stronicowanie w pamięci (patrz komentarz w handlerze).
 - Tabele `Conversations` (unikalny indeks AnnouncementId+HelperId, indeksy ClientId/HelperId) i `ConversationMessages` (indeks ConversationId+SentAt),
   Cascade z ogłoszenia. Migracja `Conversations` zakłada wątki dla istniejących ofert.
+
+## Powiadomienia (Krok 13)
+- Rura: metoda domenowa → zdarzenie (`Core/Events`, rekordy z samymi Guid/enum/tekst + `OccurredAt` = czas z parametru) w
+  `AggregateRoot.DomainEvents` (`Announcement`, `Conversation`) → `SqlUnitOfWork` przed `SaveChanges` przenosi je do `OutboxMessages`
+  (ta sama transakcja) → `Infrastructure/Outbox/OutboxProcessor` (pętla `OutboxBackgroundService`, `Outbox:Interval` 2 s, paczki
+  `BatchSize`, najstarsze pierwsze, każda wiadomość we własnym scope) woła `IDomainEventHandler<T>` z Application → `ProcessedAt`.
+  Błąd → `Attempts++`, `Error`, ponowienie w następnej rundzie do `MaxAttempts` (5). `DomainEvents` ignorowane w modelu EF.
+- Zdarzenia: `AnnouncementPublished` (ctor; obsłuży Krok 14), `AnnouncementEdited` (każda nowa rewizja – edycja i zdjęcia; edycja bez zmian
+  nic nie podnosi), `OfferMade`, `OfferCountered`, `OfferAccepted`, `OfferRejected` (`AnotherOfferAccepted` = automatycznie przy akceptacji
+  innej), `OfferWithdrawn`, `MessageSent`. `AcceptOffer`/`RejectOffer`/`WithdrawOffer` dostały parametr czasu (handler: `IClock`).
+- Typ w outboksie = nazwa klasy zdarzenia (`DomainEventSerializer`, JSON, enumy jako tekst) – zmiana nazwy klasy wymaga migracji wierszy.
+- `Application/Notifications/TransactionNotificationHandler` – wybór odbiorcy (zawsze druga strona, nigdy autor; edycja → pomocnicy
+  z wątkami, `IConversationRepository.GetParticipantsAsync`) i parametry tekstu (`NotificationPayload`: announcementTitle, price,
+  messagePreview, changedFields…). `NotificationPublisher` zapisuje (`Notification`, idempotencja: `ExistsAsync` + unikalny indeks
+  UserId+SourceEventId, SourceEventId = id wiadomości outboksa) i po commicie wysyła nowe przez `INotificationSender`.
+- Kanały: `Api/Notifications/SignalRNotificationSender` + `NotificationsHub` (`/hubs/notifications`, `[Authorize]`, grupa `user:{id}`,
+  metoda `notification` z `NotificationDto`; JWT z query `access_token` dla ścieżek `/hubs`). `IEmailSender` → `LoggingEmailSender`
+  (tylko log; zbiorczy skrót e-mail – później).
+- Api (`NotificationsController`): `GET api/me/notifications` (`unreadOnly`, `page`, `pageSize`, od najnowszych), `GET …/unread-count`,
+  `POST …/{id}/read` (cudze/nieistniejące → 404 `NotificationNotFound`), `POST …/read-all`.
+- Tabele `Notifications` (FK UserId Restrict; AnnouncementId/ConversationId bez FK – historia; indeksy UserId+SourceEventId unikalny,
+  UserId+ReadAt+CreatedAt) i `OutboxMessages` (indeks ProcessedAt+OccurredAt). Migracja `Notifications` (20261108100000, ręczna).
+- Testy integracyjne: `Outbox:Enabled=false`, outbox przetwarza `TestApi.ProcessOutboxAsync()` (`IOutboxProcessor`, semafor – nie biegnie
+  równolegle z pętlą). Kilka instancji API wymagałoby blokowania wierszy (`UPDLOCK, READPAST`) – na razie niepotrzebne.

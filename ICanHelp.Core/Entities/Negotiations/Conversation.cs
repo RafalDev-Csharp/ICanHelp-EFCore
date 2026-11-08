@@ -1,4 +1,5 @@
 using ICanHelp.Core.Enums;
+using ICanHelp.Core.Events;
 using ICanHelp.Core.Exceptions;
 using ICanHelp.Core.ValueObjects;
 
@@ -9,8 +10,9 @@ namespace ICanHelp.Core.Entities.Negotiations;
 /// ("why more expensive?") next to the formal offers. A separate aggregate, so chatting neither loads nor locks
 /// the announcement. One conversation per (announcement, helper) – enforced by the application layer and a unique index.
 /// Created by <see cref="Announcement.StartConversation"/> (checks that the announcement is open).
+/// Every message raises <see cref="MessageSent"/> (notification for the other participant).
 /// </summary>
-public class Conversation
+public class Conversation : AggregateRoot
 {
     private readonly List<ConversationMessage> _messages = new();
 
@@ -78,6 +80,8 @@ public class Conversation
 
         var message = new ConversationMessage(messageId, Id, senderId, text, sentAtUtc, announcement.Revision);
         _messages.Add(message);
+        AddDomainEvent(new MessageSent(Id, AnnouncementId, message.Id, ClientId, HelperId, senderId, text.Value,
+            sentAtUtc));
 
         MarkAsRead(senderId, sentAtUtc);
         return message;

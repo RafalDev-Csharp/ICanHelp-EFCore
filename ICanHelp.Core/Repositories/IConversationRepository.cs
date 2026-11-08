@@ -12,5 +12,9 @@ public interface IConversationRepository
     Task<Conversation?> GetByParticipantsAsync(Id announcementId, UserId helperId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Conversations about the announcement – only their ids and helpers (e.g. whom to notify about an edit).</summary>
+    Task<IReadOnlyList<(Id ConversationId, UserId HelperId)>> GetParticipantsAsync(Id announcementId,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(Conversation conversation, CancellationToken cancellationToken = default);
 }

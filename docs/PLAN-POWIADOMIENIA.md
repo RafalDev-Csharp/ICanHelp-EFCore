@@ -29,33 +29,39 @@
 
 ## Krok 13 – powiadomienia o ofertach, wiadomościach i edycji (infrastruktura powiadomień)
 
-- [ ] Core: `IDomainEvent` (+ `OccurredAt`), baza agregatu z `_domainEvents`, `DomainEvents`, `ClearDomainEvents()` (bez zależności).
+- [x] Core: `IDomainEvent` (+ `OccurredAt`), baza agregatu z `_domainEvents`, `DomainEvents`, `ClearDomainEvents()` (bez zależności).
       Zdarzenia (`Core/Events`): `OfferMade`, `OfferCountered`, `OfferAccepted`, `OfferRejected`, `OfferWithdrawn`,
       `MessageSent`, `AnnouncementEdited` (rewizja + zmienione pola), `AnnouncementPublished` (pod Krok 14).
       Podnoszą je istniejące metody (`AddOffer`, `CounterOffer`, `AcceptOffer`, …, `Conversation.SendMessage`, `Update`,
       `AddImage/RemoveImage`). Czas zdarzenia = czas przekazany parametrem (domena nie woła `UtcNow`).
-- [ ] Infrastructure: tabela `OutboxMessages` (Id, Type, Payload JSON, OccurredAt, ProcessedAt?, Attempts, Error?).
+- [x] Infrastructure: tabela `OutboxMessages` (Id, Type, Payload JSON, OccurredAt, ProcessedAt?, Attempts, Error?).
       `SqlUnitOfWork` przed `SaveChanges` zbiera zdarzenia z śledzonych agregatów (`ChangeTracker`), zapisuje je do outboksa
       i czyści – ta sama transakcja.
-- [ ] Infrastructure: `OutboxProcessor : BackgroundService` – co kilka sekund bierze nieprzetworzone (paczka, `ORDER BY OccurredAt`),
+- [x] Infrastructure: `OutboxProcessor : BackgroundService` – co kilka sekund bierze nieprzetworzone (paczka, `ORDER BY OccurredAt`),
       woła handlery zdarzeń z Application, oznacza `ProcessedAt`; błąd → `Attempts++`, `Error`, ponowienie później (limit prób).
       Przetwarzanie idempotentne (to samo zdarzenie dwa razy = jedno powiadomienie).
-- [ ] Core/Application: encja `Notification` (Id, UserId, Type, Payload/parametry do tekstu, `AnnouncementId?`, `ConversationId?`,
+- [x] Core/Application: encja `Notification` (Id, UserId, Type, Payload/parametry do tekstu, `AnnouncementId?`, `ConversationId?`,
       CreatedAt, ReadAt?, `SourceEventId` – unikalny z `UserId`, dla idempotencji). Odbiorca = druga strona
       (np. `OfferMade` → właściciel, `OfferCountered` → druga strona niż autor, `AnnouncementEdited` → pomocnicy z aktywnymi
       wątkami/ofertami, `MessageSent` → druga osoba w wątku). Nigdy autor akcji.
-- [ ] Application: `INotificationSender` (kanały); w tym kroku SignalR (`NotificationsHub`, grupa = UserId z JWT).
+- [x] Application: `INotificationSender` (kanały); w tym kroku SignalR (`NotificationsHub`, grupa = UserId z JWT).
       E-mail – interfejs `IEmailSender` + implementacja logująca (prawdziwy SMTP później); zbiorczy skrót – opcjonalnie.
-- [ ] Api: `GET api/me/notifications` (stronicowanie, `unreadOnly`), `GET api/me/notifications/unread-count`,
+- [x] Api: `GET api/me/notifications` (stronicowanie, `unreadOnly`), `GET api/me/notifications/unread-count`,
       `POST api/me/notifications/{id}/read`, `POST api/me/notifications/read-all`; hub `/hubs/notifications`
       (JWT z query `access_token` dla WebSocketów).
-- [ ] Migracja `Notifications` (OutboxMessages + Notifications, indeksy: Outbox po `ProcessedAt, OccurredAt`;
+- [x] Migracja `Notifications` (OutboxMessages + Notifications, indeksy: Outbox po `ProcessedAt, OccurredAt`;
       Notifications po `UserId, ReadAt, CreatedAt`) – ręcznie, bez linii o `GeoPoint`.
 - [ ] Testy: Core (agregaty podnoszą właściwe zdarzenia, w tym brak zdarzenia przy edycji bez zmian), Application
       (wybór odbiorcy, brak powiadomienia dla autora), Api (oferta → właściciel ma powiadomienie; kontroferta → pomocnik;
       licznik + oznaczanie przeczytanych; obcy nie widzi cudzych). W testach integracyjnych outbox przetwarzany
       synchronicznie (metoda testowa / krótki interwał), żeby nie czekać.
-- [ ] `dotnet build` + `dotnet test`, commit
+- [x] `dotnet build` + `dotnet test`, commit – 8.11.2026: 320/320 zielone
+
+Zrobione w Kroku 13 (odstępstwa od planu): `AcceptOffer`/`RejectOffer`/`WithdrawOffer` dostały parametr czasu (dotąd go nie miały).
+Automatyczne odrzucenie pozostałych ofert przy akceptacji też podnosi `OfferRejected` (`AnotherOfferAccepted = true`) – pomocnik
+dowiaduje się, że wybrano kogoś innego. `AnnouncementEdited` trafia do pomocników z wątkami (każda oferta zakłada wątek, więc to
+obejmuje też tych z ofertami). Zbiorczy skrót e-mail – nie zrobiony (tylko `IEmailSender` + implementacja logująca).
+Szczegóły: `docs/ARCHITEKTURA.md`, sekcja „Powiadomienia”.
 
 ## Krok 14 – alerty o nowych ogłoszeniach: obszar i trasa
 

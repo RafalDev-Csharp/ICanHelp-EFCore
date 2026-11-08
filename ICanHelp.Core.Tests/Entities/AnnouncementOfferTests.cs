@@ -65,7 +65,7 @@ public class AnnouncementOfferTests
     {
         var announcement = CreateAnnouncement();
         var first = announcement.AddHelperOffer(Helper);
-        announcement.WithdrawOffer(first.Id, Helper);
+        announcement.WithdrawOffer(first.Id, Helper, Now);
 
         var second = announcement.AddHelperOffer(Helper, price: 110m);
 
@@ -78,7 +78,7 @@ public class AnnouncementOfferTests
     {
         var announcement = CreateAnnouncement();
         var first = announcement.AddHelperOffer(Helper);
-        announcement.RejectOffer(first.Id, OwnerId);
+        announcement.RejectOffer(first.Id, OwnerId, Now);
 
         var second = announcement.AddHelperOffer(Helper, price: 110m);
 
@@ -272,7 +272,7 @@ public class AnnouncementOfferTests
         var announcement = CreateAnnouncement();
         var offer = announcement.AddHelperOffer(Helper);
 
-        announcement.AcceptOffer(offer.Id, OwnerId);
+        announcement.AcceptOffer(offer.Id, OwnerId, Now);
 
         offer.Status.ShouldBe(OfferStatus.Accepted);
         announcement.Status.ShouldBe(AnnouncementStatus.Accepted);
@@ -289,9 +289,9 @@ public class AnnouncementOfferTests
         var otherFirst = announcement.AddHelperOffer(OtherHelper);
         var otherCounter = announcement.Counter(otherFirst, OwnerId);   // otherFirst -> Countered
         var withdrawn = announcement.AddHelperOffer(third);
-        announcement.WithdrawOffer(withdrawn.Id, third);
+        announcement.WithdrawOffer(withdrawn.Id, third, Now);
 
-        announcement.AcceptOffer(chosen.Id, OwnerId);
+        announcement.AcceptOffer(chosen.Id, OwnerId, Now);
 
         chosen.Status.ShouldBe(OfferStatus.Accepted);
         otherCounter.Status.ShouldBe(OfferStatus.Rejected);
@@ -306,7 +306,7 @@ public class AnnouncementOfferTests
         var first = announcement.AddHelperOffer(Helper, price: 150m);
         var clientCounter = announcement.Counter(first, OwnerId, price: 100m);
 
-        announcement.AcceptOffer(clientCounter.Id, Helper);
+        announcement.AcceptOffer(clientCounter.Id, Helper, Now);
 
         clientCounter.Status.ShouldBe(OfferStatus.Accepted);
         first.Status.ShouldBe(OfferStatus.Countered);
@@ -320,7 +320,7 @@ public class AnnouncementOfferTests
         var announcement = CreateAnnouncement();
         var offer = announcement.AddHelperOffer(Helper);
 
-        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, Helper));
+        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, Helper, Now));
 
         offer.Status.ShouldBe(OfferStatus.Pending);
         announcement.Status.ShouldBe(AnnouncementStatus.Open);
@@ -334,7 +334,7 @@ public class AnnouncementOfferTests
         var first = announcement.AddHelperOffer(Helper);
         var clientCounter = announcement.Counter(first, OwnerId);
 
-        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(clientCounter.Id, OwnerId));
+        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(clientCounter.Id, OwnerId, Now));
 
         clientCounter.Status.ShouldBe(OfferStatus.Pending);
     }
@@ -347,7 +347,7 @@ public class AnnouncementOfferTests
         var offer = announcement.AddHelperOffer(Helper);
         announcement.AddHelperOffer(OtherHelper);
 
-        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, actorId));
+        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, actorId, Now));
 
         offer.Status.ShouldBe(OfferStatus.Pending);
         announcement.Status.ShouldBe(AnnouncementStatus.Open);
@@ -360,7 +360,7 @@ public class AnnouncementOfferTests
         var first = announcement.AddHelperOffer(Helper);
         announcement.Counter(first, OwnerId);
 
-        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(first.Id, OwnerId));
+        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(first.Id, OwnerId, Now));
     }
 
     [Fact]
@@ -368,9 +368,9 @@ public class AnnouncementOfferTests
     {
         var announcement = CreateAnnouncement();
         var offer = announcement.AddHelperOffer(Helper);
-        announcement.WithdrawOffer(offer.Id, Helper);
+        announcement.WithdrawOffer(offer.Id, Helper, Now);
 
-        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, OwnerId));
+        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(offer.Id, OwnerId, Now));
 
         announcement.Status.ShouldBe(AnnouncementStatus.Open);
     }
@@ -381,9 +381,9 @@ public class AnnouncementOfferTests
         var announcement = CreateAnnouncement();
         var first = announcement.AddHelperOffer(Helper);
         var second = announcement.AddHelperOffer(OtherHelper);
-        announcement.AcceptOffer(first.Id, OwnerId);
+        announcement.AcceptOffer(first.Id, OwnerId, Now);
 
-        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(second.Id, OwnerId));
+        Should.Throw<DomainRuleException>(() => announcement.AcceptOffer(second.Id, OwnerId, Now));
 
         announcement.AcceptedOfferId.ShouldBe(first.Id);
     }
@@ -394,7 +394,7 @@ public class AnnouncementOfferTests
         var announcement = CreateAnnouncement();
         announcement.AddHelperOffer(Helper);
 
-        Should.Throw<OfferNotFoundException>(() => announcement.AcceptOffer(Id.New(), OwnerId));
+        Should.Throw<OfferNotFoundException>(() => announcement.AcceptOffer(Id.New(), OwnerId, Now));
     }
 
     // ---------- RejectOffer ----------
@@ -406,7 +406,7 @@ public class AnnouncementOfferTests
         var offer = announcement.AddHelperOffer(Helper);
         var other = announcement.AddHelperOffer(OtherHelper);
 
-        announcement.RejectOffer(offer.Id, OwnerId);
+        announcement.RejectOffer(offer.Id, OwnerId, Now);
 
         offer.Status.ShouldBe(OfferStatus.Rejected);
         other.Status.ShouldBe(OfferStatus.Pending);
@@ -420,7 +420,7 @@ public class AnnouncementOfferTests
         var first = announcement.AddHelperOffer(Helper);
         var clientCounter = announcement.Counter(first, OwnerId);
 
-        announcement.RejectOffer(clientCounter.Id, Helper);
+        announcement.RejectOffer(clientCounter.Id, Helper, Now);
 
         clientCounter.Status.ShouldBe(OfferStatus.Rejected);
     }
@@ -431,7 +431,7 @@ public class AnnouncementOfferTests
         var announcement = CreateAnnouncement();
         var offer = announcement.AddHelperOffer(Helper);
 
-        Should.Throw<DomainRuleException>(() => announcement.RejectOffer(offer.Id, Helper));
+        Should.Throw<DomainRuleException>(() => announcement.RejectOffer(offer.Id, Helper, Now));
 
         offer.Status.ShouldBe(OfferStatus.Pending);
     }
@@ -444,7 +444,7 @@ public class AnnouncementOfferTests
         var offer = announcement.AddHelperOffer(Helper);
         announcement.AddHelperOffer(OtherHelper);
 
-        Should.Throw<DomainRuleException>(() => announcement.RejectOffer(offer.Id, actorId));
+        Should.Throw<DomainRuleException>(() => announcement.RejectOffer(offer.Id, actorId, Now));
 
         offer.Status.ShouldBe(OfferStatus.Pending);
     }
@@ -454,9 +454,9 @@ public class AnnouncementOfferTests
     {
         var announcement = CreateAnnouncement();
         var offer = announcement.AddHelperOffer(Helper);
-        announcement.RejectOffer(offer.Id, OwnerId);
+        announcement.RejectOffer(offer.Id, OwnerId, Now);
 
-        Should.Throw<DomainRuleException>(() => announcement.RejectOffer(offer.Id, OwnerId));
+        Should.Throw<DomainRuleException>(() => announcement.RejectOffer(offer.Id, OwnerId, Now));
     }
 
     // ---------- WithdrawOffer ----------
@@ -467,7 +467,7 @@ public class AnnouncementOfferTests
         var announcement = CreateAnnouncement();
         var offer = announcement.AddHelperOffer(Helper);
 
-        announcement.WithdrawOffer(offer.Id, Helper);
+        announcement.WithdrawOffer(offer.Id, Helper, Now);
 
         offer.Status.ShouldBe(OfferStatus.Withdrawn);
         announcement.Status.ShouldBe(AnnouncementStatus.Open);
@@ -480,7 +480,7 @@ public class AnnouncementOfferTests
         var first = announcement.AddHelperOffer(Helper);
         var clientCounter = announcement.Counter(first, OwnerId);
 
-        announcement.WithdrawOffer(clientCounter.Id, OwnerId);
+        announcement.WithdrawOffer(clientCounter.Id, OwnerId, Now);
 
         clientCounter.Status.ShouldBe(OfferStatus.Withdrawn);
     }
@@ -491,7 +491,7 @@ public class AnnouncementOfferTests
         var announcement = CreateAnnouncement();
         var offer = announcement.AddHelperOffer(Helper);
 
-        Should.Throw<DomainRuleException>(() => announcement.WithdrawOffer(offer.Id, OwnerId));
+        Should.Throw<DomainRuleException>(() => announcement.WithdrawOffer(offer.Id, OwnerId, Now));
 
         offer.Status.ShouldBe(OfferStatus.Pending);
     }
@@ -504,7 +504,7 @@ public class AnnouncementOfferTests
         var offer = announcement.AddHelperOffer(Helper);
         announcement.AddHelperOffer(OtherHelper);
 
-        Should.Throw<DomainRuleException>(() => announcement.WithdrawOffer(offer.Id, actorId));
+        Should.Throw<DomainRuleException>(() => announcement.WithdrawOffer(offer.Id, actorId, Now));
 
         offer.Status.ShouldBe(OfferStatus.Pending);
     }
@@ -514,9 +514,9 @@ public class AnnouncementOfferTests
     {
         var announcement = CreateAnnouncement();
         var offer = announcement.AddHelperOffer(Helper);
-        announcement.AcceptOffer(offer.Id, OwnerId);
+        announcement.AcceptOffer(offer.Id, OwnerId, Now);
 
-        Should.Throw<DomainRuleException>(() => announcement.WithdrawOffer(offer.Id, Helper));
+        Should.Throw<DomainRuleException>(() => announcement.WithdrawOffer(offer.Id, Helper, Now));
 
         offer.Status.ShouldBe(OfferStatus.Accepted);
     }
@@ -531,7 +531,7 @@ public class AnnouncementOfferTests
         var helperOffer = announcement.AddHelperOffer(Helper, price: 200m);
         var clientCounter = announcement.Counter(helperOffer, OwnerId, price: 120m);
         var helperCounter = announcement.Counter(clientCounter, Helper, price: 160m);
-        announcement.AcceptOffer(helperCounter.Id, OwnerId);
+        announcement.AcceptOffer(helperCounter.Id, OwnerId, Now);
 
         announcement.Offers.Count.ShouldBe(3);
         helperOffer.Status.ShouldBe(OfferStatus.Countered);

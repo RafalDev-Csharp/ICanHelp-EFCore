@@ -1,10 +1,12 @@
 using ICanHelp.Core.Entities;
 using ICanHelp.Core.Entities.Liked;
 using ICanHelp.Core.Entities.Negotiations;
+using ICanHelp.Core.Entities.Notifications;
 using ICanHelp.Core.Entities.Users;
 using ICanHelp.Core.Enums;
 using ICanHelp.Core.ValueObjects;
 using ICanHelp.Infrastructure.DAL.Converters;
+using ICanHelp.Infrastructure.Outbox;
 using Microsoft.EntityFrameworkCore;
 
 namespace ICanHelp.Infrastructure.DAL;
@@ -22,6 +24,8 @@ public sealed class ICanHelpDbContext : DbContext
     public DbSet<Rating> Ratings => Set<Rating>();
     public DbSet<LikedAnnouncement> LikedAnnouncements => Set<LikedAnnouncement>();
     public DbSet<LikedUser> LikedUsers => Set<LikedUser>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public ICanHelpDbContext(DbContextOptions<ICanHelpDbContext> options) : base(options)
     {
@@ -30,6 +34,14 @@ public sealed class ICanHelpDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ICanHelpDbContext).Assembly);
+
+        // Domain events live only in memory until SqlUnitOfWork moves them to the outbox – not a column, not a relation.
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes()
+                     .Where(t => typeof(AggregateRoot).IsAssignableFrom(t.ClrType))
+                     .ToList())
+        {
+            modelBuilder.Entity(entityType.ClrType).Ignore(nameof(AggregateRoot.DomainEvents));
+        }
     }
 
     // Conventions apply to every property of the given type in the whole model,
@@ -53,6 +65,7 @@ public sealed class ICanHelpDbContext : DbContext
         configurationBuilder.Properties<OfferParty>().HaveConversion<string>().HaveMaxLength(20);
         configurationBuilder.Properties<DifficultyLevel>().HaveConversion<string>().HaveMaxLength(20);
         configurationBuilder.Properties<UserRole>().HaveConversion<string>().HaveMaxLength(20);
+        configurationBuilder.Properties<NotificationType>().HaveConversion<string>().HaveMaxLength(40);
         // [Flags] enum as text, e.g. "Description, Budget" (Enum.Parse reads it back).
         configurationBuilder.Properties<AnnouncementFields>().HaveConversion<string>().HaveMaxLength(200);
     }

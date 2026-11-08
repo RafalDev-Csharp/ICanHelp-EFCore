@@ -1,7 +1,9 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
 using ICanHelp.Api.ErrorHandling;
+using ICanHelp.Api.Notifications;
 using ICanHelp.Application;
+using ICanHelp.Application.Notifications;
 using ICanHelp.Infrastructure;
 using Microsoft.OpenApi.Models;
 
@@ -23,6 +25,11 @@ builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
     ctx.ProblemDetails.Extensions.TryAdd("traceId", ctx.HttpContext.TraceIdentifier);
 });
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
+
+// Powiadomienia na żywo (Krok 13). Enumy jako tekst – tak jak w kontrolerach.
+builder.Services.AddSignalR()
+    .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddSingleton<INotificationSender, SignalRNotificationSender>();
 
 builder.Services.AddHealthChecks();
 
@@ -77,6 +84,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<NotificationsHub>(NotificationsHub.Path);
 app.MapHealthChecks("/health");
 
 app.Run();

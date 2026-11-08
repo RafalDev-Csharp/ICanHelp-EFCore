@@ -47,6 +47,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("ConnectionStrings:DefaultConnection", connectionString);
         builder.UseSetting("Auth:SigningKey", SigningKey);
         builder.UseSetting("Storage:ImagesPath", ImagesPath);
+        // Outbox bez pętli w tle: testy przetwarzają go same (TestApi.ProcessOutboxAsync), żeby nie czekać na interwał.
+        builder.UseSetting("Outbox:Enabled", "false");
     }
 
     async Task IAsyncLifetime.DisposeAsync()

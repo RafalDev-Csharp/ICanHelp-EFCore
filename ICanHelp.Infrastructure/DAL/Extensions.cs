@@ -26,6 +26,7 @@ internal static class Extensions
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<ILikedAnnouncementRepository, LikedAnnouncementRepository>();
         services.AddScoped<ILikedUserRepository, LikedUserRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
 
         services.AddScoped<IUnitOfWork, SqlUnitOfWork>();
 

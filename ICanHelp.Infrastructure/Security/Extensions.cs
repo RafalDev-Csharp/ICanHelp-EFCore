@@ -53,6 +53,21 @@ internal static class Extensions
                     NameClaimType = AuthClaims.UserName,
                     RoleClaimType = AuthClaims.Role
                 };
+
+                // WebSockets (SignalR, /hubs/...) cannot send the Authorization header – the token comes in the query.
+                jwt.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+                        if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                        {
+                            context.Token = accessToken;
+                        }
+
+                        return Task.CompletedTask;
+                    }
+                };
             });
 
         services.AddAuthorization();

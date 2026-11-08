@@ -246,3 +246,29 @@ Content-Type: application/json
 
 ###
 GET {{baseUrl}}/api/announcements/{{announcementId}}/ratings
+
+###
+# ---------- Powiadomienia (Krok 13) ----------
+# Powstają w tle (outbox, co ~2 s) po ofercie, kontrofercie, akceptacji, odrzuceniu, wycofaniu, wiadomości i edycji.
+# Na żywo: SignalR /hubs/notifications?access_token=JWT, metoda "notification".
+GET {{baseUrl}}/api/me/notifications?unreadOnly=true&page=1&pageSize=20
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+###
+# @name myNotifications
+GET {{baseUrl}}/api/me/notifications
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+GET {{baseUrl}}/api/me/notifications/unread-count
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# Jedno przeczytane -> 204 (cudze / nieistniejące -> 404)
+POST {{baseUrl}}/api/me/notifications/{{myNotifications.response.body.$[0].id}}/read
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# Wszystkie przeczytane -> 204
+POST {{baseUrl}}/api/me/notifications/read-all
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}

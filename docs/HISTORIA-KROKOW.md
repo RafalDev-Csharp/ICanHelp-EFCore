@@ -35,4 +35,10 @@
 - [x] Krok 12 – „moje negocjacje”: `GET api/me/conversations` (sekcja „Rozmowa”), bez migracji. Testy: `Api.Tests/MyConversationsTests.cs`,
   `Application.Tests/Queries/MyConversationPreviewTests.cs`. 6.11.2026: build + 286/286 testów zielone
   (w tym integracyjne z migracją `Conversations`), commit 77f0e73.
-- [ ] Krok 13 – powiadomienia (opcjonalnie): `docs/PLAN-NEGOCJACJE.md`
+- [x] Krok 13 – powiadomienia o ofertach/wiadomościach/edycji (sekcja „Powiadomienia” w `docs/ARCHITEKTURA.md`, plan:
+  `docs/PLAN-POWIADOMIENIA.md`): zdarzenia domenowe (`Core/Events`, `AggregateRoot`), outbox w `SqlUnitOfWork` + `OutboxProcessor`
+  w tle, `Notification` + `TransactionNotificationHandler`, SignalR (`/hubs/notifications`), `api/me/notifications`.
+  Migracja `Notifications` (20261108100000, ręczna). Testy: `Core.Tests/.../DomainEventsTests.cs`,
+  `Application.Tests/Notifications/TransactionNotificationHandlerTests.cs`, `Api.Tests/NotificationTests.cs`.
+  Pisane 8.11.2026 bez kompilatora; tego samego dnia u autora: build + 320/320 testów zielone (w tym integracyjne z migracją).
+- [ ] Krok 14 – alerty o nowych ogłoszeniach (obszar / trasa): `docs/PLAN-POWIADOMIENIA.md`

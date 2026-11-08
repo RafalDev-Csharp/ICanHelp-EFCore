@@ -361,6 +361,49 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                     b.ToTable("Offers");
                 });
 
+            modelBuilder.Entity("ICanHelp.Core.Entities.Notifications.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AnnouncementId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ConversationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("SourceEventId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "SourceEventId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "ReadAt", "CreatedAt");
+
+                    b.ToTable("Notifications");
+                });
+
             modelBuilder.Entity("ICanHelp.Core.Entities.Rating", b =>
                 {
                     b.Property<Guid>("Id")
@@ -459,6 +502,40 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("ICanHelp.Infrastructure.Outbox.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessedAt", "OccurredAt");
+
+                    b.ToTable("OutboxMessages");
                 });
 
             modelBuilder.Entity("ICanHelp.Core.Entities.Announcement", b =>
@@ -619,6 +696,15 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                         .WithMany()
                         .HasForeignKey("ParentOfferId")
                         .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("ICanHelp.Core.Entities.Notifications.Notification", b =>
+                {
+                    b.HasOne("ICanHelp.Core.Entities.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("ICanHelp.Core.Entities.Rating", b =>
