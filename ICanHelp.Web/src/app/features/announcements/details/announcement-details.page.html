@@ -1,0 +1,161 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/announcements"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Ogłoszenie</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  @switch (state()) { @case ('loading') {
+  <div class="ion-padding" aria-busy="true" aria-label="Wczytywanie ogłoszenia">
+    <ion-skeleton-text [animated]="true" class="skeleton-gallery"></ion-skeleton-text>
+    <ion-skeleton-text [animated]="true" style="width: 80%; height: 24px"></ion-skeleton-text>
+    <ion-skeleton-text [animated]="true" style="width: 40%"></ion-skeleton-text>
+    <ion-skeleton-text [animated]="true" style="width: 100%"></ion-skeleton-text>
+    <ion-skeleton-text [animated]="true" style="width: 90%"></ion-skeleton-text>
+  </div>
+  } @case ('not-found') {
+  <app-empty-state
+    icon="alert-circle-outline"
+    heading="Nie ma takiego ogłoszenia"
+    message="Mogło zostać usunięte albo link jest niepoprawny."
+  >
+    <ion-button routerLink="/announcements" fill="outline">Wróć do ogłoszeń</ion-button>
+  </app-empty-state>
+  } @case ('failed') {
+  <app-empty-state
+    icon="cloud-offline-outline"
+    heading="Nie udało się wczytać ogłoszenia"
+    message="Sprawdź połączenie z internetem i spróbuj ponownie."
+  >
+    <ion-button (click)="load()">Spróbuj ponownie</ion-button>
+  </app-empty-state>
+  } @case ('ready') { @if (announcement(); as item) {
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  @if (images().length > 0) {
+  <div class="gallery" aria-label="Zdjęcia">
+    @for (image of images(); track image.id; let index = $index) {
+    <a class="gallery-item" [href]="image.url" target="_blank" rel="noopener">
+      <img [src]="image.url" [alt]="'Zdjęcie ' + (index + 1) + ' z ' + images().length" loading="lazy" />
+    </a>
+    }
+  </div>
+  }
+
+  <section class="ion-padding summary">
+    <ion-badge [color]="statusColor(item.status)">{{ statusLabel(item.status) }}</ion-badge>
+    <h1>{{ item.title }}</h1>
+    <p class="budget">{{ item.budget.amount | price }}</p>
+    <p class="meta">
+      Dodane {{ item.createdAt | timeAgo }} @if (item.updatedAt) { · edytowane {{ item.updatedAt | timeAgo }} }
+    </p>
+  </section>
+
+  <ion-list inset="true">
+    @if (category()) {
+    <ion-item>
+      <ion-icon name="pricetag-outline" slot="start" aria-hidden="true"></ion-icon>
+      <ion-label>{{ category() }}</ion-label>
+    </ion-item>
+    }
+    <ion-item>
+      <ion-icon name="construct-outline" slot="start" aria-hidden="true"></ion-icon>
+      <ion-label>Trudność</ion-label>
+      <ion-note slot="end">{{ difficultyLabel(item.difficulty) }}</ion-note>
+    </ion-item>
+    <ion-item lines="none">
+      <ion-icon name="people-outline" slot="start" aria-hidden="true"></ion-icon>
+      <ion-label>Oferty od pomocników</ion-label>
+      <ion-note slot="end">{{ item.helperCount }}</ion-note>
+    </ion-item>
+  </ion-list>
+
+  <section class="ion-padding-horizontal">
+    <h2>Opis</h2>
+    <p class="description">{{ item.description }}</p>
+  </section>
+
+  <section class="ion-padding-horizontal">
+    <h2>Miejsce</h2>
+    <app-map
+      class="detail-map"
+      [markers]="marker()"
+      [center]="item.location"
+      [zoom]="15"
+      [interactive]="false"
+    ></app-map>
+    <ion-button fill="clear" size="small" [href]="mapLink()" target="_blank" rel="noopener">
+      <ion-icon name="location-outline" slot="start" aria-hidden="true"></ion-icon>
+      Otwórz w mapach
+    </ion-button>
+  </section>
+
+  <ion-list inset="true" class="owner">
+    <ion-list-header>
+      <ion-label>Zleceniodawca</ion-label>
+    </ion-list-header>
+    @if (owner(); as person) {
+    <ion-item>
+      <ion-icon name="person-circle-outline" slot="start" aria-hidden="true"></ion-icon>
+      <ion-label>
+        <h3>{{ person.fullName }}</h3>
+        <p>{{ person.city }} · w serwisie od {{ parseApiDate(person.createdAt) | date: 'MMMM yyyy' }}</p>
+      </ion-label>
+    </ion-item>
+    <ion-item [lines]="recentReviews().length > 0 ? 'inset' : 'none'">
+      <ion-icon name="star" slot="start" color="warning" aria-hidden="true"></ion-icon>
+      @if (ratingSummary(); as rating) {
+      <ion-label>
+        <strong>{{ rating.average }}</strong> / 5
+        <ion-text color="medium"> · {{ rating.count }}</ion-text>
+      </ion-label>
+      } @else {
+      <ion-label color="medium">Jeszcze bez ocen</ion-label>
+      }
+    </ion-item>
+    @for (review of recentReviews(); track review.id; let last = $last) {
+    <ion-item [lines]="last ? 'none' : 'inset'">
+      <ion-label class="ion-text-wrap">
+        <p class="review-rate" [attr.aria-label]="'Ocena ' + review.rate + ' na 5'">
+          {{ '★'.repeat(review.rate) }}<span class="review-rate-empty">{{ '★'.repeat(5 - review.rate) }}</span>
+          <ion-text color="medium"> · {{ review.createdAt | timeAgo }}</ion-text>
+        </p>
+        <p class="review-text">{{ review.comment }}</p>
+      </ion-label>
+    </ion-item>
+    } } @else {
+    <ion-item lines="none">
+      <ion-label>
+        <ion-skeleton-text [animated]="true" style="width: 50%"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 30%"></ion-skeleton-text>
+      </ion-label>
+    </ion-item>
+    }
+  </ion-list>
+  } } }
+</ion-content>
+
+@if (state() === 'ready') {
+<ion-footer>
+  <ion-toolbar>
+    @if (isOwner()) {
+    <p class="footer-note">To Twoje ogłoszenie.</p>
+    } @else if (isOpen()) {
+    <div class="actions">
+      <ion-button fill="outline" (click)="writeMessage()">
+        <ion-icon name="chatbubble-outline" slot="start" aria-hidden="true"></ion-icon>
+        Napisz
+      </ion-button>
+      <ion-button class="primary-action" (click)="makeOffer()">Złóż ofertę</ion-button>
+    </div>
+    } @else {
+    <p class="footer-note">To ogłoszenie nie przyjmuje już ofert.</p>
+    }
+  </ion-toolbar>
+</ion-footer>
+}

@@ -77,6 +77,23 @@
   Pisane bez .NET i bez rejestru npm w sesji AI; jedyna poprawka po uruchomieniu: test logowania (e-mail ze spacjami nie przechodzi
   `Validators.email`). 8.11.2026 u autora: dotnet build + 400/400 testów (186 Core, 136 Application, 78 Api, w tym migracja),
   `npm run api` (NSwag 14.7, wygenerowany klient pasuje do kodu bez zmian), lint + 65/65 testów Vitest + build zielone.
+- [x] Krok F3 (frontend, 8.11.2026) – przeglądanie ogłoszeń.
+  Zależność: `leaflet` 1.9 + `@types/leaflet` (style w `global.scss`). Nowe: `core/geo` (`GeolocationService` – pozycja tylko po
+  kliknięciu, zaokrąglona do ~100 m, komunikaty po polsku), `core/categories/CategoriesService` (raz na sesję, nazwy po id),
+  `core/config/map.ts` (kafelki OSM, środek domyślny Augustów, link „Otwórz w mapach”), `apiResourceUrl` (adresy zdjęć z API),
+  `ToastService.info`, `shared/components/map` (`app-map`: pinezki, okrąg promienia, pozycja użytkownika, tryb poglądowy),
+  `shared/text/plural.ts` (`pluralPl`). Lista (`/announcements`): `AnnouncementListStore` (strony po 20, przewijanie bez końca,
+  nowsze żądanie przerywa starsze, bez duplikatów), filtry kategoria/podkategoria/„Blisko mnie” + promień 2–50 km, tylko `Open`,
+  karta (`AnnouncementCardComponent`: miniatura, tytuł, budżet, kategoria, odległość, wiek), przełącznik Lista ↔ Mapa (pinezki,
+  podgląd wybranego ogłoszenia, „Pokaż więcej”). Szczegóły (`/announcements/:announcementId`, w stosie zakładki): galeria, status,
+  budżet, kategoria, trudność, liczba ofert (`helperCount`), opis, mapa, zleceniodawca (`api/users/{id}`) ze średnią i ostatnimi
+  opiniami (`api/users/{id}/ratings`), „Złóż ofertę” / „Napisz” (gość → logowanie i powrót; zalogowany – na razie komunikat, F5),
+  właściciel widzi „To Twoje ogłoszenie”. Testy Vitest: plural, filtry, store, CategoriesService, GeolocationService, strona listy,
+  strona szczegółów (mapa zastąpiona zaślepką).
+  Zadania backendowe (zapisane w `docs/PLAN-FRONTEND.md`, F3): `helperCount` w `AnnouncementDto` (lista), endpointy polubień.
+  Pisane bez rejestru npm i .NET w sesji AI: zweryfikowane `ngc` (strict templates, Leaflet przez zaślepkę typów), `tsc` specs,
+  ESLint i Prettier. 9.11.2026 u autora: `npm install` (lock; npm pominął skrypty instalacyjne narzędzi – esbuild, lmdb itp. –
+  bez skutków, binarki są w pakietach opcjonalnych), lint + test + build zielone bez poprawek.
 - [ ] Krok 15 – kanał push (FCM): `docs/PLAN-POWIADOMIENIA.md`
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

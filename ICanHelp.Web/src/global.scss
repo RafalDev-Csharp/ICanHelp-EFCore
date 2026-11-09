@@ -35,3 +35,28 @@
 /* @import "@ionic/angular/css/palettes/dark.always.css"; */
 /* @import "@ionic/angular/css/palettes/dark.class.css"; */
 @import '@ionic/angular/css/palettes/dark.system.css';
+
+/* Style Leaflet (mapy, F3) – razem z pozostałymi importami, przed regułami. */
+@import 'leaflet/dist/leaflet.css';
+
+/* Mapy (Leaflet, F3): kolory warstw rysowanych przez `app-map` (poza widokiem komponentu). */
+.leaflet-container {
+  font: inherit;
+}
+
+.leaflet-container path.map-pin {
+  fill: var(--ion-color-primary);
+  stroke: #fff;
+}
+
+.leaflet-container path.map-user {
+  fill: var(--ion-color-tertiary);
+  stroke: #fff;
+}
+
+.leaflet-container path.map-radius {
+  fill: var(--ion-color-primary);
+  fill-opacity: 0.08;
+  stroke: var(--ion-color-primary);
+  stroke-width: 1;
+}

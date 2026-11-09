@@ -1,0 +1,23 @@
+@let item = announcement();
+<ion-item [routerLink]="['/announcements', item.id]" [detail]="false" [lines]="lines()">
+  <ion-thumbnail slot="start">
+    @if (thumbnailUrl(); as url) {
+      <img [src]="url" alt="" loading="lazy" />
+    } @else {
+      <div class="no-photo"><ion-icon name="image-outline" aria-hidden="true"></ion-icon></div>
+    }
+  </ion-thumbnail>
+  <ion-label>
+    <h2>{{ item.title }}</h2>
+    @if (category()) {
+      <p>{{ category() }}</p>
+    }
+    <p class="meta">
+      @if (item.distanceKm !== undefined && item.distanceKm !== null) {
+        <span class="distance">{{ item.distanceKm | distance }}</span> ·
+      }
+      {{ item.createdAt | timeAgo }}
+    </p>
+  </ion-label>
+  <ion-note slot="end" class="price">{{ item.budget.amount | price }}</ion-note>
+</ion-item>

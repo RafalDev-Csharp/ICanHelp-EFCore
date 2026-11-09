@@ -17,3 +17,14 @@ export function isApiUrl(url: string): boolean {
   const path = url.startsWith(environment.apiUrl) ? url.slice(environment.apiUrl.length) : url;
   return path.startsWith('/api/') || path.startsWith('/hubs/');
 }
+
+/**
+ * Pełny adres zasobu z API podanego jako ścieżka (np. `thumbnailUrl`, `images[].url` – „/api/announcements/…/images/…”).
+ * Przy pustym `apiUrl` (ta sama domena) ścieżka zostaje bez zmian.
+ */
+export function apiResourceUrl(path: string | null | undefined): string | undefined {
+  if (!path) {
+    return undefined;
+  }
+  return path.startsWith('/') ? `${environment.apiUrl}${path}` : path;
+}

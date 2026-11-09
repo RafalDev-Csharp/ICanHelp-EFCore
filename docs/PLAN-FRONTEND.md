@@ -77,12 +77,24 @@ DTO jako interfejsy. Zakładki Dodaj / Rozmowy / Powiadomienia za `authGuard`, P
 
 ## Krok F3 – przeglądanie ogłoszeń
 
-- [ ] Lista: `GET api/announcements` ze stronicowaniem (przewijanie bez końca), filtry: kategoria/podkategoria, status `Open`,
+- [x] Lista: `GET api/announcements` ze stronicowaniem (przewijanie bez końca), filtry: kategoria/podkategoria, status `Open`,
       „blisko mnie” (geolokalizacja **po kliknięciu**, potem `latitude/longitude/radiusKm`), odległość na karcie.
-- [ ] Karta ogłoszenia: miniatura (`GetThumbnail`), tytuł, budżet, odległość, kategoria, liczba pomocników (`HelperCount`).
-- [ ] Szczegóły: galeria zdjęć, opis, mapa z punktem (Leaflet), oceny właściciela, przycisk „Złóż ofertę” / „Napisz”.
-- [ ] Widok mapy listy (przełącznik lista ↔ mapa, pinezki z ogłoszeniami w okolicy).
-- [ ] Polubienia (jeśli API je wystawia – sprawdzić `LikedAnnouncement`; brakujące endpointy zapisz jako zadanie backendowe).
+- [x] Karta ogłoszenia: miniatura (`GetThumbnail`), tytuł, budżet, odległość, kategoria. Liczba pomocników (`HelperCount`) – na razie
+      tylko w szczegółach, bo lista (`AnnouncementDto`) jej nie ma → zadanie backendowe niżej.
+- [x] Szczegóły: galeria zdjęć, opis, mapa z punktem (Leaflet), oceny właściciela, przycisk „Złóż ofertę” / „Napisz”
+      (gość → logowanie i powrót; po zalogowaniu na razie komunikat – formularz oferty i wątek w F5).
+- [x] Widok mapy listy (przełącznik lista ↔ mapa, pinezki z ogłoszeniami w okolicy).
+- [x] Polubienia: API ma tylko odczyt (`GET api/users/{id}/liked-announcements`, `liked-users`), nie da się polubić → bez UI,
+      zadanie backendowe niżej.
+
+Zrobione 8.11.2026 (szczegóły: `docs/HISTORIA-KROKOW.md`). Mapa: `shared/components/map` (`app-map`), kafelki i środek domyślny
+w `core/config/map.ts` (Augustów; dostawca kafelków z konfiguracji – F10). Pozycja „blisko mnie” zaokrąglana do ~100 m i trzymana
+tylko w filtrze ekranu.
+
+**Zadania backendowe z F3** (zrobić przy najbliższym kroku backendu, potem `npm run api`):
+- `HelperCount` w `AnnouncementDto` (lista i alerty `/preview`) – karta na liście pokaże „N ofert”.
+- Polubienia: `PUT` / `DELETE api/announcements/{id}/like` (zalogowany), `IsLiked` dla zalogowanego w `AnnouncementDetailsDto`
+  (i ew. na liście), „Polubione” w profilu z `liked-announcements` – wtedy serduszko na karcie i w szczegółach.
 
 ## Krok F4 – dodawanie i edycja ogłoszenia
 

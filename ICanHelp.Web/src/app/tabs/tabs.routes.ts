@@ -16,6 +16,12 @@ export const routes: Routes = [
         loadComponent: () => import('../features/announcements/announcements.page').then((m) => m.AnnouncementsPage),
       },
       {
+        // Szczegóły w stosie zakładki Ogłoszenia (pasek zakładek zostaje). Publiczne – akcje same proszą o logowanie.
+        path: 'announcements/:announcementId',
+        loadComponent: () =>
+          import('../features/announcements/details/announcement-details.page').then((m) => m.AnnouncementDetailsPage),
+      },
+      {
         path: 'add',
         canActivate: [authGuard],
         loadComponent: () =>

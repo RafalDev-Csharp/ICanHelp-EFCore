@@ -4,14 +4,13 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
 import { AddAnnouncementPage } from './announcements/add-announcement.page';
-import { AnnouncementsPage } from './announcements/announcements.page';
 import { ConversationsPage } from './conversations/conversations.page';
 import { NotificationsPage } from './notifications/notifications.page';
 import { ProfilePage } from './profile/profile.page';
 
-// Strony zakładek z Kroku F1 (na razie puste stany). Kolejne kroki dają stronom własne, dokładniejsze testy.
+// Strony zakładek z Kroku F1 (na razie puste stany). Kolejne kroki dają stronom własne, dokładniejsze testy
+// (Ogłoszenia – F3: `announcements/announcements.page.spec.ts`).
 const pages: [string, Type<unknown>, string][] = [
-  ['AnnouncementsPage', AnnouncementsPage, 'Ogłoszenia'],
   ['AddAnnouncementPage', AddAnnouncementPage, 'Dodaj ogłoszenie'],
   ['ConversationsPage', ConversationsPage, 'Rozmowy'],
   ['NotificationsPage', NotificationsPage, 'Powiadomienia'],

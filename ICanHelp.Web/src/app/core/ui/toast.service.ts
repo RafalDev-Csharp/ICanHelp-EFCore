@@ -19,7 +19,12 @@ export class ToastService {
     await this.show(message, 'success');
   }
 
-  private async show(message: string, color: 'danger' | 'success'): Promise<void> {
+  /** Neutralna informacja (np. „ta funkcja pojawi się wkrótce”). */
+  async info(message: string): Promise<void> {
+    await this.show(message, 'dark');
+  }
+
+  private async show(message: string, color: 'danger' | 'success' | 'dark'): Promise<void> {
     const now = Date.now();
     if (message === this.lastMessage && now - this.lastShownAt < DUPLICATE_WINDOW_MS) {
       return;

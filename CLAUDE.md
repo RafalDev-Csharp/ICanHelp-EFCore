@@ -158,6 +158,9 @@ cd ICanHelp.Web && npm ci && npm start   # frontend http://localhost:4200 (proxy
   - [x] F2 – klient NSwag (`npm run api`), `AuthService` + interceptory (Bearer/odświeżanie, ProblemDetails → toast) + `authGuard`,
     ekrany logowania/rejestracji/profilu; backend: refresh tokeny (`api/users/refresh`, `sign-out`, migracja `RefreshTokens`).
     8.11.2026: dotnet 400/400, lint + 65/65 Vitest + build zielone.
+  - [x] F3 – przeglądanie: lista (filtry, „blisko mnie”, przewijanie bez końca) ↔ mapa (Leaflet), szczegóły (galeria, mapa,
+    oceny właściciela, „Złóż ofertę”/„Napisz” → logowanie). Zadania backendowe: `helperCount` na liście, polubienia (`PLAN-FRONTEND.md`).
+    9.11.2026: `npm install` (leaflet w package-lock) + lint + test + build zielone.
 
 ## Jak pracować z AI (oszczędnie)
 - Jedna sesja = jeden krok z listy. Na start: „Przeczytaj CLAUDE.md i docs/PLAN-…md, zrób Krok N” (frontend: Krok FN).
