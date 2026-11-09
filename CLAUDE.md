@@ -140,7 +140,7 @@ cd ICanHelp.Web && npm ci && npm start   # frontend http://localhost:4200 (proxy
 ## Stan prac (aktualizuj!) – pełna historia: `docs/HISTORIA-KROKOW.md`
 - [x] Kroki 1–8: Infrastructure pod nowy Core, testy Core, Api + Swagger + ProblemDetails, Docker + migracja `Init`,
   JWT (sign-up/sign-in), komendy ogłoszeń/ofert/ocen, wyszukiwanie po odległości, testy integracyjne + CI. Zweryfikowane (172/172).
-  **Zostało: push + zielony build w GitHub Actions.**
+  Push + build w GitHub Actions zielone (potwierdzone przez autora 9.11.2026).
 - [x] Krok 9 – PATCH ogłoszenia + rewizje + blokada akceptacji nieaktualnej oferty (195/195).
 - [x] Krok 10 – zdjęcia (241/241).
 - [x] Krok 11 – wątek negocjacji + prywatność ofert, migracja `Conversations`.

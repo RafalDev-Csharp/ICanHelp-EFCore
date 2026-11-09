@@ -21,7 +21,7 @@
 
 - [x] Krok 8 – `ICanHelp.Api.Tests` (Testcontainers.MsSql 4.4.0, Mvc.Testing 9.0.11; ~30 testów: auth, prywatność, cały przepływ
   negocjacji, wyszukiwanie po odległości, ProblemDetails), CI `.github/workflows/ci.yml`, README z diagramami Mermaid.
-  Zweryfikowane u autora 5.11.2026: `dotnet test` – 172/172 zielone (potwierdza też Kroki 5–7). **Zostało: push + zielony build w Actions.**
+  Zweryfikowane u autora 5.11.2026: `dotnet test` – 172/172 zielone (potwierdza też Kroki 5–7). Push + build w GitHub Actions zielone (autor sprawdzał po każdym pushu; potwierdzone 9.11.2026).
 
 - [x] Krok 9 – PATCH ogłoszenia + rewizje (stare/nowe wartości pól → podświetlanie zmian) + blokada akceptacji nieaktualnej oferty
   (szczegóły: `docs/PLAN-NEGOCJACJE.md`). Migracja `AnnouncementRevisions` (20261106120000, pisana ręcznie). 6.11.2026: build + 195/195 testów zielone.
