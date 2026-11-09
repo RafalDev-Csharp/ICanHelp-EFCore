@@ -1,0 +1,99 @@
+@let group = form();
+<div class="fields" [formGroup]="group">
+  <section>
+    <h2>Czego potrzebujesz?</h2>
+    <ion-select
+      formControlName="categoryId"
+      label="Kategoria"
+      labelPlacement="floating"
+      fill="outline"
+      interface="action-sheet"
+      cancelText="Anuluj"
+      errorText="Wybierz kategorię."
+    >
+      @for (category of categories.categories(); track category.id) {
+        <ion-select-option [value]="category.id">{{ category.name }}</ion-select-option>
+      }
+    </ion-select>
+    <ion-select
+      formControlName="subcategoryId"
+      label="Podkategoria"
+      labelPlacement="floating"
+      fill="outline"
+      interface="action-sheet"
+      cancelText="Anuluj"
+      errorText="Wybierz podkategorię."
+    >
+      @for (subcategory of categories.subcategoriesOf(categoryId()); track subcategory.id) {
+        <ion-select-option [value]="subcategory.id">{{ subcategory.name }}</ion-select-option>
+      }
+    </ion-select>
+
+    <ion-input
+      formControlName="title"
+      label="Tytuł"
+      labelPlacement="floating"
+      fill="outline"
+      placeholder="np. Cieknący kran w kuchni"
+      [counter]="true"
+      [maxlength]="rules.title.max"
+      [errorText]="'Od ' + rules.title.min + ' do ' + rules.title.max + ' znaków.'"
+    ></ion-input>
+
+    <ion-textarea
+      formControlName="description"
+      label="Opis"
+      labelPlacement="floating"
+      fill="outline"
+      [autoGrow]="true"
+      [rows]="4"
+      [counter]="true"
+      [maxlength]="rules.description.max"
+      helperText="Co się dzieje, co już próbowałeś, czy masz potrzebne części lub narzędzia."
+      [errorText]="'Od ' + rules.description.min + ' do ' + rules.description.max + ' znaków.'"
+    ></ion-textarea>
+  </section>
+
+  <section>
+    <h2>Trudność</h2>
+    <ion-segment formControlName="difficulty" aria-label="Trudność">
+      @for (level of difficulties; track level) {
+        <ion-segment-button [value]="level">
+          <ion-label>{{ difficultyLabel(level) }}</ion-label>
+        </ion-segment-button>
+      }
+    </ion-segment>
+  </section>
+
+  <section>
+    <h2>Budżet</h2>
+    <ion-input
+      formControlName="budget"
+      type="number"
+      inputmode="decimal"
+      label="Ile chcesz zapłacić (zł)"
+      labelPlacement="floating"
+      fill="outline"
+      [min]="rules.budget.min"
+      [max]="rules.budget.max"
+      step="any"
+      helperText="Pomocnicy mogą zaproponować inną cenę."
+      [errorText]="'Kwota od ' + rules.budget.min + ' do ' + rules.budget.max + ' zł, najwyżej 2 miejsca po przecinku.'"
+    ></ion-input>
+  </section>
+
+  <section>
+    <h2>Miejsce</h2>
+    <app-location-picker [(point)]="location"></app-location-picker>
+    @if (submitted() && !location()) {
+      <ion-text color="danger"
+        ><p class="error">Wskaż miejsce – bez niego pomocnicy z okolicy nie znajdą ogłoszenia.</p></ion-text
+      >
+    }
+  </section>
+
+  <section>
+    <h2>Zdjęcia <ion-note>(opcjonalnie)</ion-note></h2>
+    <app-photo-picker [(photos)]="photos"></app-photo-picker>
+  </section>
+</div>

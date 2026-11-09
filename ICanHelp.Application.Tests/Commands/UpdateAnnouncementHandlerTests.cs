@@ -124,6 +124,27 @@ public class UpdateAnnouncementHandlerTests
             Handler().HandleAsync(Command(_owner.Id) with { Title = "Nowy tytuł" }));
     }
 
+    [Fact]
+    public async Task Update_ExpectedRevisionMatches_Updates()
+    {
+        await Handler().HandleAsync(Command(_owner.Id) with { Title = "Nowy tytuł", ExpectedRevision = 0 });
+
+        _announcement.Title.Value.ShouldBe("Nowy tytuł");
+        _announcement.Revision.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Update_StaleExpectedRevision_ThrowsConcurrencyConflict()
+    {
+        await Handler().HandleAsync(Command(_owner.Id) with { Title = "Pierwsza zmiana" });
+
+        await Should.ThrowAsync<ConcurrencyConflictException>(() =>
+            Handler().HandleAsync(Command(_owner.Id) with { Title = "Druga karta", ExpectedRevision = 0 }));
+
+        _announcement.Title.Value.ShouldBe("Pierwsza zmiana");
+        _announcement.Revision.ShouldBe(1);
+    }
+
     private UpdateAnnouncementHandler Handler() => new(_announcements, _categories, _users, _unitOfWork, _clock);
 
     private UpdateAnnouncement Command(Guid actorId) => new() { AnnouncementId = _announcement.Id, ActorId = actorId };

@@ -364,3 +364,6 @@ FodyWeavers.xsd
 
 # Zdjęcia wgrane lokalnie (Krok 10, Storage:ImagesPath)
 App_Data/
+
+# Raport skryptu verify.cmd (scripts/verify.ps1)
+.verify/

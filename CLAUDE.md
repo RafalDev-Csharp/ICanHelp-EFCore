@@ -120,11 +120,12 @@ Wspólne: `RepositoryExtensions` (`GetOrThrowAsync` → `AnnouncementNotFound`, 
 - Auth: JWT HS256 (`Auth:SigningKey` ≥ 32 bajty, poza Development wymagany z env). Prywatność: oferty widzi właściciel (wszystkie)
   i pomocnik (swoje), reszta tylko `HelperCount`; kontakt po akceptacji; wątki tylko dla dwóch uczestników (obcy → 404).
 - Refresh tokeny (F2): `RefreshToken` (tylko hash), rotacja przy każdym `refresh`, wykrycie ponownego użycia → `docs/ARCHITEKTURA.md`.
-- Endpointy: `api/users` (+ `refresh`, `sign-out`), `api/categories`, `api/announcements` (+ offers, images, conversations, contact, ratings),
+- Endpointy: `api/users` (+ `refresh`, `sign-out`), `api/categories`, `api/announcements` (+ offers, images, conversations, contact, ratings, like),
   `api/conversations/{id}`, `api/me/conversations`, `api/me/notifications` (+ hub `/hubs/notifications`), `api/me/alerts`. Przykłady wszystkich w `ICanHelp.Api.http`. Porty 5080/7080, `/health`, Swagger w Development.
 
 ## Komendy
 ```bash
+verify.cmd                                    # wszystko po kroku (Windows) → .verify/report.md; -Quick = bez Dockera
 dotnet build
 dotnet test                                   # integracyjne wymagają działającego Dockera
 dotnet test --filter "Category!=Integration"  # tylko jednostkowe
@@ -161,8 +162,16 @@ cd ICanHelp.Web && npm ci && npm start   # frontend http://localhost:4200 (proxy
   - [x] F3 – przeglądanie: lista (filtry, „blisko mnie”, przewijanie bez końca) ↔ mapa (Leaflet), szczegóły (galeria, mapa,
     oceny właściciela, „Złóż ofertę”/„Napisz” → logowanie). Zadania backendowe: `helperCount` na liście, polubienia (`PLAN-FRONTEND.md`).
     9.11.2026: `npm install` (leaflet w package-lock) + lint + test + build zielone.
+  - [x] F4 – dodawanie/edycja ogłoszenia (formularz, GPS / mapa / Nominatim, zdjęcia zmniejszane do 1600 px), „Moje ogłoszenia”,
+    „Polubione”, anulowanie; backend: `helperCount` na liście, `PUT/DELETE …/like` + `isLiked`, `expectedRevision` w PATCH (409).
+    9.11.2026: build + dotnet 410/410, `npm run api`, lint + 116/116 Vitest + build zielone.
 
 ## Jak pracować z AI (oszczędnie)
 - Jedna sesja = jeden krok z listy. Na start: „Przeczytaj CLAUDE.md i docs/PLAN-…md, zrób Krok N” (frontend: Krok FN).
 - Podawaj konkretne pliki, zamiast prosić o przeszukanie repo.
-- Po kroku: jedna linia w „Stan prac”, szczegóły w `docs/HISTORIA-KROKOW.md` (i `docs/ARCHITEKTURA.md`, jeśli doszedł obszar), commit.
+- Po kroku: jedna linia w „Stan prac”, szczegóły w `docs/HISTORIA-KROKOW.md` (i `docs/ARCHITEKTURA.md`, jeśli doszedł obszar).
+- Sesja lokalna (Claude Code desktop, środowisko „Local”, Windows): AI samo uruchamia `verify.cmd` po kroku, czyta
+  `.verify/report.md` i poprawia błędy aż do „WSZYSTKO OK”; uprawnienia do poleceń – `.claude/settings.json` (commit/push pyta).
+- Weryfikacja w sesji w chmurze (bez .NET/Dockera/npm): autor uruchamia `verify.cmd` (build, testy jednostkowe i integracyjne,
+  `npm run api`, lint/test/build frontendu) i pisze „sprawdź raport”. AI czyta `.verify/report.md` (logi: `.verify/*.log`),
+  poprawia błędy, a gdy wszystko OK – wpisuje wynik (liczby testów, data) do „Stan prac” i historii. Commit robi autor.

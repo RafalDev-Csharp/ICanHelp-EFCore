@@ -824,6 +824,7 @@ export class AnnouncementsClient {
      * Częściowa edycja ogłoszenia: wysyłasz tylko pola do zmiany (pominięte / `null` = bez zmian).
     Tylko właściciel, tylko status Open. Realna zmiana podbija `revision`: oczekujące oferty dostają
     `isOutdated = true` i nie da się ich zaakceptować – trzeba złożyć kontrofertę.
+    Z `expectedRevision`: jeśli ogłoszenie ma już inną rewizję → 409 `ConcurrencyConflict`.
      * @param body (optional) 
      * @return No Content
      */
@@ -1489,6 +1490,127 @@ export class AnnouncementsClient {
             let result409: any = null;
             result409 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
             return throwException("Conflict", status, _responseText, _headers, result409);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    /**
+     * Polubienie ogłoszenia przez zalogowanego użytkownika (lista: `GET api/users/{id}/liked-announcements`,
+    w szczegółach `isLiked`). Idempotentne – ponowne polubienie też zwraca 204.
+     * @return No Content
+     */
+    like(announcementId: string): Observable<void> {
+        let url_ = this.baseUrl + "/api/announcements/{announcementId}/like";
+        if (announcementId === undefined || announcementId === null)
+            throw new globalThis.Error("The parameter 'announcementId' must be defined.");
+        url_ = url_.replace("{announcementId}", encodeURIComponent("" + announcementId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+            })
+        };
+
+        return this.http.request("put", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processLike(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processLike(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<void>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<void>;
+        }));
+    }
+
+    protected processLike(response: HttpResponseBase): Observable<void> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return _observableOf(null as any);
+            }));
+        } else if (status === 401) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result401: any = null;
+            result401 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Unauthorized", status, _responseText, _headers, result401);
+            }));
+        } else if (status === 404) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Not Found", status, _responseText, _headers, result404);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    /**
+     * Cofnięcie polubienia. Idempotentne – gdy polubienia nie było, też 204.
+     * @return No Content
+     */
+    unlike(announcementId: string): Observable<void> {
+        let url_ = this.baseUrl + "/api/announcements/{announcementId}/like";
+        if (announcementId === undefined || announcementId === null)
+            throw new globalThis.Error("The parameter 'announcementId' must be defined.");
+        url_ = url_.replace("{announcementId}", encodeURIComponent("" + announcementId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+            })
+        };
+
+        return this.http.request("delete", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processUnlike(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processUnlike(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<void>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<void>;
+        }));
+    }
+
+    protected processUnlike(response: HttpResponseBase): Observable<void> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return _observableOf(null as any);
+            }));
+        } else if (status === 401) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result401: any = null;
+            result401 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Unauthorized", status, _responseText, _headers, result401);
             }));
         } else if (status !== 200 && status !== 204) {
             return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
@@ -3337,8 +3459,9 @@ export interface AnnouncementDetailsDto {
     updatedAt: string | undefined;
     thumbnailUrl: string | undefined;
     distanceKm: number | undefined;
-    offers: OfferDto[];
     helperCount: number;
+    offers: OfferDto[];
+    isLiked: boolean;
     images: ImageDto[];
     changes: AnnouncementChangeDto[];
 }
@@ -3360,6 +3483,7 @@ export interface AnnouncementDto {
     updatedAt: string | undefined;
     thumbnailUrl: string | undefined;
     distanceKm: number | undefined;
+    helperCount: number;
 }
 
 export interface AnnouncementFieldChangeDto {
@@ -3639,6 +3763,7 @@ export interface UpdateAnnouncement {
     description: string | undefined;
     budget: PriceDto;
     location: LocationDto;
+    expectedRevision: number | undefined;
 }
 
 export interface UserDto {

@@ -4,16 +4,26 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true">
+<ion-content [fullscreen]="true" class="ion-padding">
   <ion-header collapse="condense">
     <ion-toolbar>
       <ion-title size="large">Dodaj ogłoszenie</ion-title>
     </ion-toolbar>
   </ion-header>
 
-  <app-empty-state
-    icon="add-circle-outline"
-    heading="Potrzebujesz pomocy?"
-    message="Wkrótce opiszesz tu problem, dodasz zdjęcia i wskażesz miejsce na mapie."
-  ></app-empty-state>
+  <app-announcement-form
+    [form]="form"
+    [(location)]="location"
+    [(photos)]="photos"
+    [submitted]="submitted()"
+  ></app-announcement-form>
 </ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <ion-button class="submit" expand="block" (click)="submit()" [disabled]="saving()">
+      @if (saving()) {
+      <ion-spinner name="crescent" slot="start"></ion-spinner> Zapisuję… } @else { Opublikuj ogłoszenie }
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>

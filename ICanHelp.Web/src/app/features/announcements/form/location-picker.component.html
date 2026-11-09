@@ -1,0 +1,60 @@
+<div class="sources">
+  <ion-button fill="outline" size="small" (click)="useMyPosition()" [disabled]="locating()">
+    @if (locating()) {
+      <ion-spinner name="crescent" slot="start"></ion-spinner>
+    } @else {
+      <ion-icon name="locate-outline" slot="start" aria-hidden="true"></ion-icon>
+    }
+    Moja pozycja
+  </ion-button>
+</div>
+
+<div class="search">
+  <ion-input
+    fill="outline"
+    label="Adres"
+    labelPlacement="floating"
+    placeholder="np. Rynek 1, Augustów"
+    [value]="query()"
+    (ionInput)="setQuery($event.detail.value)"
+    enterkeyhint="search"
+    (keyup.enter)="search()"
+  ></ion-input>
+  <ion-button (click)="search()" [disabled]="searching() || query().trim().length < 3" aria-label="Szukaj adresu">
+    @if (searching()) {
+      <ion-spinner name="crescent"></ion-spinner>
+    } @else {
+      <ion-icon name="search-outline" slot="icon-only" aria-hidden="true"></ion-icon>
+    }
+  </ion-button>
+</div>
+
+@if (results(); as found) {
+  <ion-list class="results" lines="full">
+    @for (result of found; track $index) {
+      <ion-item button [detail]="false" (click)="pick(result)">
+        <ion-icon name="location-outline" slot="start" aria-hidden="true"></ion-icon>
+        <ion-label class="ion-text-wrap">{{ result.label }}</ion-label>
+      </ion-item>
+    } @empty {
+      <ion-item lines="none">
+        <ion-label color="medium">Nic nie znaleziono – wpisz inaczej albo wskaż miejsce na mapie.</ion-label>
+      </ion-item>
+    }
+  </ion-list>
+}
+
+<app-map
+  class="picker-map"
+  [markers]="markers()"
+  [center]="point() ?? undefined"
+  [zoom]="15"
+  (mapClick)="choose($event)"
+></app-map>
+<ion-note class="hint">
+  @if (point()) {
+    Pokazujemy okolicę (~100 m), nie dokładny adres – ten podasz pomocnikowi po przyjęciu oferty.
+  } @else {
+    Dotknij mapy, żeby wskazać miejsce.
+  }
+</ion-note>

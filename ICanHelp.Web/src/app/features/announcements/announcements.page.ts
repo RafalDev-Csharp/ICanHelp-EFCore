@@ -21,6 +21,7 @@ import {
   IonTitle,
   IonToolbar,
 } from '@ionic/angular';
+import type { ViewWillEnter } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { close, cloudOfflineOutline, locateOutline, searchOutline } from 'ionicons/icons';
 
@@ -33,6 +34,7 @@ import { MapComponent } from '../../shared/components/map/map.component';
 import { formatPrice } from '../../shared/pipes/price.pipe';
 import { pluralPl } from '../../shared/text/plural';
 
+import { LikesService } from './likes/likes.service';
 import { AnnouncementCardComponent } from './list/announcement-card.component';
 import { RADIUS_OPTIONS_KM, activeFilterCount } from './list/announcement-filters';
 import { AnnouncementListStore } from './list/announcement-list.store';
@@ -77,12 +79,13 @@ interface CompletableTarget {
     MapComponent,
   ],
 })
-export class AnnouncementsPage implements OnInit {
+export class AnnouncementsPage implements OnInit, ViewWillEnter {
   private readonly geolocation = inject(GeolocationService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   protected readonly store = inject(AnnouncementListStore);
   protected readonly categories = inject(CategoriesService);
+  protected readonly likes = inject(LikesService);
 
   protected readonly radiusOptions = RADIUS_OPTIONS_KM;
   protected readonly skeletons = [1, 2, 3, 4, 5];
@@ -120,6 +123,11 @@ export class AnnouncementsPage implements OnInit {
     // Błąd pokazał już interceptor; bez kategorii lista działa dalej (filtr kategorii jest wtedy pusty).
     this.categories.load().subscribe({ error: () => undefined });
     void this.store.reload();
+  }
+
+  /** Przy każdym wejściu na zakładkę (np. po zalogowaniu): serduszka na kartach – wczytane raz na sesję. */
+  ionViewWillEnter(): void {
+    this.likes.load().subscribe({ error: () => undefined });
   }
 
   setView(value: unknown): void {

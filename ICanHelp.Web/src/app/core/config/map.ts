@@ -20,3 +20,15 @@ export function openStreetMapUrl(point: GeoPoint, zoom = 16): string {
   const { latitude: lat, longitude: lon } = point;
   return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=${zoom}/${lat}/${lon}`;
 }
+
+/**
+ * Wyszukiwanie adresu: Nominatim (OpenStreetMap). Zasady użycia: najwyżej 1 zapytanie na sekundę, bez podpowiedzi
+ * „w trakcie pisania” – szukamy dopiero po zatwierdzeniu. Przy większym ruchu (F10) – własna instancja albo płatny dostawca.
+ */
+export const GEOCODING = {
+  url: 'https://nominatim.openstreetmap.org/search',
+  /** Kraje, w których szukamy (MVP: Polska). */
+  countryCodes: 'pl',
+  limit: 5,
+  minIntervalMs: 1_100,
+} as const;

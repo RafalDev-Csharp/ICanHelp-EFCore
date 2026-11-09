@@ -38,6 +38,8 @@ export class MapComponent implements OnDestroy {
   /** `false` – mapa poglądowa (np. w szczegółach): bez przesuwania i zoomu, nie przechwytuje przewijania strony. */
   readonly interactive = input(true);
   readonly markerClick = output<string>();
+  /** Dotknięcie mapy poza pinezką (tylko mapa interaktywna) – np. wskazanie miejsca ogłoszenia. */
+  readonly mapClick = output<GeoPoint>();
 
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
   private map: L.Map | null = null;
@@ -71,6 +73,11 @@ export class MapComponent implements OnDestroy {
     });
     L.tileLayer(MAP_TILES.url, { attribution: MAP_TILES.attribution, maxZoom: MAP_TILES.maxZoom }).addTo(this.map);
     this.layers = L.layerGroup().addTo(this.map);
+    if (interactive) {
+      this.map.on('click', (event: L.LeafletMouseEvent) =>
+        this.mapClick.emit({ latitude: event.latlng.lat, longitude: event.latlng.lng }),
+      );
+    }
     this.render(this.markers(), this.circle(), this.userPosition());
 
     if (typeof ResizeObserver !== 'undefined') {
@@ -115,6 +122,8 @@ export class MapComponent implements OnDestroy {
         fillOpacity: 1,
         className: 'map-pin',
         interactive: this.interactive(),
+        // Kliknięcie pinezki to nie kliknięcie mapy (`mapClick`).
+        bubblingMouseEvents: false,
       });
       if (marker.title) {
         pin.bindTooltip(marker.title, { direction: 'top', offset: [0, -8] });

@@ -7,6 +7,7 @@ import { GeolocationError, GeolocationService } from '../../core/geo/geolocation
 import { ToastService } from '../../core/ui/toast.service';
 
 import { AnnouncementsPage } from './announcements.page';
+import { LikesService } from './likes/likes.service';
 import { PAGE_SIZE } from './list/announcement-filters';
 import { announcement } from './testing/announcement-fixtures';
 
@@ -15,6 +16,7 @@ describe('AnnouncementsPage', () => {
   const categoriesClient = { getAll: vi.fn() };
   const geolocation = { getCurrentPosition: vi.fn() };
   const toast = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
+  const likes = { load: () => of([]), isLiked: (id: string): boolean => id === 'liked-1' };
 
   function create(): { page: AnnouncementsPage; element: HTMLElement; render: () => Promise<void> } {
     TestBed.configureTestingModule({
@@ -25,6 +27,7 @@ describe('AnnouncementsPage', () => {
         { provide: CategoriesClient, useValue: categoriesClient },
         { provide: GeolocationService, useValue: geolocation },
         { provide: ToastService, useValue: toast },
+        { provide: LikesService, useValue: likes },
       ],
     });
     const fixture = TestBed.createComponent(AnnouncementsPage);
@@ -62,6 +65,20 @@ describe('AnnouncementsPage', () => {
       1,
       PAGE_SIZE,
     );
+  });
+
+  it('shows the number of offers and the heart of a liked announcement', async () => {
+    client.getAll.mockReturnValue(
+      of([announcement('liked-1', { helperCount: 3 }), announcement('a2', { helperCount: 0 })]),
+    );
+    const { element, render } = create();
+    await render();
+
+    const cards = element.querySelectorAll('app-announcement-card');
+    expect(cards[0].querySelector('.offers')?.textContent).toContain('3 oferty');
+    expect(cards[0].querySelector('.liked')).not.toBeNull();
+    expect(cards[1].querySelector('.offers')).toBeNull();
+    expect(cards[1].querySelector('.liked')).toBeNull();
   });
 
   it('asks for the position only after "near me" is clicked and shows distances', async () => {

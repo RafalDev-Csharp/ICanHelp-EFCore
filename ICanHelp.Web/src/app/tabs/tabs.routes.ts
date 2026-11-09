@@ -22,6 +22,13 @@ export const routes: Routes = [
           import('../features/announcements/details/announcement-details.page').then((m) => m.AnnouncementDetailsPage),
       },
       {
+        // Edycja w stosie zakładki Ogłoszenia (wejście ze szczegółów). Strona sama sprawdza właściciela i status.
+        path: 'announcements/:announcementId/edit',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('../features/announcements/edit/edit-announcement.page').then((m) => m.EditAnnouncementPage),
+      },
+      {
         path: 'add',
         canActivate: [authGuard],
         loadComponent: () =>
@@ -40,6 +47,17 @@ export const routes: Routes = [
       {
         path: 'profile',
         loadComponent: () => import('../features/profile/profile.page').then((m) => m.ProfilePage),
+      },
+      {
+        path: 'profile/announcements',
+        canActivate: [authGuard],
+        loadComponent: () => import('../features/profile/my-announcements.page').then((m) => m.MyAnnouncementsPage),
+      },
+      {
+        path: 'profile/liked',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('../features/profile/liked-announcements.page').then((m) => m.LikedAnnouncementsPage),
       },
       {
         path: '',

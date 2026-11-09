@@ -8,7 +8,15 @@
     }
   </ion-thumbnail>
   <ion-label>
-    <h2>{{ item.title }}</h2>
+    @if (showStatus()) {
+      <ion-badge class="status" [color]="statusColor(item.status)">{{ statusLabel(item.status) }}</ion-badge>
+    }
+    <h2>
+      @if (liked()) {
+        <ion-icon class="liked" name="heart" color="danger" aria-label="Polubione"></ion-icon>
+      }
+      {{ item.title }}
+    </h2>
     @if (category()) {
       <p>{{ category() }}</p>
     }
@@ -17,6 +25,9 @@
         <span class="distance">{{ item.distanceKm | distance }}</span> ·
       }
       {{ item.createdAt | timeAgo }}
+      @if (offers()) {
+        · <span class="offers">{{ offers() }}</span>
+      }
     </p>
   </ion-label>
   <ion-note slot="end" class="price">{{ item.budget.amount | price }}</ion-note>

@@ -1,6 +1,7 @@
 import { Component, input, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
+import { AlertController } from '@ionic/angular';
 import { of, throwError } from 'rxjs';
 
 import type { UserDto } from '../../../core/api/api-client';
@@ -8,6 +9,7 @@ import { AnnouncementsClient, CategoriesClient, UsersClient } from '../../../cor
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../core/ui/toast.service';
 import { MapComponent } from '../../../shared/components/map/map.component';
+import { LikesService } from '../likes/likes.service';
 import { announcementDetails } from '../testing/announcement-fixtures';
 
 import { AnnouncementDetailsPage } from './announcement-details.page';
@@ -22,7 +24,16 @@ class MapStubComponent {
 }
 
 describe('AnnouncementDetailsPage', () => {
-  const announcements = { getById: vi.fn() };
+  const announcements = { getById: vi.fn(), cancel: vi.fn() };
+  const likes = { load: vi.fn(() => of([])), isLiked: vi.fn(() => false), sync: vi.fn(), toggle: vi.fn() };
+  /** Potwierdzenie z okna: `confirm` wybiera przycisk o tej roli. */
+  let alertButtons: { role?: string; handler?: () => void }[] = [];
+  const alerts = {
+    create: vi.fn((options: { buttons: { role?: string; handler?: () => void }[] }) => {
+      alertButtons = options.buttons;
+      return Promise.resolve({ present: () => Promise.resolve() });
+    }),
+  };
   const users = { getById: vi.fn(), getRatings: vi.fn() };
   const toast = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
   const auth = {
@@ -41,6 +52,8 @@ describe('AnnouncementDetailsPage', () => {
         { provide: CategoriesClient, useValue: { getAll: () => of([]) } },
         { provide: AuthService, useValue: auth },
         { provide: ToastService, useValue: toast },
+        { provide: LikesService, useValue: likes },
+        { provide: AlertController, useValue: alerts },
       ],
     });
     TestBed.overrideComponent(AnnouncementDetailsPage, {
@@ -135,14 +148,64 @@ describe('AnnouncementDetailsPage', () => {
     expect(toast.info).not.toHaveBeenCalled();
   });
 
-  it('hides the offer actions from the owner', async () => {
+  it('gives the owner edit and cancel instead of the offer actions', async () => {
     auth.isAuthenticated.set(true);
     auth.currentUser.set({ id: 'owner-1' } as UserDto);
-    const { element, render } = create();
+    const { page, element, render } = create();
     await render();
 
-    expect(element.querySelector('ion-footer')?.textContent).toContain('To Twoje ogłoszenie');
-    expect(element.querySelector('.actions')).toBeNull();
+    const footer = element.querySelector('ion-footer')?.textContent ?? '';
+    expect(footer).toContain('Edytuj');
+    expect(footer).toContain('Anuluj');
+    expect(footer).not.toContain('Złóż ofertę');
+    expect(element.querySelector('ion-header ion-buttons[slot="end"]')).toBeNull();
+
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    page.edit();
+    expect(navigate).toHaveBeenCalledWith(['/announcements', 'a1', 'edit']);
+  });
+
+  it('cancels the announcement only after confirmation', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'owner-1' } as UserDto);
+    announcements.cancel.mockReturnValue(of(undefined));
+    const { page, render } = create();
+    await render();
+
+    await page.cancel();
+    expect(announcements.cancel).not.toHaveBeenCalled();
+
+    alertButtons.find((button) => button.role === 'destructive')?.handler?.();
+
+    expect(announcements.cancel).toHaveBeenCalledWith('a1');
+    expect(toast.success).toHaveBeenCalledWith('Ogłoszenie anulowane.');
+    expect(announcements.getById).toHaveBeenCalledTimes(2);
+  });
+
+  it('likes the announcement of someone else', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'helper-1' } as UserDto);
+    likes.toggle.mockReturnValue(of(true));
+    const { page, render } = create();
+    await render();
+
+    expect(likes.sync).toHaveBeenCalledWith('a1', false);
+    page.toggleLike();
+
+    expect(likes.toggle).toHaveBeenCalledWith('a1');
+    expect(toast.info).toHaveBeenCalledWith('Dodano do polubionych.');
+  });
+
+  it('sends a guest to sign in before liking', async () => {
+    const { page, render } = create();
+    await render();
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+    page.toggleLike();
+
+    expect(navigate).toHaveBeenCalled();
+    expect(likes.toggle).not.toHaveBeenCalled();
   });
 
   it('shows a not-found state for a missing announcement', async () => {

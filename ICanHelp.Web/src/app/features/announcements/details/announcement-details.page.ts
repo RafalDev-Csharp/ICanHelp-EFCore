@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
+  AlertController,
   IonBackButton,
   IonBadge,
   IonButton,
@@ -27,8 +28,12 @@ import { addIcons } from 'ionicons';
 import {
   alertCircleOutline,
   chatbubbleOutline,
+  closeCircleOutline,
   cloudOfflineOutline,
   constructOutline,
+  createOutline,
+  heart,
+  heartOutline,
   locationOutline,
   peopleOutline,
   personCircleOutline,
@@ -53,6 +58,7 @@ import { PricePipe } from '../../../shared/pipes/price.pipe';
 import { TimeAgoPipe, parseApiDate } from '../../../shared/pipes/time-ago.pipe';
 import { pluralPl } from '../../../shared/text/plural';
 import { difficultyLabel, statusColor, statusLabel } from '../announcement-labels';
+import { LikesService } from '../likes/likes.service';
 
 type LoadState = 'loading' | 'ready' | 'not-found' | 'failed';
 
@@ -61,7 +67,8 @@ const VISIBLE_RATINGS = 3;
 
 /**
  * Szczegóły ogłoszenia (publiczne): zdjęcia, opis, mapa, właściciel z ocenami i akcje „Złóż ofertę” / „Napisz”
- * (niezalogowany → logowanie i powrót tutaj). Oferty i rozmowy – Krok F5.
+ * (niezalogowany → logowanie i powrót tutaj), serduszko (polubienie). Właściciel: „Edytuj” (Open) i „Anuluj”
+ * (Open/Accepted). Oferty i rozmowy – Krok F5.
  */
 @Component({
   selector: 'app-announcement-details',
@@ -100,6 +107,8 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
   private readonly users = inject(UsersClient);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly alerts = inject(AlertController);
+  private readonly likes = inject(LikesService);
   protected readonly auth = inject(AuthService);
   protected readonly categories = inject(CategoriesService);
 
@@ -140,6 +149,13 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     return user !== null && user.id === this.announcement()?.ownerId;
   });
   protected readonly isOpen = computed(() => this.announcement()?.status === 'Open');
+  protected readonly canCancel = computed(() => ['Open', 'Accepted'].includes(this.announcement()?.status ?? ''));
+  protected readonly isLiked = computed(() => {
+    const announcement = this.announcement();
+    return announcement !== null && this.auth.isAuthenticated() && this.likes.isLiked(announcement.id);
+  });
+  protected readonly liking = signal(false);
+  protected readonly cancelling = signal(false);
   protected readonly ratingSummary = computed(() => {
     const ratings = this.ownerRatings();
     if (ratings.length === 0) {
@@ -163,8 +179,12 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     addIcons({
       alertCircleOutline,
       chatbubbleOutline,
+      closeCircleOutline,
       cloudOfflineOutline,
       constructOutline,
+      createOutline,
+      heart,
+      heartOutline,
       locationOutline,
       peopleOutline,
       personCircleOutline,
@@ -179,6 +199,8 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     if (this.auth.isAuthenticated() && !this.auth.currentUser()) {
       this.auth.loadCurrentUser().subscribe({ error: () => undefined });
     }
+    // Stan serduszka (raz na sesję; potem `sync` z `isLiked` ogłoszenia).
+    this.likes.load().subscribe({ error: () => undefined });
     this.load();
   }
 
@@ -191,6 +213,7 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
       next: (announcement) => {
         const ownerChanged = this.announcement()?.ownerId !== announcement.ownerId;
         this.announcement.set(announcement);
+        this.likes.sync(announcement.id, announcement.isLiked);
         this.state.set('ready');
         if (ownerChanged) {
           this.loadOwner(announcement.ownerId);
@@ -222,6 +245,62 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     if (this.requireSignIn()) {
       void this.toast.info('Rozmowy z właścicielem pojawią się w kolejnej wersji aplikacji.');
     }
+  }
+
+  /** Serduszko: niezalogowany → logowanie i powrót. */
+  toggleLike(): void {
+    const announcement = this.announcement();
+    if (!announcement || this.liking() || !this.requireSignIn()) {
+      return;
+    }
+    this.liking.set(true);
+    this.likes.toggle(announcement.id).subscribe({
+      next: (liked) => {
+        this.liking.set(false);
+        void this.toast.info(liked ? 'Dodano do polubionych.' : 'Usunięto z polubionych.');
+      },
+      error: () => this.liking.set(false),
+    });
+  }
+
+  edit(): void {
+    void this.router.navigate(['/announcements', this.announcementId(), 'edit']);
+  }
+
+  /** Anulowanie (właściciel) – po potwierdzeniu, bo nie da się go cofnąć. */
+  async cancel(): Promise<void> {
+    const announcement = this.announcement();
+    if (!announcement || this.cancelling()) {
+      return;
+    }
+    const accepted = announcement.status === 'Accepted';
+    const alert = await this.alerts.create({
+      header: 'Anulować ogłoszenie?',
+      message: accepted
+        ? 'Przyjąłeś już ofertę – pomocnik dostanie informację, że zlecenie jest odwołane. Tego nie da się cofnąć.'
+        : 'Ogłoszenie zniknie z listy, a oczekujące oferty przepadną. Tego nie da się cofnąć.',
+      buttons: [
+        { text: 'Nie', role: 'cancel' },
+        { text: 'Anuluj ogłoszenie', role: 'destructive', handler: () => this.confirmCancel(announcement.id) },
+      ],
+    });
+    await alert.present();
+  }
+
+  private confirmCancel(announcementId: string): void {
+    this.cancelling.set(true);
+    this.announcements.cancel(announcementId).subscribe({
+      next: () => {
+        this.cancelling.set(false);
+        void this.toast.success('Ogłoszenie anulowane.');
+        this.load();
+      },
+      // 409 (np. zlecenie już w realizacji) – komunikat z interceptora; pokazujemy aktualny stan.
+      error: () => {
+        this.cancelling.set(false);
+        this.load();
+      },
+    });
   }
 
   private requireSignIn(): boolean {

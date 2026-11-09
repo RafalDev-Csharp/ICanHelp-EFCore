@@ -88,7 +88,10 @@
   @if (store.items().length > 0) {
   <ion-list>
     @for (announcement of store.items(); track announcement.id) {
-    <app-announcement-card [announcement]="announcement"></app-announcement-card>
+    <app-announcement-card
+      [announcement]="announcement"
+      [liked]="likes.isLiked(announcement.id)"
+    ></app-announcement-card>
     }
   </ion-list>
   <ion-infinite-scroll [disabled]="store.complete()" (ionInfinite)="loadMore($event)">
@@ -164,7 +167,11 @@
         <ion-icon slot="icon-only" name="close" aria-hidden="true"></ion-icon>
       </ion-button>
       <div class="map-card">
-        <app-announcement-card [announcement]="announcement" lines="none"></app-announcement-card>
+        <app-announcement-card
+          [announcement]="announcement"
+          [liked]="likes.isLiked(announcement.id)"
+          lines="none"
+        ></app-announcement-card>
       </div>
     </div>
     }

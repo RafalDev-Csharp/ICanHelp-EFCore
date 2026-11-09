@@ -5,6 +5,7 @@ import {
   IonButton,
   IonContent,
   IonHeader,
+  IonIcon,
   IonItem,
   IonLabel,
   IonList,
@@ -15,6 +16,8 @@ import {
   IonToolbar,
 } from '@ionic/angular';
 import type { ViewWillEnter } from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import { documentTextOutline, heartOutline } from 'ionicons/icons';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
@@ -33,6 +36,7 @@ import { parseApiDate } from '../../shared/pipes/time-ago.pipe';
     IonList,
     IonListHeader,
     IonItem,
+    IonIcon,
     IonLabel,
     IonNote,
     IonButton,
@@ -45,6 +49,10 @@ export class ProfilePage implements ViewWillEnter {
   protected readonly auth = inject(AuthService);
   protected readonly loading = signal(false);
   protected readonly parseApiDate = parseApiDate;
+
+  constructor() {
+    addIcons({ documentTextOutline, heartOutline });
+  }
 
   /** Zakładki Ionic zostają w pamięci – dane odświeżamy przy każdym wejściu na zakładkę. */
   ionViewWillEnter(): void {

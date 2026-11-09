@@ -28,7 +28,15 @@ internal sealed class GetAnnouncementByIdHandler : IQueryHandler<GetAnnouncement
             .AsSplitQuery()
             .SingleOrDefaultAsync(a => a.Id == id, cancellationToken);
 
+        if (announcement is null)
+        {
+            return null;
+        }
+
         var viewerId = query.ViewerId is { } viewer ? new UserId(viewer) : null;
-        return announcement?.AsDetailsDto(viewerId);
+        var isLiked = viewerId is not null && await _db.LikedAnnouncements
+            .AnyAsync(l => l.UserId == viewerId && l.AnnouncementId == id, cancellationToken);
+
+        return announcement.AsDetailsDto(viewerId, isLiked);
     }
 }

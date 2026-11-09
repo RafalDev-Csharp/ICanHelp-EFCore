@@ -147,6 +147,7 @@ public sealed class AnnouncementsController : ControllerBase
     /// Częściowa edycja ogłoszenia: wysyłasz tylko pola do zmiany (pominięte / <c>null</c> = bez zmian).
     /// Tylko właściciel, tylko status Open. Realna zmiana podbija <c>revision</c>: oczekujące oferty dostają
     /// <c>isOutdated = true</c> i nie da się ich zaakceptować – trzeba złożyć kontrofertę.
+    /// Z <c>expectedRevision</c>: jeśli ogłoszenie ma już inną rewizję → 409 <c>ConcurrencyConflict</c>.
     /// </summary>
     [HttpPatch("{announcementId:guid}")]
     [Authorize]
@@ -273,6 +274,30 @@ public sealed class AnnouncementsController : ControllerBase
 
         return CreatedAtAction(nameof(GetRatings), new { announcementId }, new CreatedDto(ratingId));
     }
+
+    // ---------- polubienia ----------
+
+    /// <summary>
+    /// Polubienie ogłoszenia przez zalogowanego użytkownika (lista: <c>GET api/users/{id}/liked-announcements</c>,
+    /// w szczegółach <c>isLiked</c>). Idempotentne – ponowne polubienie też zwraca 204.
+    /// </summary>
+    [HttpPut("{announcementId:guid}/like")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public Task<IActionResult> Like(Guid announcementId,
+        [FromServices] ICommandHandler<LikeAnnouncement> handler, CancellationToken cancellationToken)
+        => Execute(userId => new LikeAnnouncement(announcementId, userId), handler, cancellationToken);
+
+    /// <summary>Cofnięcie polubienia. Idempotentne – gdy polubienia nie było, też 204.</summary>
+    [HttpDelete("{announcementId:guid}/like")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public Task<IActionResult> Unlike(Guid announcementId,
+        [FromServices] ICommandHandler<UnlikeAnnouncement> handler, CancellationToken cancellationToken)
+        => Execute(userId => new UnlikeAnnouncement(announcementId, userId), handler, cancellationToken);
 
     // ---------- rozmowa ----------
 

@@ -34,6 +34,12 @@ internal sealed class UpdateAnnouncementHandler : ICommandHandler<UpdateAnnounce
             await _users.GetActiveOrThrowAsync(command.ActorId, cancellationToken);
             var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
 
+            // Klient edytował starszą wersję – nie nadpisujemy po cichu cudzej (albo własnej z innej karty) zmiany.
+            if (command.ExpectedRevision is { } expectedRevision && expectedRevision != announcement.Revision)
+            {
+                throw new ConcurrencyConflictException();
+            }
+
             var categoryId = command.CategoryId is { } newCategoryId ? new Id(newCategoryId) : announcement.CategoryId;
             var subcategoryId = command.SubcategoryId is { } newSubcategoryId
                 ? new Id(newSubcategoryId)

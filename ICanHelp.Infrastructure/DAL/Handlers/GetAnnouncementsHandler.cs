@@ -60,7 +60,8 @@ internal sealed class GetAnnouncementsHandler : IQueryHandler<GetAnnouncements, 
                 {
                     Announcement = a,
                     Distance = EF.Property<Point>(a, Spatial.GeoPoint).Distance(origin),
-                    ThumbnailId = a.Images.OrderBy(i => i.AddedAt).Select(i => i.Id).FirstOrDefault()
+                    ThumbnailId = a.Images.OrderBy(i => i.AddedAt).Select(i => i.Id).FirstOrDefault(),
+                    HelperCount = a.Offers.Select(o => o.HelperId).Distinct().Count()
                 })
                 .OrderBy(x => x.Distance)
                 .ThenByDescending(x => x.Announcement.CreatedAt)
@@ -72,12 +73,14 @@ internal sealed class GetAnnouncementsHandler : IQueryHandler<GetAnnouncements, 
                 .Select(x => x.Announcement.AsDto() with
                 {
                     DistanceKm = Math.Round(x.Distance / 1000, 2),
-                    ThumbnailUrl = ThumbnailUrl(x.Announcement.Id, x.ThumbnailId)
+                    ThumbnailUrl = ThumbnailUrl(x.Announcement.Id, x.ThumbnailId),
+                    HelperCount = x.HelperCount
                 })
                 .ToList();
         }
 
-        // Thumbnail = the oldest image, as a subquery – the list does not load whole image collections.
+        // Thumbnail = the oldest image and HelperCount = distinct helpers with an offer, both as subqueries –
+        // the list does not load whole image/offer collections.
         var page = await announcements
             .OrderByDescending(a => a.CreatedAt)
             .Skip(skip)
@@ -85,12 +88,17 @@ internal sealed class GetAnnouncementsHandler : IQueryHandler<GetAnnouncements, 
             .Select(a => new
             {
                 Announcement = a,
-                ThumbnailId = a.Images.OrderBy(i => i.AddedAt).Select(i => i.Id).FirstOrDefault()
+                ThumbnailId = a.Images.OrderBy(i => i.AddedAt).Select(i => i.Id).FirstOrDefault(),
+                HelperCount = a.Offers.Select(o => o.HelperId).Distinct().Count()
             })
             .ToListAsync(cancellationToken);
 
         return page
-            .Select(x => x.Announcement.AsDto() with { ThumbnailUrl = ThumbnailUrl(x.Announcement.Id, x.ThumbnailId) })
+            .Select(x => x.Announcement.AsDto() with
+            {
+                ThumbnailUrl = ThumbnailUrl(x.Announcement.Id, x.ThumbnailId),
+                HelperCount = x.HelperCount
+            })
             .ToList();
     }
 

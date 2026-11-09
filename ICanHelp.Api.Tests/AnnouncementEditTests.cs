@@ -193,4 +193,24 @@ public sealed class AnnouncementEditTests
         details!.Budget.Amount.ShouldBe(150m);
         details.Revision.ShouldBe(0);
     }
+
+    [Fact]
+    public async Task Edit_WithStaleExpectedRevision_Returns409ConcurrencyConflict()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var announcementId = await owner.CreateAnnouncementAsync();
+        var url = $"/api/announcements/{announcementId}";
+
+        // Pierwsza karta zapisuje zmianę na rewizji 0 → rewizja 1.
+        (await owner.Client.PatchAsJsonAsync(url, new { title = "Kran w kuchni", expectedRevision = 0 })).StatusCode
+            .ShouldBe(HttpStatusCode.NoContent);
+
+        // Druga karta wciąż ma rewizję 0 – nie nadpisuje pierwszej zmiany.
+        var stale = await owner.Client.PatchAsJsonAsync(url, new { title = "Kran w łazience", expectedRevision = 0 });
+        await stale.ShouldBeProblemAsync(HttpStatusCode.Conflict, "ConcurrencyConflict");
+
+        var details = await owner.Client.GetFromJsonAsync<AnnouncementDetailsDto>(url);
+        details!.Title.ShouldBe("Kran w kuchni");
+        details.Revision.ShouldBe(1);
+    }
 }

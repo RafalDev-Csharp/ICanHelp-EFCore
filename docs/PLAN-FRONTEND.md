@@ -91,19 +91,25 @@ Zrobione 8.11.2026 (szczegóły: `docs/HISTORIA-KROKOW.md`). Mapa: `shared/compo
 w `core/config/map.ts` (Augustów; dostawca kafelków z konfiguracji – F10). Pozycja „blisko mnie” zaokrąglana do ~100 m i trzymana
 tylko w filtrze ekranu.
 
-**Zadania backendowe z F3** (zrobić przy najbliższym kroku backendu, potem `npm run api`):
-- `HelperCount` w `AnnouncementDto` (lista i alerty `/preview`) – karta na liście pokaże „N ofert”.
-- Polubienia: `PUT` / `DELETE api/announcements/{id}/like` (zalogowany), `IsLiked` dla zalogowanego w `AnnouncementDetailsDto`
-  (i ew. na liście), „Polubione” w profilu z `liked-announcements` – wtedy serduszko na karcie i w szczegółach.
+**Zadania backendowe z F3** – zrobione w F4 (9.11.2026):
+- [x] `HelperCount` w `AnnouncementDto` (lista i alerty `/preview`) – karta na liście pokazuje „N ofert”.
+- [x] Polubienia: `PUT` / `DELETE api/announcements/{id}/like` (zalogowany), `IsLiked` dla zalogowanego w `AnnouncementDetailsDto`
+  (na liście nie – karty biorą stan z `LikesService`), „Polubione” w profilu z `liked-announcements` + serduszko na karcie i w szczegółach.
 
 ## Krok F4 – dodawanie i edycja ogłoszenia
 
-- [ ] Formularz: kategoria → podkategoria, trudność, tytuł, opis, budżet; lokalizacja: „moja pozycja” (GPS) / wskazanie na mapie /
+- [x] Formularz: kategoria → podkategoria, trudność, tytuł, opis, budżet; lokalizacja: „moja pozycja” (GPS) / wskazanie na mapie /
       wyszukanie adresu (Nominatim).
-- [ ] Zdjęcia (max 5): `<input type="file" accept="image/*" capture>` – na telefonie otwiera aparat; zmniejszanie przed wysłaniem
+- [x] Zdjęcia (max 5): `<input type="file" accept="image/*" capture>` – na telefonie otwiera aparat; zmniejszanie przed wysłaniem
       (canvas, np. dłuższy bok 1600 px, JPEG) – szybszy upload na komórkowym internecie.
-- [ ] „Moje ogłoszenia” (filtr po właścicielu), edycja (`PATCH`), obsługa 409 `ConcurrencyConflict` („ktoś zmienił w międzyczasie,
+- [x] „Moje ogłoszenia” (filtr po właścicielu), edycja (`PATCH`), obsługa 409 `ConcurrencyConflict` („ktoś zmienił w międzyczasie,
       odśwież”), anulowanie.
+
+Zrobione 9.11.2026 (szczegóły: `docs/HISTORIA-KROKOW.md`). Decyzje: miejsce ogłoszenia zaokrąglane do ~100 m (dokładny adres –
+po akceptacji, w kontakcie); dwa przyciski zdjęć – „Zrób zdjęcie” (`capture`, sam aparat) i „Z galerii” (bez `capture`, kilka naraz);
+PATCH zawsze z `expectedRevision` (nowe pole backendu – bez niego 409 przy edycji praktycznie nie występował), także przy samych
+zmianach zdjęć (pusty PATCH nie tworzy rewizji, tylko sprawdza wersję); edycja tylko w statusie `Open`, anulowanie w szczegółach.
+„Polubione” dociąga ogłoszenia po jednym (max 50) – przy większej skali endpoint zwracający od razu `AnnouncementDto`.
 
 ## Krok F5 – oferty, negocjacje, realizacja, oceny
 

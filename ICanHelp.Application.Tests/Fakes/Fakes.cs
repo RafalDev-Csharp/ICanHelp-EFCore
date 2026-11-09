@@ -5,6 +5,7 @@ using ICanHelp.Application.Storage;
 using ICanHelp.Application.Time;
 using ICanHelp.Core.Entities;
 using ICanHelp.Core.Entities.Alerts;
+using ICanHelp.Core.Entities.Liked;
 using ICanHelp.Core.Entities.Negotiations;
 using ICanHelp.Core.Entities.Notifications;
 using ICanHelp.Core.Entities.Users;
@@ -102,6 +103,23 @@ internal sealed class InMemoryAnnouncementRepository : IAnnouncementRepository
     }
 
     public void Remove(Announcement announcement) => Announcements.Remove(announcement);
+}
+
+internal sealed class InMemoryLikedAnnouncementRepository : ILikedAnnouncementRepository
+{
+    public List<LikedAnnouncement> Likes { get; } = new();
+
+    public Task<LikedAnnouncement?> GetAsync(UserId userId, Id announcementId,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(Likes.SingleOrDefault(l => l.UserId == userId && l.AnnouncementId == announcementId));
+
+    public Task AddAsync(LikedAnnouncement likedAnnouncement, CancellationToken cancellationToken = default)
+    {
+        Likes.Add(likedAnnouncement);
+        return Task.CompletedTask;
+    }
+
+    public void Remove(LikedAnnouncement likedAnnouncement) => Likes.Remove(likedAnnouncement);
 }
 
 internal sealed class InMemoryCategoryRepository : ICategoryRepository

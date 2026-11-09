@@ -1,0 +1,46 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/profile"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Polubione</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  @switch (state()) { @case ('loading') {
+  <div class="ion-text-center ion-padding" aria-busy="true">
+    <ion-spinner name="crescent"></ion-spinner>
+  </div>
+  } @case ('failed') {
+  <app-empty-state
+    icon="cloud-offline-outline"
+    heading="Nie udało się wczytać polubionych"
+    message="Sprawdź połączenie z internetem i spróbuj ponownie."
+  >
+    <ion-button (click)="reload()">Spróbuj ponownie</ion-button>
+  </app-empty-state>
+  } @case ('ready') { @if (items().length === 0) {
+  <app-empty-state
+    icon="heart-outline"
+    heading="Nic jeszcze nie polubiłeś"
+    message="Dotknij serduszka w ogłoszeniu, żeby mieć je pod ręką."
+  >
+    <ion-button routerLink="/announcements" fill="outline">Przeglądaj ogłoszenia</ion-button>
+  </app-empty-state>
+  } @else {
+  <ion-list>
+    @for (item of items(); track item.id) {
+    <app-announcement-card
+      [announcement]="item"
+      [liked]="true"
+      [showStatus]="item.status !== 'Open'"
+    ></app-announcement-card>
+    }
+  </ion-list>
+  } } }
+</ion-content>

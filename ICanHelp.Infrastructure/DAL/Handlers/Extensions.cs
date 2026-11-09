@@ -28,14 +28,18 @@ internal static class Extensions
             Revision = entity.Revision,
             UpdatedAt = entity.UpdatedAt,
             ThumbnailUrl = entity.GetThumbnailUrl()
+            // HelperCount: the list queries count it with a subquery (offers are not loaded there).
         };
 
     /// <summary>URL of the oldest image (needs the images loaded; the list query computes it with a subquery instead).</summary>
     private static string? GetThumbnailUrl(this Announcement entity)
         => entity.GetThumbnail() is { } thumbnail ? ImageDto.GetUrl(entity.Id, thumbnail.Id) : null;
 
-    /// <summary>Offers only as far as <paramref name="viewerId"/> may see them (Announcement.GetOffersVisibleTo).</summary>
-    public static AnnouncementDetailsDto AsDetailsDto(this Announcement entity, UserId? viewerId)
+    /// <summary>
+    /// Offers only as far as <paramref name="viewerId"/> may see them (Announcement.GetOffersVisibleTo).
+    /// <paramref name="isLiked"/> – whether the viewer has liked it (read separately, likes are not part of the aggregate).
+    /// </summary>
+    public static AnnouncementDetailsDto AsDetailsDto(this Announcement entity, UserId? viewerId, bool isLiked = false)
         => new()
         {
             Id = entity.Id,
@@ -55,6 +59,7 @@ internal static class Extensions
             ThumbnailUrl = entity.GetThumbnailUrl(),
             Offers = entity.GetOffersVisibleTo(viewerId).OrderBy(o => o.CreatedAt).Select(o => o.AsDto(entity)).ToList(),
             HelperCount = entity.Offers.Select(o => o.HelperId).Distinct().Count(),
+            IsLiked = isLiked,
             Images = entity.Images.OrderBy(i => i.AddedAt).ThenBy(i => i.Id.Value).Select(i => i.AsDto()).ToList(),
             Changes = entity.Changes.OrderBy(c => c.Revision).Select(c => c.AsDto()).ToList()
         };

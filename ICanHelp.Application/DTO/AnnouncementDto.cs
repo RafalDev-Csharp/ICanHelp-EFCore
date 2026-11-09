@@ -27,6 +27,9 @@ public record AnnouncementDto
 
     /// <summary>Distance from the search point in km – only when the list was searched by location.</summary>
     public double? DistanceKm { get; init; }
+
+    /// <summary>How many helpers have made an offer (public – the offers themselves are not).</summary>
+    public int HelperCount { get; init; }
 }
 
 /// <summary>An announcement with the negotiation and images (oldest first).</summary>
@@ -37,8 +40,9 @@ public sealed record AnnouncementDetailsDto : AnnouncementDto
     /// </summary>
     public IReadOnlyList<OfferDto> Offers { get; init; } = [];
 
-    /// <summary>How many helpers have made an offer (public – the offers themselves are not).</summary>
-    public int HelperCount { get; init; }
+    /// <summary>Whether the signed-in reader has liked the announcement (always false for anonymous readers).</summary>
+    public bool IsLiked { get; init; }
+
     public IReadOnlyList<ImageDto> Images { get; init; } = [];
 
     /// <summary>History of edits, oldest first.</summary>

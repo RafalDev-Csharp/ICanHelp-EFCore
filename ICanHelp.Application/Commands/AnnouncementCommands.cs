@@ -40,6 +40,12 @@ public sealed record UpdateAnnouncement : ICommand
     public string? Description { get; init; }
     public PriceDto? Budget { get; init; }
     public LocationDto? Location { get; init; }
+
+    /// <summary>
+    /// Rewizja, którą klient edytował (z <c>AnnouncementDto.Revision</c>). Jeśli ogłoszenie zmieniło się w międzyczasie
+    /// (np. edycja w drugiej karcie, dodane zdjęcie) → <c>ConcurrencyConflict</c> (409) zamiast nadpisania. Pominięte = bez sprawdzania.
+    /// </summary>
+    public int? ExpectedRevision { get; init; }
 }
 
 /// <summary>Anulowanie ogłoszenia (tylko właściciel, status Open albo Accepted).</summary>
@@ -62,3 +68,9 @@ public sealed record RateAnnouncement : ICommand
     public int Rate { get; init; }
     public string? Comment { get; init; }
 }
+
+/// <summary>Polubienie ogłoszenia (zakładka „Polubione”). Ponowne polubienie niczego nie zmienia.</summary>
+public sealed record LikeAnnouncement(Guid AnnouncementId, Guid UserId) : ICommand;
+
+/// <summary>Cofnięcie polubienia. Gdy polubienia nie było – nic się nie dzieje.</summary>
+public sealed record UnlikeAnnouncement(Guid AnnouncementId, Guid UserId) : ICommand;

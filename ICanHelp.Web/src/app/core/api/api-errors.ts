@@ -9,3 +9,15 @@ export function errorStatus(error: unknown): number | undefined {
   }
   return undefined;
 }
+
+/**
+ * `errorCode` z ProblemDetails (np. „ConcurrencyConflict”) – gdy ekran musi zareagować na konkretny błąd
+ * (komunikat i tak pokazuje interceptor). Klienci NSwag rzucają samo ciało ProblemDetails.
+ */
+export function errorCode(error: unknown): string | undefined {
+  if (typeof error === 'object' && error !== null && 'errorCode' in error) {
+    const code = (error as { errorCode: unknown }).errorCode;
+    return typeof code === 'string' ? code : undefined;
+  }
+  return undefined;
+}

@@ -147,7 +147,27 @@ Content-Type: application/json
 }
 
 ###
+# PATCH z "expectedRevision": ogłoszenie ma już rewizję 1 (po edycji wyżej), więc 0 -> 409 ConcurrencyConflict.
+PATCH {{baseUrl}}/api/announcements/{{announcementId}}
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Cieknący kran w kuchni",
+  "expectedRevision": 0
+}
+
+###
 GET {{baseUrl}}/api/announcements/{{announcementId}}
+
+###
+# F4: polubienie (idempotentne) -> 204; w GET ogłoszenia z tokenem "isLiked": true. DELETE cofa (też 204).
+PUT {{baseUrl}}/api/announcements/{{announcementId}}/like
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+DELETE {{baseUrl}}/api/announcements/{{announcementId}}/like
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
 
 ### ======== Krok 11: rozmowa (wątek negocjacji) ========
 # Pomocnik otwiera wątek z właścicielem -> 201 { id } (już istnieje, np. po ofercie wyżej -> 200 z tym samym id).

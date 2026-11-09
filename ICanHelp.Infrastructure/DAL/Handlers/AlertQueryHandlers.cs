@@ -114,7 +114,8 @@ internal sealed class GetAlertPreviewHandler : IQueryHandler<GetAlertPreview, IR
             {
                 Announcement = a,
                 Distance = EF.Property<Point>(a, Spatial.GeoPoint).Distance(shape),
-                ThumbnailId = a.Images.OrderBy(i => i.AddedAt).Select(i => i.Id).FirstOrDefault()
+                ThumbnailId = a.Images.OrderBy(i => i.AddedAt).Select(i => i.Id).FirstOrDefault(),
+                HelperCount = a.Offers.Select(o => o.HelperId).Distinct().Count()
             })
             .ToListAsync(cancellationToken);
 
@@ -124,7 +125,8 @@ internal sealed class GetAlertPreviewHandler : IQueryHandler<GetAlertPreview, IR
             .Select(x => x.Announcement.AsDto() with
             {
                 DistanceKm = Math.Round(x.Distance / 1000, 2),
-                ThumbnailUrl = x.ThumbnailId is null ? null : ImageDto.GetUrl(x.Announcement.Id, x.ThumbnailId)
+                ThumbnailUrl = x.ThumbnailId is null ? null : ImageDto.GetUrl(x.Announcement.Id, x.ThumbnailId),
+                HelperCount = x.HelperCount
             })
             .ToList();
     }

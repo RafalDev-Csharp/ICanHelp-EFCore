@@ -1,0 +1,29 @@
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+
+  ion-note {
+    font-size: 0.875rem;
+    font-weight: 400;
+  }
+}
+
+.error {
+  margin: 0;
+  font-size: 0.8125rem;
+}

@@ -4,6 +4,22 @@
       <ion-back-button defaultHref="/announcements"></ion-back-button>
     </ion-buttons>
     <ion-title>Ogłoszenie</ion-title>
+    @if (state() === 'ready' && !isOwner()) {
+    <ion-buttons slot="end">
+      <ion-button
+        (click)="toggleLike()"
+        [disabled]="liking()"
+        [attr.aria-label]="isLiked() ? 'Usuń z polubionych' : 'Polub'"
+        [attr.aria-pressed]="isLiked()"
+      >
+        <ion-icon
+          slot="icon-only"
+          [name]="isLiked() ? 'heart' : 'heart-outline'"
+          [color]="isLiked() ? 'danger' : undefined"
+        ></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    }
   </ion-toolbar>
 </ion-header>
 
@@ -143,9 +159,24 @@
 @if (state() === 'ready') {
 <ion-footer>
   <ion-toolbar>
-    @if (isOwner()) {
+    @if (isOwner()) { @if (canCancel()) {
+    <div class="actions">
+      <ion-button fill="outline" color="danger" (click)="cancel()" [disabled]="cancelling()">
+        <ion-icon name="close-circle-outline" slot="start" aria-hidden="true"></ion-icon>
+        Anuluj
+      </ion-button>
+      @if (isOpen()) {
+      <ion-button class="primary-action" (click)="edit()">
+        <ion-icon name="create-outline" slot="start" aria-hidden="true"></ion-icon>
+        Edytuj
+      </ion-button>
+      } @else {
+      <p class="footer-note primary-action">Oferta przyjęta – edycja niedostępna.</p>
+      }
+    </div>
+    } @else {
     <p class="footer-note">To Twoje ogłoszenie.</p>
-    } @else if (isOpen()) {
+    } } @else if (isOpen()) {
     <div class="actions">
       <ion-button fill="outline" (click)="writeMessage()">
         <ion-icon name="chatbubble-outline" slot="start" aria-hidden="true"></ion-icon>

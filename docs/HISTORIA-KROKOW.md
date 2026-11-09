@@ -94,6 +94,32 @@
   Pisane bez rejestru npm i .NET w sesji AI: zweryfikowane `ngc` (strict templates, Leaflet przez zaślepkę typów), `tsc` specs,
   ESLint i Prettier. 9.11.2026 u autora: `npm install` (lock; npm pominął skrypty instalacyjne narzędzi – esbuild, lmdb itp. –
   bez skutków, binarki są w pakietach opcjonalnych), lint + test + build zielone bez poprawek.
+- [x] Krok F4 (frontend + backend, 9.11.2026) – dodawanie i edycja ogłoszenia, polubienia.
+  Backend (zadania z F3 + kontrola rewizji): `HelperCount` przeniesione do `AnnouncementDto` (lista, „blisko mnie” i podgląd alertu
+  liczą je podzapytaniem `COUNT(DISTINCT HelperId)`), `AnnouncementDetailsDto.IsLiked` (dla zalogowanego czytelnika),
+  komendy `LikeAnnouncement` / `UnlikeAnnouncement` (idempotentne, `LikeHandlers.cs`), `PUT` / `DELETE api/announcements/{id}/like`,
+  `UpdateAnnouncement.ExpectedRevision` (inna rewizja → `ConcurrencyConflict` 409 – bez tego 409 przy edycji zdarzał się tylko przy
+  wyścigu zapisów). Bez migracji (tabela `LikedAnnouncements` była od Kroku 1). Testy: `Application.Tests/Commands/LikeHandlersTests.cs`,
+  `UpdateAnnouncementHandlerTests` (+2), `Api.Tests/AnnouncementLikeTests.cs` (polubienia, `helperCount` na liście),
+  `AnnouncementEditTests` (+1: nieaktualna rewizja → 409).
+  Frontend: `features/announcements/form/` – `createAnnouncementForm` + reguły z backendu, `toCreateCommand`, `toUpdateCommand`
+  (PATCH tylko ze zmienionymi polami + `expectedRevision`), `AnnouncementFormComponent` (wspólny dla Dodaj/Edytuj),
+  `LocationPickerComponent` („Moja pozycja”, adres z Nominatim – `core/geo/GeocodingService`, ≥ 1,1 s między zapytaniami,
+  dotknięcie mapy – nowe `mapClick` w `app-map`; punkt zaokrąglany do ~100 m), `PhotoPickerComponent` (max 5, „Zrób zdjęcie” z `capture`
+  i „Z galerii”, `resizeImage`: canvas → JPEG, dłuższy bok 1600 px, bez metadanych EXIF/GPS), `syncPhotos` (usunięcia, potem nowe
+  zdjęcia po kolei). Strony: „Dodaj” (`/add` – po sukcesie czyści formularz i otwiera ogłoszenie), „Edytuj”
+  (`/announcements/:id/edit` – tylko właściciel i `Open`, 409 `ConcurrencyConflict` → okno „Wczytaj aktualną”), „Moje ogłoszenia”
+  (`/profile/announcements`, wszystkie statusy) i „Polubione” (`/profile/liked`). Szczegóły: serduszko w nagłówku, właściciel –
+  „Edytuj” (Open) i „Anuluj” (Open/Accepted, z potwierdzeniem). Karta: „N ofert”, serduszko, opcjonalny status. `LikesService`
+  (lista polubień raz na sesję, zmiany optymistyczne, czyszczenie po wylogowaniu), `errorCode()` w `api-errors.ts`.
+  `api-client.ts` poprawiony ręcznie pod nowe API (backend nie działał w sesji) – **do potwierdzenia `npm run api`**.
+  Testy Vitest: formularz (walidacja, komendy), `resizeImage` (wymiary, nazwa, odrzucenie nie-zdjęć), `GeocodingService`,
+  `LikesService`, strony Dodaj / Edytuj (formularz zastąpiony zaślepką), szczegóły (+4), lista (+1).
+  Pisane bez .NET i bez rejestru npm w sesji AI (ESLint nie ruszył – brak natywnego resolvera dla Linuksa): zweryfikowane `ngc`
+  (strict templates), `tsc` specs/e2e i Prettier; kolejność importów sprawdzona ręcznie. Do zrobienia u autora: `dotnet build`,
+  `dotnet test`, `npm run api`, `npm run lint`, `npm test`, `npm run build`.
+  9.11.2026 lokalnie (`verify.cmd`, Docker): build + dotnet 410/410 (Core 186, Application 142, integracyjne 82), `npm run api`
+  (klient przegenerowany, nadpisał ręczne poprawki – kompiluje się), lint + Vitest 116/116 + build zielone bez poprawek.
 - [ ] Krok 15 – kanał push (FCM): `docs/PLAN-POWIADOMIENIA.md`
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

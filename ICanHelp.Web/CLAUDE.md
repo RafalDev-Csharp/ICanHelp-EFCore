@@ -17,7 +17,8 @@ app.config.ts     providery (router, Ionic, locale) · app.routes.ts → tabs/ta
 core/             jedno miejsce na całą aplikację: config/locale.ts (pl-PL, PLN), config/map.ts (kafelki, środek domyślny);
                   api/ – `api-client.ts` (NSwag, generowany), `provideApi()` (API_BASE_URL), `isApiUrl`, `apiResourceUrl`
                   (adresy zdjęć), `errorStatus`; categories/ – `CategoriesService` (raz na sesję, `name(id)`);
-                  geo/ – `GeoPoint`, `GeolocationService` (tylko po kliknięciu, ~100 m);
+                  geo/ – `GeoPoint`, `GeolocationService` (tylko po kliknięciu, ~100 m), `GeocodingService` (Nominatim, ≥ 1,1 s
+                  między zapytaniami, `approximatePoint`);
                   auth/ – `AuthService` (sygnały `currentUser`, `isAuthenticated`; tokeny w localStorage `icanhelp.auth`, synchronizacja kart,
                   jedno odświeżenie naraz), `authGuard` (+ `loginUrlTree`, `safeReturnUrl`);
                   interceptors/ – `authInterceptor` (Bearer, odświeżenie przed wygaśnięciem i raz po 401), `errorInterceptor`
@@ -27,15 +28,19 @@ shared/           components/ (EmptyStateComponent, `app-map` – Leaflet: pinez
                   pipes/ (`price`, `distance` – km z API, `timeAgo` – „2 h temu”), text/ (`pluralPl` – „1 ocena / 2 oceny / 5 ocen”)
 features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poza zakładkami, `?returnUrl=`),
                   announcements (lista ↔ mapa: `list/` – store, filtry, karta; `details/` – `/announcements/:announcementId`;
-                  `testing/` – dane do specs; „Dodaj” – F4),
-                  conversations, notifications, profile (bez logowania: „Zaloguj się”);
+                  `form/` – formularz ogłoszenia (pola, miejsce, zdjęcia + `resizeImage`, `syncPhotos`), wspólny dla
+                  `add-announcement.page` (`/add`) i `edit/` (`/announcements/:id/edit`); `likes/` – `LikesService`;
+                  `testing/` – dane i zaślepki do specs),
+                  conversations, notifications, profile (bez logowania: „Zaloguj się”; `/profile/announcements` – moje,
+                  `/profile/liked` – polubione);
                   offers i alerts dojdą w F5/F8
 tabs/             TabsPage – dolny pasek zakładek, rejestruje ikony zakładek (`addIcons`)
 ```
-Trasy `/add`, `/conversations`, `/notifications` mają `authGuard`; ogłoszenia (lista, szczegóły) i profil są publiczne –
+Trasy `/add`, `/announcements/:id/edit`, `/conversations`, `/notifications`, `/profile/announcements`, `/profile/liked` mają `authGuard`; ogłoszenia (lista, szczegóły) i profil są publiczne –
 akcje wymagające konta same prowadzą na `/login?returnUrl=…`.
 Mapy: Leaflet (`import * as L from 'leaflet'`, style w `global.scss`, kolory pinezek – klasy `.map-pin/.map-user/.map-radius`).
-W specs stron z mapą podmieniamy `MapComponent` zaślepką (`TestBed.overrideComponent`) – jsdom nie rysuje map.
+W specs stron z mapą podmieniamy `MapComponent` zaślepką (`TestBed.overrideComponent`) – jsdom nie rysuje map; strony z formularzem
+ogłoszenia – `AnnouncementFormStubComponent` (`features/announcements/testing/announcement-form.stub.ts`).
 `src/environments/environment*.ts`: `apiUrl` – pusty = ta sama domena (dev przez proxy, produkcja: API serwuje frontend, F10).
 
 ## Zasady (z `docs/PLAN-FRONTEND.md` „Dlaczego tak”)

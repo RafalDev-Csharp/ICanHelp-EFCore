@@ -1,0 +1,71 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button [defaultHref]="detailsUrl()"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Edytuj ogłoszenie</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  @switch (state()) { @case ('loading') {
+  <div class="ion-text-center ion-padding" aria-busy="true">
+    <ion-spinner name="crescent"></ion-spinner>
+  </div>
+  } @case ('ready') { @if (original(); as item) { @if (item.helperCount > 0) {
+  <p class="edit-warning">
+    Masz już oferty od pomocników. Po zmianie treści oczekujące oferty staną się nieaktualne – pomocnicy zobaczą, co się
+    zmieniło, a przyjąć da się tylko nową (kontr)ofertę.
+  </p>
+  } }
+  <app-announcement-form
+    [form]="form"
+    [(location)]="location"
+    [(photos)]="photos"
+    [submitted]="submitted()"
+  ></app-announcement-form>
+  } @case ('locked') {
+  <app-empty-state
+    icon="lock-closed-outline"
+    heading="Tego ogłoszenia nie można już edytować"
+    message="Edytować można tylko ogłoszenie, które czeka na oferty."
+  >
+    <ion-button [routerLink]="detailsUrl()" fill="outline">Wróć do ogłoszenia</ion-button>
+  </app-empty-state>
+  } @case ('not-owner') {
+  <app-empty-state
+    icon="lock-closed-outline"
+    heading="To nie Twoje ogłoszenie"
+    message="Edytować może tylko osoba, która je dodała."
+  >
+    <ion-button [routerLink]="detailsUrl()" fill="outline">Wróć do ogłoszenia</ion-button>
+  </app-empty-state>
+  } @case ('not-found') {
+  <app-empty-state
+    icon="alert-circle-outline"
+    heading="Nie ma takiego ogłoszenia"
+    message="Mogło zostać usunięte albo link jest niepoprawny."
+  >
+    <ion-button routerLink="/announcements" fill="outline">Wróć do ogłoszeń</ion-button>
+  </app-empty-state>
+  } @case ('failed') {
+  <app-empty-state
+    icon="cloud-offline-outline"
+    heading="Nie udało się wczytać ogłoszenia"
+    message="Sprawdź połączenie z internetem i spróbuj ponownie."
+  >
+    <ion-button (click)="load()">Spróbuj ponownie</ion-button>
+  </app-empty-state>
+  } }
+</ion-content>
+
+@if (state() === 'ready') {
+<ion-footer>
+  <ion-toolbar>
+    <ion-button expand="block" (click)="save()" [disabled]="saving()">
+      @if (saving()) {
+      <ion-spinner name="crescent" slot="start"></ion-spinner> Zapisuję… } @else { Zapisz zmiany }
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>
+}
