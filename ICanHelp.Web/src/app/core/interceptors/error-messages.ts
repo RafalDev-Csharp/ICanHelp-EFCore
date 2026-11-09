@@ -32,7 +32,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   // Konflikty (409)
   DomainRule: 'Tej operacji nie można teraz wykonać – stan ogłoszenia lub oferty się zmienił.',
   ConcurrencyConflict: 'Ktoś zmienił te dane w międzyczasie – odśwież i spróbuj ponownie.',
-  AlreadyRated: 'Już oceniłeś to zlecenie.',
+  AlreadyRated: 'To zlecenie jest już przez Ciebie ocenione.',
 };
 
 /** Komunikat, gdy nie ma `errorCode` (np. błąd walidacji ASP.NET, 500, brak sieci). */

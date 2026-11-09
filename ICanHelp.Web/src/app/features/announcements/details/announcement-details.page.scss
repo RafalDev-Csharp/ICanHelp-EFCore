@@ -89,6 +89,14 @@ h2 {
   }
 }
 
+.negotiation-offer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  color: var(--ion-text-color);
+}
+
 .footer-note {
   margin: 0;
   padding: 12px 16px;

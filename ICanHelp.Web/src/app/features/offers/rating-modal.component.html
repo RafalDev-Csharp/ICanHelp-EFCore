@@ -1,0 +1,51 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="cancel()">Anuluj</ion-button>
+    </ion-buttons>
+    <ion-title>Ocena</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <h2 class="ion-text-center">Jak oceniasz współpracę{{ otherParty ? ' z ' + otherParty : '' }}?</h2>
+  <div class="stars" role="radiogroup" aria-label="Ocena od 1 do 5">
+    @for (value of rates; track value) {
+      <ion-button
+        fill="clear"
+        role="radio"
+        [attr.aria-checked]="rate() === value"
+        [attr.aria-label]="value + ' na 5'"
+        (click)="rate.set(value)"
+      >
+        <ion-icon slot="icon-only" color="warning" [name]="value <= rate() ? 'star' : 'star-outline'"></ion-icon>
+      </ion-button>
+    }
+  </div>
+  @if (submitted() && rate() === 0) {
+    <ion-text color="danger"><p class="ion-text-center">Wybierz liczbę gwiazdek.</p></ion-text>
+  }
+  <ion-textarea
+    [(ngModel)]="comment"
+    label="Komentarz (opcjonalnie)"
+    labelPlacement="floating"
+    fill="outline"
+    [autoGrow]="true"
+    [rows]="3"
+    [counter]="true"
+    [maxlength]="maxComment"
+  ></ion-textarea>
+  @if (submitted() && commentError(); as error) {
+    <ion-text color="danger"
+      ><p>{{ error }}</p></ion-text
+    >
+  }
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <div class="ion-padding-horizontal">
+      <ion-button expand="block" (click)="submit()">Wyślij ocenę</ion-button>
+    </div>
+  </ion-toolbar>
+</ion-footer>

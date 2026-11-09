@@ -82,7 +82,8 @@
   `POST {id}/read` (204). Obcy przy zapisie → 409 (DomainRule), brak wątku → 404 `ConversationNotFound`.
 - `GET api/me/conversations` (Krok 12, query `GetMyConversations`, handler `GetMyConversationsHandler`): `MyConversationDto` –
   ogłoszenie (tytuł, miniatura, status), `myRole`, `otherParty`, `lastOffer` (+ `isOutdated`), `lastMessagePreview`, `unreadCount`,
-  `announcementChangedSinceLastRead` (tylko pomocnik), sortowanie po `lastActivityAt`; filtry `role`, `status`, `page`, `pageSize`.
+  `announcementChangedSinceLastRead` (tylko pomocnik), sortowanie po `lastActivityAt`; filtry `role`, `status`, `announcementId`
+  (F5: wątki jednego ogłoszenia – szczegóły ogłoszenia), `page`, `pageSize`.
   Jedno zapytanie SQL z podzapytaniami, sort/stronicowanie w pamięci (patrz komentarz w handlerze).
 - Tabele `Conversations` (unikalny indeks AnnouncementId+HelperId, indeksy ClientId/HelperId) i `ConversationMessages` (indeks ConversationId+SentAt),
   Cascade z ogłoszenia. Migracja `Conversations` zakłada wątki dla istniejących ofert.

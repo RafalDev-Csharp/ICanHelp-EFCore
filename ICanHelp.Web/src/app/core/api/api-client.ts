@@ -2183,15 +2183,17 @@ export class ConversationsClient {
     /**
      * „Moje negocjacje”: wątki zalogowanego użytkownika (jako właściciel ogłoszenia albo pomocnik) z podglądem
     ogłoszenia, ostatniej oferty i wiadomości, licznikiem nieprzeczytanych i flagą zmiany ogłoszenia –
-    od ostatniej aktywności. Filtry: `role` (Client / Helper), `status` ogłoszenia (np. Open).
+    od ostatniej aktywności. Filtry: `role` (Client / Helper), `status` ogłoszenia (np. Open),
+    `announcementId` (wątki jednego ogłoszenia – właściciel widzi przy każdej ofercie link do rozmowy).
     Do odpytywania (polling), dopóki nie ma powiadomień (Krok 13).
      * @param role (optional) 
      * @param status (optional) 
+     * @param announcementId (optional) 
      * @param page (optional) 
      * @param pageSize (optional) 
      * @return OK
      */
-    getMine(role?: OfferParty | undefined, status?: AnnouncementStatus | undefined, page?: number | undefined, pageSize?: number | undefined): Observable<MyConversationDto[]> {
+    getMine(role?: OfferParty | undefined, status?: AnnouncementStatus | undefined, announcementId?: string | undefined, page?: number | undefined, pageSize?: number | undefined): Observable<MyConversationDto[]> {
         let url_ = this.baseUrl + "/api/me/conversations?";
         if (role === null)
             throw new globalThis.Error("The parameter 'role' cannot be null.");
@@ -2201,6 +2203,10 @@ export class ConversationsClient {
             throw new globalThis.Error("The parameter 'status' cannot be null.");
         else if (status !== undefined)
             url_ += "status=" + encodeURIComponent("" + status) + "&";
+        if (announcementId === null)
+            throw new globalThis.Error("The parameter 'announcementId' cannot be null.");
+        else if (announcementId !== undefined)
+            url_ += "announcementId=" + encodeURIComponent("" + announcementId) + "&";
         if (page === null)
             throw new globalThis.Error("The parameter 'page' cannot be null.");
         else if (page !== undefined)

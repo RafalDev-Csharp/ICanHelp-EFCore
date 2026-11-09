@@ -153,39 +153,160 @@
     </ion-item>
     }
   </ion-list>
-  } } }
+
+  @if (contact(); as person) {
+  <ion-list inset="true" class="contact">
+    <ion-list-header>
+      <ion-label>{{ isOwner() ? 'Kontakt do pomocnika' : 'Kontakt do zleceniodawcy' }}</ion-label>
+    </ion-list-header>
+    <ion-item>
+      <ion-icon name="person-circle-outline" slot="start" aria-hidden="true"></ion-icon>
+      <ion-label>
+        <h3>{{ person.fullName }}</h3>
+        <p>{{ person.contactData.city }} {{ person.contactData.postalCode }}</p>
+      </ion-label>
+    </ion-item>
+    <ion-item [href]="'tel:' + person.contactData.phoneNumber">
+      <ion-icon name="call-outline" slot="start" aria-hidden="true"></ion-icon>
+      <ion-label>{{ person.contactData.phoneNumber }}</ion-label>
+    </ion-item>
+    <ion-item [href]="'mailto:' + person.contactData.email" lines="none">
+      <ion-icon name="mail-outline" slot="start" aria-hidden="true"></ion-icon>
+      <ion-label>{{ person.contactData.email }}</ion-label>
+    </ion-item>
+  </ion-list>
+  } @if (negotiations().length > 0) {
+  <ion-list inset="true" class="negotiations">
+    <ion-list-header>
+      <ion-label>{{ isOwner() ? 'Oferty i rozmowy' : 'Twoja negocjacja' }}</ion-label>
+    </ion-list-header>
+    @for (negotiation of negotiations(); track negotiation.helperId; let last = $last) {
+    <ion-item
+      [button]="!!negotiation.conversationId"
+      [detail]="!!negotiation.conversationId"
+      (click)="openConversation(negotiation.conversationId)"
+      [lines]="last ? 'none' : 'inset'"
+    >
+      <ion-icon
+        [name]="negotiation.latest ? 'pricetag-outline' : 'chatbubbles-outline'"
+        slot="start"
+        aria-hidden="true"
+      ></ion-icon>
+      <ion-label>
+        @if (isOwner()) {
+        <h3>{{ negotiation.userName || 'Pomocnik' }}</h3>
+        } @if (negotiation.latest; as offer) {
+        <p class="negotiation-offer">
+          <strong>{{ offer.price.amount | price }}</strong>
+          <ion-badge [color]="offerStatusColor(offer.status)">{{ offerStatusLabel(offer.status) }}</ion-badge>
+          @if (offer.isOutdated && offer.status === 'Pending') {
+          <ion-badge color="warning">nieaktualna</ion-badge>
+          }
+        </p>
+        <p>{{ formatOfferTerm(offer.proposedStart, offer.proposedEnd) }}</p>
+        } @else {
+        <p>Na razie tylko wiadomości</p>
+        }
+      </ion-label>
+      @if (negotiation.unreadCount > 0) {
+      <ion-badge slot="end" color="primary" [attr.aria-label]="negotiation.unreadCount + ' nieprzeczytanych'"
+        >{{ negotiation.unreadCount }}</ion-badge
+      >
+      }
+    </ion-item>
+    }
+  </ion-list>
+  } @if (history().length > 0) {
+  <ion-list inset="true" class="history">
+    <ion-list-header>
+      <ion-label>Historia ogłoszenia</ion-label>
+    </ion-list-header>
+    @for (entry of history(); track entry.key; let last = $last) {
+    <ion-item [lines]="last ? 'none' : 'inset'">
+      <ion-icon
+        [name]="entry.kind === 'offer' ? 'pricetag-outline' : 'create-outline'"
+        slot="start"
+        aria-hidden="true"
+      ></ion-icon>
+      <ion-label class="ion-text-wrap">{{ entry.text }}</ion-label>
+      <ion-note slot="end">{{ entry.at | timeAgo }}</ion-note>
+    </ion-item>
+    }
+  </ion-list>
+  } } } }
 </ion-content>
 
 @if (state() === 'ready') {
 <ion-footer>
   <ion-toolbar>
-    @if (isOwner()) { @if (canCancel()) {
+    @if (isParticipant() && status() === 'Completed') { @if (rated()) {
+    <p class="footer-note">
+      <ion-icon name="checkmark-done-outline" aria-hidden="true"></ion-icon>
+      Zlecenie zakończone · dziękujemy za ocenę.
+    </p>
+    } @else {
+    <div class="actions">
+      <ion-button class="primary-action" (click)="rate()" [disabled]="busy()">
+        <ion-icon name="star-outline" slot="start" aria-hidden="true"></ion-icon>
+        {{ isOwner() ? 'Oceń pomocnika' : 'Oceń zleceniodawcę' }}
+      </ion-button>
+    </div>
+    } } @else if (isParticipant() && (status() === 'Accepted' || status() === 'InProgress')) {
+    <div class="actions">
+      @if (isOwner() && status() === 'Accepted') {
+      <ion-button fill="outline" color="danger" (click)="cancel()" [disabled]="cancelling() || busy()">
+        <ion-icon name="close-circle-outline" slot="start" aria-hidden="true"></ion-icon>
+        Anuluj
+      </ion-button>
+      } @else {
+      <ion-button fill="outline" (click)="openAcceptedConversation()">
+        <ion-icon name="chatbubble-outline" slot="start" aria-hidden="true"></ion-icon>
+        Rozmowa
+      </ion-button>
+      } @if (status() === 'Accepted') {
+      <ion-button class="primary-action" (click)="start()" [disabled]="busy()">
+        <ion-icon name="play-outline" slot="start" aria-hidden="true"></ion-icon>
+        Rozpocznij
+      </ion-button>
+      } @else if (isOwner()) {
+      <ion-button class="primary-action" color="success" (click)="complete()" [disabled]="busy()">
+        <ion-icon name="checkmark-done-outline" slot="start" aria-hidden="true"></ion-icon>
+        Zakończ
+      </ion-button>
+      } @else {
+      <p class="footer-note primary-action">W realizacji – zakończenie potwierdzi zleceniodawca.</p>
+      }
+    </div>
+    } @else if (isOwner()) { @if (isOpen()) {
     <div class="actions">
       <ion-button fill="outline" color="danger" (click)="cancel()" [disabled]="cancelling()">
         <ion-icon name="close-circle-outline" slot="start" aria-hidden="true"></ion-icon>
         Anuluj
       </ion-button>
-      @if (isOpen()) {
       <ion-button class="primary-action" (click)="edit()">
         <ion-icon name="create-outline" slot="start" aria-hidden="true"></ion-icon>
         Edytuj
       </ion-button>
-      } @else {
-      <p class="footer-note primary-action">Oferta przyjęta – edycja niedostępna.</p>
-      }
     </div>
     } @else {
-    <p class="footer-note">To Twoje ogłoszenie.</p>
+    <p class="footer-note">{{ statusLabel(status()) }} · to Twoje ogłoszenie.</p>
     } } @else if (isOpen()) {
     <div class="actions">
-      <ion-button fill="outline" (click)="writeMessage()">
+      <ion-button fill="outline" (click)="writeMessage()" [disabled]="busy()">
         <ion-icon name="chatbubble-outline" slot="start" aria-hidden="true"></ion-icon>
-        Napisz
+        {{ myConversationId() ? 'Rozmowa' : 'Napisz' }}
       </ion-button>
-      <ion-button class="primary-action" (click)="makeOffer()">Złóż ofertę</ion-button>
+      <ion-button class="primary-action" (click)="makeOffer()" [disabled]="busy()">
+        @if (myPendingOffer(); as offer) { Twoja oferta: {{ offer.price.amount | price }} } @else { Złóż ofertę }
+      </ion-button>
     </div>
     } @else {
-    <p class="footer-note">To ogłoszenie nie przyjmuje już ofert.</p>
+    <div class="actions">
+      <p class="footer-note primary-action">To ogłoszenie nie przyjmuje już ofert.</p>
+      @if (myConversationId()) {
+      <ion-button fill="clear" (click)="writeMessage()">Rozmowa</ion-button>
+      }
+    </div>
     }
   </ion-toolbar>
 </ion-footer>

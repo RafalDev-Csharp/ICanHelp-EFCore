@@ -21,7 +21,8 @@ public sealed class ConversationsController : ControllerBase
     /// <summary>
     /// „Moje negocjacje”: wątki zalogowanego użytkownika (jako właściciel ogłoszenia albo pomocnik) z podglądem
     /// ogłoszenia, ostatniej oferty i wiadomości, licznikiem nieprzeczytanych i flagą zmiany ogłoszenia –
-    /// od ostatniej aktywności. Filtry: <c>role</c> (Client / Helper), <c>status</c> ogłoszenia (np. Open).
+    /// od ostatniej aktywności. Filtry: <c>role</c> (Client / Helper), <c>status</c> ogłoszenia (np. Open),
+    /// <c>announcementId</c> (wątki jednego ogłoszenia – właściciel widzi przy każdej ofercie link do rozmowy).
     /// Do odpytywania (polling), dopóki nie ma powiadomień (Krok 13).
     /// </summary>
     [HttpGet("~/api/me/conversations")]
@@ -31,6 +32,7 @@ public sealed class ConversationsController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<MyConversationDto>>> GetMine(
         [FromQuery] OfferParty? role,
         [FromQuery] AnnouncementStatus? status,
+        [FromQuery] Guid? announcementId,
         [FromServices] IQueryHandler<GetMyConversations, IReadOnlyList<MyConversationDto>> handler,
         CancellationToken cancellationToken,
         [FromQuery] int page = 1,
@@ -46,6 +48,7 @@ public sealed class ConversationsController : ControllerBase
             UserId = userId,
             Role = role,
             Status = status,
+            AnnouncementId = announcementId,
             Page = page,
             PageSize = pageSize
         }, cancellationToken);

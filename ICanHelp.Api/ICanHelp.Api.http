@@ -214,6 +214,11 @@ Authorization: Bearer {{signIn.response.body.$.accessToken}}
 GET {{baseUrl}}/api/me/conversations?role=Helper&status=Open&page=1&pageSize=20
 Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
 
+###
+# F5: właściciel – wątki jednego ogłoszenia (link do rozmowy przy każdej ofercie w szczegółach)
+GET {{baseUrl}}/api/me/conversations?announcementId={{announcementId}}
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
 ### ======== Krok 10: zdjęcia ========
 # Właściciel dodaje zdjęcie (multipart, pole "file"; JPEG/PNG/WebP, max 5 MB, max 5) -> 201 { id }, Location = adres pliku.
 # To też zmiana treści: nowa rewizja, w ofercie "changesSinceOffer" z polem "Images" (stare/nowe id zdjęć).

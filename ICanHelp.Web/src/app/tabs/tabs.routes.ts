@@ -40,6 +40,12 @@ export const routes: Routes = [
         loadComponent: () => import('../features/conversations/conversations.page').then((m) => m.ConversationsPage),
       },
       {
+        // Wątek w stosie zakładki Rozmowy (wejście też ze szczegółów ogłoszenia; obcy → „Nie ma takiej rozmowy”).
+        path: 'conversations/:conversationId',
+        canActivate: [authGuard],
+        loadComponent: () => import('../features/conversations/conversation.page').then((m) => m.ConversationPage),
+      },
+      {
         path: 'notifications',
         canActivate: [authGuard],
         loadComponent: () => import('../features/notifications/notifications.page').then((m) => m.NotificationsPage),

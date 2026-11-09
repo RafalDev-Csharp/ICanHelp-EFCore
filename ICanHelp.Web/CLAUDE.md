@@ -30,17 +30,24 @@ features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poz
                   announcements (lista ↔ mapa: `list/` – store, filtry, karta; `details/` – `/announcements/:announcementId`;
                   `form/` – formularz ogłoszenia (pola, miejsce, zdjęcia + `resizeImage`, `syncPhotos`), wspólny dla
                   `add-announcement.page` (`/add`) i `edit/` (`/announcements/:id/edit`); `likes/` – `LikesService`;
+                  `details/announcement-negotiations.ts` – negocjacje per pomocnik i „Historia ogłoszenia” właściciela;
                   `testing/` – dane i zaślepki do specs),
-                  conversations, notifications, profile (bez logowania: „Zaloguj się”; `/profile/announcements` – moje,
-                  `/profile/liked` – polubione);
-                  offers i alerts dojdą w F5/F8
+                  offers (`offer-labels` – teksty i `offerActions` = reguły domeny, `offer-form` – formularz oferty /
+                  kontroferty, okna `OfferFormModalComponent` i `RatingModalComponent`, `OffersService` – okno → potwierdzenie
+                  → API → toast, wspólny dla wątku i szczegółów; `testing/offer-fixtures`),
+                  conversations (`/conversations` – lista z filtrem roli, `/conversations/:conversationId` – wątek: wiadomości,
+                  oferty z akcjami, zmiany ogłoszenia; `conversation-timeline.ts`),
+                  notifications, profile (bez logowania: „Zaloguj się”; `/profile/announcements` – moje,
+                  `/profile/liked` – polubione); alerts dojdą w F8
 tabs/             TabsPage – dolny pasek zakładek, rejestruje ikony zakładek (`addIcons`)
 ```
-Trasy `/add`, `/announcements/:id/edit`, `/conversations`, `/notifications`, `/profile/announcements`, `/profile/liked` mają `authGuard`; ogłoszenia (lista, szczegóły) i profil są publiczne –
+Trasy `/add`, `/announcements/:id/edit`, `/conversations` (+ `/:conversationId`), `/notifications`, `/profile/announcements`, `/profile/liked` mają `authGuard`; ogłoszenia (lista, szczegóły) i profil są publiczne –
 akcje wymagające konta same prowadzą na `/login?returnUrl=…`.
 Mapy: Leaflet (`import * as L from 'leaflet'`, style w `global.scss`, kolory pinezek – klasy `.map-pin/.map-user/.map-radius`).
 W specs stron z mapą podmieniamy `MapComponent` zaślepką (`TestBed.overrideComponent`) – jsdom nie rysuje map; strony z formularzem
 ogłoszenia – `AnnouncementFormStubComponent` (`features/announcements/testing/announcement-form.stub.ts`).
+Okna (Ionic modal) dostają dane przez `componentProps` → w komponentach okien zwykłe `@Input()`, nie `input()`; w specs
+`ModalController` / `AlertController` zastępujemy obiektem z `create()` (wynik `onWillDismiss` / `onDidDismiss` ustawia test).
 `src/environments/environment*.ts`: `apiUrl` – pusty = ta sama domena (dev przez proxy, produkcja: API serwuje frontend, F10).
 
 ## Zasady (z `docs/PLAN-FRONTEND.md` „Dlaczego tak”)

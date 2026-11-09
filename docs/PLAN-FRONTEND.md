@@ -113,12 +113,20 @@ zmianach zdjęć (pusty PATCH nie tworzy rewizji, tylko sprawdza wersję); edycj
 
 ## Krok F5 – oferty, negocjacje, realizacja, oceny
 
-- [ ] Złożenie oferty (cena, termin od–do, wiadomość), kontroferta, akceptacja/odrzucenie (druga strona), wycofanie (autor).
+- [x] Złożenie oferty (cena, termin od–do, wiadomość), kontroferta, akceptacja/odrzucenie (druga strona), wycofanie (autor).
       Oferta nieaktualna (`IsOutdated`) – wyraźne oznaczenie, zamiast „Akceptuj” → „Zaproponuj kontrofertę”.
-- [ ] Wątek rozmowy (`api/conversations/{id}`): wiadomości, wysyłanie, oznaczanie przeczytanych; tylko do odczytu po zakończeniu.
-- [ ] Zakładka **Rozmowy** = `GET api/me/conversations` (role Klient / Pomocnik, nieprzeczytane).
-- [ ] Po akceptacji: dane kontaktowe (`/contact`), Start / Zakończ / Anuluj zgodnie z uprawnieniami, ocena po `Completed`.
-- [ ] Oś czasu ogłoszenia dla właściciela: oferty, kontroferty, zmiany (rewizje).
+- [x] Wątek rozmowy (`api/conversations/{id}`): wiadomości, wysyłanie, oznaczanie przeczytanych; tylko do odczytu po zakończeniu.
+- [x] Zakładka **Rozmowy** = `GET api/me/conversations` (role Klient / Pomocnik, nieprzeczytane).
+- [x] Po akceptacji: dane kontaktowe (`/contact`), Start / Zakończ / Anuluj zgodnie z uprawnieniami, ocena po `Completed`.
+- [x] Oś czasu ogłoszenia dla właściciela: oferty, kontroferty, zmiany (rewizje).
+
+Zrobione 9.11.2026 (szczegóły: `docs/HISTORIA-KROKOW.md`). Decyzje: akcje na ofertach (przyjmij / odrzuć / kontroferta / wycofaj)
+są **w wątku** – tam widać całą negocjację z jednym pomocnikiem; szczegóły ogłoszenia pokazują listę negocjacji (link do wątku)
+i „Historię ogłoszenia” (właściciel). Oferta / kontroferta / ocena w oknach (Ionic modal), nieodwracalne kroki z potwierdzeniem.
+Pomocnik z oczekującą ofertą zamiast „Złóż ofertę” widzi „Twoja oferta: X zł” (→ wątek; backend i tak odrzuca drugą oczekującą).
+Termin oferty: `<input type="datetime-local">` (natywny wybór daty na telefonie), domyślnie najbliższa pełna godzina za ≥ 1 h, na 2 h.
+Backend: filtr `announcementId` w `GET api/me/conversations` – właściciel nie mógł inaczej trafić ze szczegółów do wątku pomocnika.
+Nowe wiadomości bez odświeżania – F6 (SignalR); do tego czasu „pociągnij, aby odświeżyć”.
 
 ## Krok F6 – powiadomienia w aplikacji (SignalR)
 

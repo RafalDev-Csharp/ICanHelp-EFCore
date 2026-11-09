@@ -165,6 +165,9 @@ cd ICanHelp.Web && npm ci && npm start   # frontend http://localhost:4200 (proxy
   - [x] F4 – dodawanie/edycja ogłoszenia (formularz, GPS / mapa / Nominatim, zdjęcia zmniejszane do 1600 px), „Moje ogłoszenia”,
     „Polubione”, anulowanie; backend: `helperCount` na liście, `PUT/DELETE …/like` + `isLiked`, `expectedRevision` w PATCH (409).
     9.11.2026: build + dotnet 410/410, `npm run api`, lint + 116/116 Vitest + build zielone.
+  - [x] F5 – oferty i negocjacje: okna oferty/kontroferty/oceny (`features/offers`), zakładka „Rozmowy” + wątek z akcjami ofert,
+    w szczegółach negocjacje, historia (właściciel), kontakt, Rozpocznij/Zakończ, ocena; backend: `announcementId` w `api/me/conversations`.
+    9.11.2026: build + dotnet 411/411, `npm run api`, lint + 157/157 Vitest + build zielone.
 
 ## Jak pracować z AI (oszczędnie)
 - Jedna sesja = jeden krok z listy. Na start: „Przeczytaj CLAUDE.md i docs/PLAN-…md, zrób Krok N” (frontend: Krok FN).

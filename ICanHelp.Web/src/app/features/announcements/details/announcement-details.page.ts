@@ -27,7 +27,10 @@ import type { ViewWillEnter } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
   alertCircleOutline,
+  callOutline,
   chatbubbleOutline,
+  chatbubblesOutline,
+  checkmarkDoneOutline,
   closeCircleOutline,
   cloudOfflineOutline,
   constructOutline,
@@ -35,15 +38,26 @@ import {
   heart,
   heartOutline,
   locationOutline,
+  mailOutline,
   peopleOutline,
   personCircleOutline,
+  playOutline,
   pricetagOutline,
   star,
+  starOutline,
+  warningOutline,
 } from 'ionicons/icons';
-import { catchError, forkJoin, of } from 'rxjs';
+import type { Observable } from 'rxjs';
+import { catchError, firstValueFrom, forkJoin, of } from 'rxjs';
 
-import type { AnnouncementDetailsDto, RatingDto, UserPublicDto } from '../../../core/api/api-client';
-import { AnnouncementsClient, UsersClient } from '../../../core/api/api-client';
+import type {
+  AnnouncementContactDto,
+  AnnouncementDetailsDto,
+  MyConversationDto,
+  RatingDto,
+  UserPublicDto,
+} from '../../../core/api/api-client';
+import { AnnouncementsClient, ConversationsClient, UsersClient } from '../../../core/api/api-client';
 import { errorStatus } from '../../../core/api/api-errors';
 import { apiResourceUrl } from '../../../core/api/api.providers';
 import { loginUrlTree } from '../../../core/auth/auth.guard';
@@ -57,18 +71,31 @@ import { MapComponent } from '../../../shared/components/map/map.component';
 import { PricePipe } from '../../../shared/pipes/price.pipe';
 import { TimeAgoPipe, parseApiDate } from '../../../shared/pipes/time-ago.pipe';
 import { pluralPl } from '../../../shared/text/plural';
+import { formatOfferTerm, offerStatusColor, offerStatusLabel, pendingOffer } from '../../offers/offer-labels';
+import { OffersService } from '../../offers/offers.service';
 import { difficultyLabel, statusColor, statusLabel } from '../announcement-labels';
 import { LikesService } from '../likes/likes.service';
+
+import { negotiationsOf, ownerHistory } from './announcement-negotiations';
 
 type LoadState = 'loading' | 'ready' | 'not-found' | 'failed';
 
 /** Ile ostatnich opinii o właścicielu pokazujemy pod ogłoszeniem. */
 const VISIBLE_RATINGS = 3;
 
+/** Wątki jednego ogłoszenia – więcej pomocników w jednym ogłoszeniu się nie spodziewamy. */
+const CONVERSATIONS_LIMIT = 50;
+
+/** Statusy po akceptacji oferty – wtedy uczestnicy widzą swoje dane kontaktowe. */
+const AFTER_ACCEPTANCE = ['Accepted', 'InProgress', 'Completed'];
+
 /**
- * Szczegóły ogłoszenia (publiczne): zdjęcia, opis, mapa, właściciel z ocenami i akcje „Złóż ofertę” / „Napisz”
- * (niezalogowany → logowanie i powrót tutaj), serduszko (polubienie). Właściciel: „Edytuj” (Open) i „Anuluj”
- * (Open/Accepted). Oferty i rozmowy – Krok F5.
+ * Szczegóły ogłoszenia (publiczne): zdjęcia, opis, mapa, właściciel z ocenami, serduszko. Akcje zależą od roli:
+ * - gość: „Złóż ofertę” / „Napisz” → logowanie i powrót tutaj;
+ * - pomocnik: oferta (okno), wątek rozmowy, po przyjęciu jego oferty – kontakt, „Rozpocznij”, ocena po zakończeniu;
+ * - właściciel: „Edytuj” (Open), „Anuluj” (Open/Accepted), lista negocjacji i historia ogłoszenia (oferty,
+ *   kontroferty, edycje), po akceptacji – kontakt, „Rozpocznij” / „Zakończ”, ocena po zakończeniu.
+ * Akcje na samych ofertach (przyjmij, odrzuć, kontroferta, wycofaj) są w wątku – tam widać całą negocjację.
  */
 @Component({
   selector: 'app-announcement-details',
@@ -104,11 +131,13 @@ const VISIBLE_RATINGS = 3;
 })
 export class AnnouncementDetailsPage implements ViewWillEnter {
   private readonly announcements = inject(AnnouncementsClient);
+  private readonly conversationsClient = inject(ConversationsClient);
   private readonly users = inject(UsersClient);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly alerts = inject(AlertController);
   private readonly likes = inject(LikesService);
+  private readonly offers = inject(OffersService);
   protected readonly auth = inject(AuthService);
   protected readonly categories = inject(CategoriesService);
 
@@ -119,11 +148,22 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
   protected readonly announcement = signal<AnnouncementDetailsDto | null>(null);
   protected readonly owner = signal<UserPublicDto | null>(null);
   protected readonly ownerRatings = signal<RatingDto[]>([]);
+  /** Wątki zalogowanego w tym ogłoszeniu (właściciel – wszystkie, pomocnik – jego jeden). */
+  protected readonly conversations = signal<MyConversationDto[]>([]);
+  /** Dane drugiej strony – dopiero po akceptacji, tylko dla uczestników. */
+  protected readonly contact = signal<AnnouncementContactDto | null>(null);
+  /** Czy zalogowany już ocenił (po `Completed`). */
+  protected readonly rated = signal(false);
+  /** Trwa akcja (oferta, start, zakończenie, ocena) – przyciski nieaktywne. */
+  protected readonly busy = signal(false);
 
   protected readonly parseApiDate = parseApiDate;
   protected readonly difficultyLabel = difficultyLabel;
   protected readonly statusLabel = statusLabel;
   protected readonly statusColor = statusColor;
+  protected readonly offerStatusLabel = offerStatusLabel;
+  protected readonly offerStatusColor = offerStatusColor;
+  protected readonly formatOfferTerm = formatOfferTerm;
 
   protected readonly images = computed(() =>
     (this.announcement()?.images ?? []).map((image) => ({ id: image.id, url: apiResourceUrl(image.url) ?? '' })),
@@ -148,8 +188,40 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     const user = this.auth.currentUser();
     return user !== null && user.id === this.announcement()?.ownerId;
   });
-  protected readonly isOpen = computed(() => this.announcement()?.status === 'Open');
-  protected readonly canCancel = computed(() => ['Open', 'Accepted'].includes(this.announcement()?.status ?? ''));
+  protected readonly status = computed(() => this.announcement()?.status ?? '');
+  protected readonly isOpen = computed(() => this.status() === 'Open');
+  /** Pomocnik, którego ofertę przyjęto (pomocnik widzi tylko swoje oferty, więc wystarczy szukać przyjętej). */
+  protected readonly isAcceptedHelper = computed(() => {
+    const announcement = this.announcement();
+    const userId = this.auth.currentUser()?.id;
+    return (
+      !!announcement?.acceptedOfferId &&
+      !!userId &&
+      announcement.offers.some((offer) => offer.id === announcement.acceptedOfferId && offer.helperId === userId)
+    );
+  });
+  protected readonly isParticipant = computed(() => this.isOwner() || this.isAcceptedHelper());
+  protected readonly afterAcceptance = computed(() => AFTER_ACCEPTANCE.includes(this.status()));
+  protected readonly negotiations = computed(() =>
+    negotiationsOf(this.announcement()?.offers ?? [], this.conversations(), this.auth.currentUser()?.id),
+  );
+  /** Pomocnik: jego oczekująca oferta (zamiast „Złóż ofertę” – „Twoja oferta”). */
+  protected readonly myPendingOffer = computed(() =>
+    this.isOwner() ? undefined : pendingOffer(this.announcement()?.offers ?? []),
+  );
+  /** Pomocnik: jego wątek w tym ogłoszeniu. */
+  protected readonly myConversationId = computed(() =>
+    this.isOwner() ? undefined : this.conversations()[0]?.conversationId,
+  );
+  /** Właściciel: oferty, kontroferty i edycje od najnowszych. */
+  protected readonly history = computed(() => {
+    const announcement = this.announcement();
+    if (!announcement || !this.isOwner()) {
+      return [];
+    }
+    const names = new Map(this.negotiations().map((negotiation) => [negotiation.helperId, negotiation.userName]));
+    return ownerHistory(announcement, names);
+  });
   protected readonly isLiked = computed(() => {
     const announcement = this.announcement();
     return announcement !== null && this.auth.isAuthenticated() && this.likes.isLiked(announcement.id);
@@ -178,7 +250,10 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
   constructor() {
     addIcons({
       alertCircleOutline,
+      callOutline,
       chatbubbleOutline,
+      chatbubblesOutline,
+      checkmarkDoneOutline,
       closeCircleOutline,
       cloudOfflineOutline,
       constructOutline,
@@ -186,21 +261,27 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
       heart,
       heartOutline,
       locationOutline,
+      mailOutline,
       peopleOutline,
       personCircleOutline,
+      playOutline,
       pricetagOutline,
       star,
+      starOutline,
+      warningOutline,
     });
   }
 
   /** Przy każdym wejściu (także po powrocie z logowania – zalogowany może widzieć swoje oferty). */
   ionViewWillEnter(): void {
     this.categories.load().subscribe({ error: () => undefined });
-    if (this.auth.isAuthenticated() && !this.auth.currentUser()) {
-      this.auth.loadCurrentUser().subscribe({ error: () => undefined });
-    }
     // Stan serduszka (raz na sesję; potem `sync` z `isLiked` ogłoszenia).
     this.likes.load().subscribe({ error: () => undefined });
+    if (this.auth.isAuthenticated() && !this.auth.currentUser()) {
+      // Rola (właściciel / pomocnik) zależy od użytkownika – ogłoszenie wczytujemy, gdy już go znamy.
+      this.auth.loadCurrentUser().subscribe({ complete: () => this.load(), error: () => this.load() });
+      return;
+    }
     this.load();
   }
 
@@ -218,6 +299,7 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
         if (ownerChanged) {
           this.loadOwner(announcement.ownerId);
         }
+        this.loadNegotiation(announcement);
         done?.();
       },
       error: (error: unknown) => {
@@ -232,18 +314,100 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     });
   }
 
-  /** „Złóż ofertę” / „Napisz”: niezalogowany → logowanie i powrót do tego ogłoszenia. */
-  makeOffer(): void {
-    // TODO(F5): formularz oferty.
-    if (this.requireSignIn()) {
-      void this.toast.info('Składanie ofert pojawi się w kolejnej wersji aplikacji.');
+  /**
+   * „Złóż ofertę”: niezalogowany → logowanie i powrót; pomocnik z oczekującą ofertą → jego wątek (tam kontroferty);
+   * inaczej okno oferty → `POST …/offers` → wątek (oferta zakłada go sama).
+   */
+  async makeOffer(): Promise<void> {
+    const announcement = this.announcement();
+    if (!announcement || this.busy() || !this.requireSignIn()) {
+      return;
+    }
+    if (this.myPendingOffer()) {
+      await this.writeMessage();
+      return;
+    }
+    this.busy.set(true);
+    try {
+      const offerId = await this.offers.make(announcement.id, announcement.budget.amount);
+      if (offerId) {
+        await this.openOwnConversation(announcement.id);
+      }
+    } finally {
+      this.busy.set(false);
     }
   }
 
-  writeMessage(): void {
-    // TODO(F5): wątek rozmowy (`POST …/conversations`).
-    if (this.requireSignIn()) {
-      void this.toast.info('Rozmowy z właścicielem pojawią się w kolejnej wersji aplikacji.');
+  /** „Napisz” / „Rozmowa” (pomocnik): istniejący wątek albo nowy (`POST …/conversations` – istniał → ten sam id). */
+  async writeMessage(): Promise<void> {
+    const announcement = this.announcement();
+    if (!announcement || !this.requireSignIn()) {
+      return;
+    }
+    const existing = this.myConversationId();
+    if (existing) {
+      void this.router.navigate(['/conversations', existing]);
+      return;
+    }
+    await this.openOwnConversation(announcement.id);
+  }
+
+  /** Właściciel: wątek z pomocnikiem (z listy negocjacji albo przyjętym – „Rozmowa” w stopce). */
+  openConversation(conversationId: string | undefined): void {
+    if (conversationId) {
+      void this.router.navigate(['/conversations', conversationId]);
+    }
+  }
+
+  /** Wątek przyjętego pomocnika – dla obu stron po akceptacji. */
+  openAcceptedConversation(): void {
+    if (this.isOwner()) {
+      const acceptedOfferId = this.announcement()?.acceptedOfferId;
+      const helperId = this.announcement()?.offers.find((offer) => offer.id === acceptedOfferId)?.helperId;
+      this.openConversation(this.negotiations().find((n) => n.helperId === helperId)?.conversationId);
+    } else {
+      this.openConversation(this.myConversationId());
+    }
+  }
+
+  /** „Rozpocznij” – właściciel albo przyjęty pomocnik (Accepted → InProgress). */
+  async start(): Promise<void> {
+    await this.lifecycle(
+      'Rozpocząć zlecenie?',
+      'Oznaczy zlecenie jako „w realizacji”. Po wszystkim zleceniodawca potwierdzi zakończenie.',
+      'Rozpocznij',
+      (id) => this.announcements.start(id),
+      'Zlecenie w realizacji.',
+    );
+  }
+
+  /** „Zakończ” – tylko właściciel (InProgress → Completed), potem obie strony mogą się ocenić. */
+  async complete(): Promise<void> {
+    await this.lifecycle(
+      'Potwierdzić wykonanie?',
+      'Zlecenie zostanie zakończone, a rozmowa – zamknięta. Potem możecie się wzajemnie ocenić.',
+      'Zakończ',
+      (id) => this.announcements.complete(id),
+      'Zlecenie zakończone. Oceń współpracę!',
+    );
+  }
+
+  /** Ocena drugiej strony po zakończeniu. */
+  async rate(): Promise<void> {
+    const announcement = this.announcement();
+    if (!announcement || this.busy()) {
+      return;
+    }
+    const other = this.isOwner() ? this.contact()?.fullName : this.owner()?.fullName;
+    this.busy.set(true);
+    try {
+      if (await this.offers.rate(announcement.id, other ?? '')) {
+        this.rated.set(true);
+      }
+    } finally {
+      this.busy.set(false);
+      // Także po 409 `AlreadyRated` (np. ocena z innego urządzenia) – stan z serwera.
+      this.load();
     }
   }
 
@@ -301,6 +465,88 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
         this.load();
       },
     });
+  }
+
+  private async lifecycle(
+    header: string,
+    message: string,
+    action: string,
+    request: (announcementId: string) => Observable<void>,
+    success: string,
+  ): Promise<void> {
+    const announcement = this.announcement();
+    if (!announcement || this.busy()) {
+      return;
+    }
+    const alert = await this.alerts.create({
+      header,
+      message,
+      buttons: [
+        { text: 'Nie', role: 'cancel' },
+        { text: action, role: 'confirm' },
+      ],
+    });
+    await alert.present();
+    const { role } = await alert.onDidDismiss();
+    if (role !== 'confirm') {
+      return;
+    }
+    this.busy.set(true);
+    try {
+      await firstValueFrom(request(announcement.id), { defaultValue: undefined });
+      void this.toast.success(success);
+    } catch {
+      // Komunikat (np. 409 – druga strona zmieniła status) pokazał interceptor.
+    } finally {
+      this.busy.set(false);
+      this.load();
+    }
+  }
+
+  private async openOwnConversation(announcementId: string): Promise<void> {
+    try {
+      const { id } = await firstValueFrom(this.announcements.postConversation(announcementId));
+      void this.router.navigate(['/conversations', id]);
+    } catch {
+      // 409 (np. ogłoszenie właśnie zamknięte) – komunikat z interceptora, pokazujemy aktualny stan.
+      this.load();
+    }
+  }
+
+  /**
+   * Dane negocjacji zalogowanego: jego wątki w tym ogłoszeniu, kontakt (po akceptacji, uczestnicy) i czy już ocenił
+   * (po zakończeniu). Dodatki – błąd nie psuje ekranu.
+   */
+  private loadNegotiation(announcement: AnnouncementDetailsDto): void {
+    if (!this.auth.isAuthenticated()) {
+      this.conversations.set([]);
+      return;
+    }
+    this.conversationsClient
+      .getMine(undefined, undefined, announcement.id, 1, CONVERSATIONS_LIMIT)
+      .pipe(catchError(() => of<MyConversationDto[]>([])))
+      .subscribe((conversations) => this.conversations.set(conversations));
+
+    const userId = this.auth.currentUser()?.id;
+    const participant =
+      userId !== undefined &&
+      (userId === announcement.ownerId ||
+        announcement.offers.some((offer) => offer.id === announcement.acceptedOfferId && offer.helperId === userId));
+    if (!participant || !AFTER_ACCEPTANCE.includes(announcement.status)) {
+      this.contact.set(null);
+      this.rated.set(false);
+      return;
+    }
+    this.announcements
+      .getContact(announcement.id)
+      .pipe(catchError(() => of(null)))
+      .subscribe((contact) => this.contact.set(contact));
+    if (announcement.status === 'Completed') {
+      this.announcements
+        .getRatings(announcement.id)
+        .pipe(catchError(() => of<RatingDto[]>([])))
+        .subscribe((ratings) => this.rated.set(ratings.some((rating) => rating.raterId === userId)));
+    }
   }
 
   private requireSignIn(): boolean {

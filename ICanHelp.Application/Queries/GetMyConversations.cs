@@ -19,6 +19,9 @@ public sealed record GetMyConversations : IQuery<IReadOnlyList<MyConversationDto
     /// <summary>Status ogłoszenia (np. tylko Open – trwające negocjacje).</summary>
     public AnnouncementStatus? Status { get; init; }
 
+    /// <summary>Tylko wątki tego ogłoszenia (np. właściciel w szczegółach: wątek przy każdej ofercie).</summary>
+    public Guid? AnnouncementId { get; init; }
+
     public int Page { get; init; } = 1;
     public int PageSize { get; init; } = 20;
 }

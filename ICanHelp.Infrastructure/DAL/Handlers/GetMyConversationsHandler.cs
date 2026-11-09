@@ -38,6 +38,11 @@ internal sealed class GetMyConversationsHandler : IQueryHandler<GetMyConversatio
             OfferParty.Helper => conversations.Where(c => c.HelperId == userId),
             _ => conversations.Where(c => c.ClientId == userId || c.HelperId == userId)
         };
+        if (query.AnnouncementId is { } announcementIdValue)
+        {
+            var announcementId = new Id(announcementIdValue);
+            conversations = conversations.Where(c => c.AnnouncementId == announcementId);
+        }
 
         var announcements = _db.Announcements.AsNoTracking();
         if (query.Status is { } status)

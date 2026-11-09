@@ -1,0 +1,146 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/conversations"></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ title() }}</ion-title>
+  </ion-toolbar>
+  @if (conversation(); as thread) {
+  <ion-toolbar>
+    <ion-item lines="none" [routerLink]="['/announcements', thread.announcementId]" [detail]="true" class="subject">
+      <ion-label>
+        <h2>{{ thread.announcementTitle }}</h2>
+        <p>
+          <ion-badge [color]="statusColor(thread.announcementStatus)"
+            >{{ statusLabel(thread.announcementStatus) }}</ion-badge
+          >
+          · jesteś: {{ partyLabel(thread.myRole).toLowerCase() }}
+        </p>
+      </ion-label>
+    </ion-item>
+  </ion-toolbar>
+  }
+</ion-header>
+
+<ion-content>
+  @switch (state()) { @case ('loading') {
+  <div class="ion-text-center ion-padding" aria-busy="true">
+    <ion-spinner name="crescent"></ion-spinner>
+  </div>
+  } @case ('not-found') {
+  <app-empty-state
+    icon="alert-circle-outline"
+    heading="Nie ma takiej rozmowy"
+    message="Rozmowę widzą tylko jej dwaj uczestnicy."
+  ></app-empty-state>
+  } @case ('failed') {
+  <app-empty-state
+    icon="cloud-offline-outline"
+    heading="Nie udało się wczytać rozmowy"
+    message="Sprawdź połączenie z internetem i spróbuj ponownie."
+  >
+    <ion-button (click)="load()">Spróbuj ponownie</ion-button>
+  </app-empty-state>
+  } @case ('ready') {
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="timeline">
+    @for (item of items(); track item.key) { @if (item.kind === 'message') {
+    <div class="message" [class.mine]="item.mine">
+      <p class="bubble">{{ item.message.text }}</p>
+      <span class="when">{{ item.at | timeAgo }}</span>
+    </div>
+    } @else if (item.kind === 'offer') {
+    <article class="offer" [class.mine]="item.mine" [class.outdated]="item.offer.isOutdated">
+      <header>
+        <ion-icon name="pricetag-outline" aria-hidden="true"></ion-icon>
+        <span class="offer-title"
+          >{{ item.isCounter ? 'Kontroferta' : 'Oferta' }} · {{ item.mine ? 'Ty' : partyLabel(item.offer.proposedBy)
+          }}</span
+        >
+        <ion-badge [color]="offerStatusColor(item.offer.status)">{{ offerStatusLabel(item.offer.status) }}</ion-badge>
+      </header>
+      <p class="offer-price">{{ item.offer.price.amount | price }}</p>
+      <p class="offer-term">{{ formatOfferTerm(item.offer.proposedStart, item.offer.proposedEnd) }}</p>
+      @if (item.offer.message) {
+      <p class="offer-message">{{ item.offer.message }}</p>
+      } @if (item.offer.isOutdated && item.offer.status === 'Pending') {
+      <p class="offer-outdated">
+        <ion-icon name="warning-outline" color="warning" aria-hidden="true"></ion-icon>
+        Nieaktualna – ogłoszenie zmieniło się po jej złożeniu{{ item.changedSince ? ' (' + item.changedSince + ')' : ''
+        }}. Przyjąć można tylko ofertę do aktualnej wersji.
+      </p>
+      } @if (item.actions.accept || item.actions.reject || item.actions.counter || item.actions.withdraw) {
+      <div class="offer-actions">
+        @if (item.actions.withdraw) {
+        <ion-button size="small" fill="outline" color="medium" (click)="withdraw(item.offer)" [disabled]="busy()"
+          >Wycofaj</ion-button
+        >
+        } @if (item.actions.reject) {
+        <ion-button size="small" fill="outline" color="danger" (click)="reject(item.offer)" [disabled]="busy()"
+          >Odrzuć</ion-button
+        >
+        } @if (item.actions.counter) {
+        <ion-button
+          size="small"
+          [fill]="item.actions.accept ? 'outline' : 'solid'"
+          (click)="counter(item.offer)"
+          [disabled]="busy()"
+          >{{ item.actions.accept ? 'Kontroferta' : 'Zaproponuj kontrofertę' }}</ion-button
+        >
+        } @if (item.actions.accept) {
+        <ion-button size="small" color="success" (click)="accept(item.offer)" [disabled]="busy()">Przyjmij</ion-button>
+        }
+      </div>
+      }
+      <span class="when">{{ item.at | timeAgo }}</span>
+    </article>
+    } @else {
+    <p class="change">
+      <ion-icon name="create-outline" aria-hidden="true"></ion-icon>
+      Ogłoszenie zmienione{{ item.fields ? ': ' + item.fields : '' }} · {{ item.at | timeAgo }}
+    </p>
+    } } @empty {
+    <p class="change">Zadaj pytanie albo złóż ofertę – zleceniodawca zobaczy ją tutaj.</p>
+    }
+  </div>
+  } }
+</ion-content>
+
+@if (conversation(); as thread) {
+<ion-footer>
+  @if (thread.canWrite) { @if (canMakeOffer()) {
+  <ion-toolbar>
+    <ion-button expand="block" fill="outline" class="ion-padding-horizontal" (click)="makeOffer()" [disabled]="busy()">
+      <ion-icon name="pricetag-outline" slot="start" aria-hidden="true"></ion-icon>
+      Złóż ofertę
+    </ion-button>
+  </ion-toolbar>
+  }
+  <ion-toolbar>
+    <div class="composer">
+      <ion-textarea
+        [(ngModel)]="draft"
+        aria-label="Wiadomość"
+        placeholder="Napisz wiadomość…"
+        [autoGrow]="true"
+        [rows]="1"
+        [maxlength]="maxMessage"
+      ></ion-textarea>
+      <ion-button (click)="send()" [disabled]="busy() || draft.trim().length < 2" aria-label="Wyślij">
+        <ion-icon slot="icon-only" name="send"></ion-icon>
+      </ion-button>
+    </div>
+  </ion-toolbar>
+  } @else {
+  <ion-toolbar>
+    <p class="footer-note">
+      <ion-icon name="lock-closed-outline" aria-hidden="true"></ion-icon>
+      {{ readOnlyReason() }}
+    </p>
+  </ion-toolbar>
+  }
+</ion-footer>
+}

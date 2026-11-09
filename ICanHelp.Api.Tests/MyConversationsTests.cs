@@ -173,6 +173,31 @@ public sealed class MyConversationsTests
     }
 
     [Fact]
+    public async Task Filter_ByAnnouncementId_ReturnsOnlyThatAnnouncementThreads()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var helperA = await _factory.CreateUserAsync();
+        var helperB = await _factory.CreateUserAsync();
+        var first = await owner.CreateAnnouncementAsync();
+        var second = await owner.CreateAnnouncementAsync();
+
+        await helperA.MakeOfferAsync(first, 100m);
+        await helperB.MakeOfferAsync(first, 110m);
+        await helperA.MakeOfferAsync(second, 120m);
+        var firstA = await StartAsync(helperA, first);
+        var firstB = await StartAsync(helperB, first);
+        var secondA = await StartAsync(helperA, second);
+
+        (await GetAsync(owner, $"?announcementId={first}")).Select(c => c.ConversationId)
+            .ShouldBe(new[] { firstA, firstB }, ignoreOrder: true);
+        (await GetAsync(owner, $"?announcementId={second}")).ShouldHaveSingleItem().ConversationId.ShouldBe(secondA);
+
+        // Pomocnik widzi tylko swój wątek, obcy – nic.
+        (await GetAsync(helperB, $"?announcementId={first}")).ShouldHaveSingleItem().ConversationId.ShouldBe(firstB);
+        (await GetAsync(helperB, $"?announcementId={second}")).ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task WithoutConversations_EmptyList_AndAnonymous401()
     {
         var user = await _factory.CreateUserAsync();

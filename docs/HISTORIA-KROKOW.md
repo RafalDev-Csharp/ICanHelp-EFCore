@@ -120,6 +120,30 @@
   `dotnet test`, `npm run api`, `npm run lint`, `npm test`, `npm run build`.
   9.11.2026 lokalnie (`verify.cmd`, Docker): build + dotnet 410/410 (Core 186, Application 142, integracyjne 82), `npm run api`
   (klient przegenerowany, nadpisał ręczne poprawki – kompiluje się), lint + Vitest 116/116 + build zielone bez poprawek.
+- [x] Krok F5 (frontend + mały backend, 9.11.2026) – oferty, negocjacje, realizacja, oceny.
+  Backend: filtr `announcementId` w `GET api/me/conversations` (`GetMyConversations.AnnouncementId`, warunek w
+  `GetMyConversationsHandler`) – właściciel ze szczegółów ogłoszenia trafia do wątku każdego pomocnika (sam `POST …/conversations`
+  może tylko pomocnik). Bez migracji. Test integracyjny `MyConversationsTests.Filter_ByAnnouncementId_…`, przykład w `ICanHelp.Api.http`.
+  `api-client.ts` (`getMine` z nowym parametrem) poprawiony ręcznie, potem przegenerowany przez `npm run api`.
+  Frontend: `features/offers/` – `offer-labels` (statusy, strony, zmienione pola, termin „wt., 10 lis, 17:00–19:00”, `offerActions`:
+  przyjąć/odrzucić/kontrować – druga strona, przyjąć tylko aktualną, wycofać – autor, wszystko tylko w `Open`), `offer-form`
+  (cena jak budżet, `datetime-local` od–do, walidacja jak w domenie: początek nie w przeszłości, koniec po początku, wiadomość
+  2–500), okna `OfferFormModalComponent` (oferta / kontroferta, przy nieaktualnej – co zmieniło się w ogłoszeniu)
+  i `RatingModalComponent` (1–5 gwiazdek + komentarz), `OffersService` (okno → potwierdzenie → API → toast).
+  `features/conversations/`: zakładka „Rozmowy” (`/conversations`: Wszystkie / Zlecam / Pomagam, ostatnia oferta z oznaczeniem
+  „nieaktualna”, podgląd wiadomości, licznik nieprzeczytanych, ostrzeżenie o zmianie ogłoszenia, przewijanie bez końca) i wątek
+  (`/conversations/:conversationId`: dymki wiadomości, karty ofert z akcjami wg roli, wpisy zmian ogłoszenia, `markAsRead` przy
+  wejściu z nieprzeczytanymi, wysyłanie, „Złóż ofertę” dla pomocnika bez oczekującej oferty, tylko do odczytu z powodem,
+  gdy `canWrite = false`; obcy → „Nie ma takiej rozmowy”).
+  Szczegóły ogłoszenia: pomocnik – „Złóż ofertę” (okno → oferta → wątek) / „Twoja oferta: X zł” (→ wątek), „Napisz” / „Rozmowa”;
+  właściciel – „Oferty i rozmowy” (ostatnia oferta per pomocnik, nieprzeczytane, link do wątku) i „Historia ogłoszenia” (oferty,
+  kontroferty, edycje od najnowszych); po akceptacji uczestnicy widzą kontakt (`/contact`: telefon, e-mail), „Rozpocznij”
+  (obie strony), „Zakończ” (właściciel), „Anuluj” (właściciel, Accepted), po `Completed` – „Oceń…” (raz; stan z `…/ratings`).
+  Szczegóły czekają na `currentUser` przed wczytaniem (rola zależy od użytkownika).
+  Testy Vitest: `offer-labels`, `offer-form`, okna, `OffersService`, `conversation-timeline`, strony wątku i listy rozmów,
+  `announcement-negotiations`, szczegóły (+5 scenariuszy ról).
+  9.11.2026 lokalnie (`verify.cmd`, Docker): build + dotnet 411/411 (Core 186, Application 142, integracyjne 83), `npm run api`
+  (klient zgodny z ręczną poprawką), lint + Vitest 157/157 + build zielone.
 - [ ] Krok 15 – kanał push (FCM): `docs/PLAN-POWIADOMIENIA.md`
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

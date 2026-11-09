@@ -5,10 +5,12 @@ import { AlertController } from '@ionic/angular';
 import { of, throwError } from 'rxjs';
 
 import type { UserDto } from '../../../core/api/api-client';
-import { AnnouncementsClient, CategoriesClient, UsersClient } from '../../../core/api/api-client';
+import { AnnouncementsClient, CategoriesClient, ConversationsClient, UsersClient } from '../../../core/api/api-client';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../core/ui/toast.service';
 import { MapComponent } from '../../../shared/components/map/map.component';
+import { OffersService } from '../../offers/offers.service';
+import { myConversationFixture, offerFixture } from '../../offers/testing/offer-fixtures';
 import { LikesService } from '../likes/likes.service';
 import { announcementDetails } from '../testing/announcement-fixtures';
 
@@ -24,14 +26,29 @@ class MapStubComponent {
 }
 
 describe('AnnouncementDetailsPage', () => {
-  const announcements = { getById: vi.fn(), cancel: vi.fn() };
+  const announcements = {
+    getById: vi.fn(),
+    cancel: vi.fn(),
+    start: vi.fn(),
+    complete: vi.fn(),
+    getContact: vi.fn(),
+    getRatings: vi.fn(),
+    postConversation: vi.fn(),
+  };
+  const conversations = { getMine: vi.fn() };
+  const offers = { make: vi.fn(), rate: vi.fn() };
   const likes = { load: vi.fn(() => of([])), isLiked: vi.fn(() => false), sync: vi.fn(), toggle: vi.fn() };
   /** Potwierdzenie z okna: `confirm` wybiera przycisk o tej roli. */
   let alertButtons: { role?: string; handler?: () => void }[] = [];
+  /** Rola, którą „wybiera” użytkownik w potwierdzeniach czekających na `onDidDismiss` (start, zakończenie). */
+  let alertRole = 'cancel';
   const alerts = {
     create: vi.fn((options: { buttons: { role?: string; handler?: () => void }[] }) => {
       alertButtons = options.buttons;
-      return Promise.resolve({ present: () => Promise.resolve() });
+      return Promise.resolve({
+        present: () => Promise.resolve(),
+        onDidDismiss: () => Promise.resolve({ role: alertRole }),
+      });
     }),
   };
   const users = { getById: vi.fn(), getRatings: vi.fn() };
@@ -48,6 +65,8 @@ describe('AnnouncementDetailsPage', () => {
       providers: [
         provideRouter([]),
         { provide: AnnouncementsClient, useValue: announcements },
+        { provide: ConversationsClient, useValue: conversations },
+        { provide: OffersService, useValue: offers },
         { provide: UsersClient, useValue: users },
         { provide: CategoriesClient, useValue: { getAll: () => of([]) } },
         { provide: AuthService, useValue: auth },
@@ -75,6 +94,10 @@ describe('AnnouncementDetailsPage', () => {
     vi.clearAllMocks();
     auth.isAuthenticated.set(false);
     auth.currentUser.set(null);
+    alertRole = 'cancel';
+    conversations.getMine.mockReturnValue(of([]));
+    announcements.getContact.mockReturnValue(of(null));
+    announcements.getRatings.mockReturnValue(of([]));
     announcements.getById.mockReturnValue(
       of(
         announcementDetails('a1', {
@@ -142,10 +165,157 @@ describe('AnnouncementDetailsPage', () => {
     const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
     vi.spyOn(router, 'url', 'get').mockReturnValue('/announcements/a1');
 
-    page.makeOffer();
+    await page.makeOffer();
 
     expect(router.serializeUrl(navigate.mock.calls[0][0] as never)).toBe('/login?returnUrl=%2Fannouncements%2Fa1');
-    expect(toast.info).not.toHaveBeenCalled();
+    expect(offers.make).not.toHaveBeenCalled();
+    expect(conversations.getMine).not.toHaveBeenCalled();
+  });
+
+  it('lets a helper make an offer and opens the thread', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'helper-1' } as UserDto);
+    offers.make.mockResolvedValue('o1');
+    announcements.postConversation.mockReturnValue(of({ id: 'c1' }));
+    const { page, render } = create();
+    await render();
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    await page.makeOffer();
+
+    expect(offers.make).toHaveBeenCalledWith('a1', 80);
+    expect(navigate).toHaveBeenCalledWith(['/conversations', 'c1']);
+  });
+
+  it('shows the pending offer of a helper and leads to his thread', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'helper-1' } as UserDto);
+    announcements.getById.mockReturnValue(of(announcementDetails('a1', { offers: [offerFixture('o1')] })));
+    conversations.getMine.mockReturnValue(
+      of([myConversationFixture('c1', { myRole: 'Helper', otherParty: { id: 'owner-1', userName: 'jan' } })]),
+    );
+    const { page, element, render } = create();
+    await render();
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    expect(conversations.getMine).toHaveBeenCalledWith(undefined, undefined, 'a1', 1, 50);
+    expect(element.querySelector('ion-footer')?.textContent?.replace(/\s+/g, ' ')).toContain('Twoja oferta: 120 zł');
+    expect(element.querySelector('.negotiations')?.textContent).toContain('Twoja negocjacja');
+
+    await page.makeOffer();
+
+    expect(offers.make).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith(['/conversations', 'c1']);
+  });
+
+  it('gives the accepted helper the contact and the start action', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'helper-1' } as UserDto);
+    announcements.getById.mockReturnValue(
+      of(
+        announcementDetails('a1', {
+          status: 'Accepted',
+          acceptedOfferId: 'o1',
+          offers: [offerFixture('o1', { status: 'Accepted' })],
+        }),
+      ),
+    );
+    announcements.getContact.mockReturnValue(
+      of({
+        userId: 'owner-1',
+        userName: 'jan',
+        fullName: 'Jan Kowalski',
+        contactData: {
+          email: 'jan@example.com',
+          phoneNumber: '+48600100200',
+          country: 'PL',
+          city: 'Augustów',
+          postalCode: '16-300',
+        },
+      }),
+    );
+    alertRole = 'confirm';
+    announcements.start.mockReturnValue(of(undefined));
+    const { page, element, render } = create();
+    await render();
+
+    expect(element.querySelector('.contact')?.textContent).toContain('+48600100200');
+    const footer = element.querySelector('ion-footer')?.textContent ?? '';
+    expect(footer).toContain('Rozpocznij');
+    expect(footer).toContain('Rozmowa');
+
+    await page.start();
+
+    expect(announcements.start).toHaveBeenCalledWith('a1');
+    expect(toast.success).toHaveBeenCalledWith('Zlecenie w realizacji.');
+  });
+
+  it('lets the owner complete the job in progress and then rate', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'owner-1' } as UserDto);
+    announcements.getById.mockReturnValue(
+      of(
+        announcementDetails('a1', {
+          status: 'InProgress',
+          acceptedOfferId: 'o1',
+          offers: [offerFixture('o1', { status: 'Accepted' })],
+        }),
+      ),
+    );
+    alertRole = 'confirm';
+    announcements.complete.mockReturnValue(of(undefined));
+    const { page, element, render } = create();
+    await render();
+
+    expect(element.querySelector('ion-footer')?.textContent).toContain('Zakończ');
+    await page.complete();
+    expect(announcements.complete).toHaveBeenCalledWith('a1');
+
+    announcements.getById.mockReturnValue(
+      of(
+        announcementDetails('a1', {
+          status: 'Completed',
+          acceptedOfferId: 'o1',
+          offers: [offerFixture('o1', { status: 'Accepted' })],
+        }),
+      ),
+    );
+    page.load();
+    await render();
+
+    expect(announcements.getRatings).toHaveBeenCalledWith('a1');
+    expect(element.querySelector('ion-footer')?.textContent).toContain('Oceń pomocnika');
+  });
+
+  it('lists negotiations and the history for the owner', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'owner-1' } as UserDto);
+    announcements.getById.mockReturnValue(
+      of(
+        announcementDetails('a1', {
+          offers: [offerFixture('o1')],
+          changes: [
+            {
+              revision: 1,
+              changedAt: '2026-11-09T12:00:00Z',
+              fields: [{ field: 'Budget', oldValue: '100', newValue: '80' }],
+            },
+          ],
+        }),
+      ),
+    );
+    conversations.getMine.mockReturnValue(of([myConversationFixture('c1', { unreadCount: 1 })]));
+    const { page, element, render } = create();
+    await render();
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    expect(element.querySelector('.negotiations')?.textContent).toContain('pomocnik1');
+    const history = element.querySelector('.history')?.textContent ?? '';
+    expect(history).toContain('Edycja: budżet');
+    expect(history).toContain('Oferta (pomocnik1)');
+
+    page.openConversation('c1');
+    expect(navigate).toHaveBeenCalledWith(['/conversations', 'c1']);
   });
 
   it('gives the owner edit and cancel instead of the offer actions', async () => {
