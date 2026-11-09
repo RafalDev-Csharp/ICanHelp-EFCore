@@ -1,11 +1,12 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 
-import type { ConversationDto, ConversationEntryDto, UserDto } from '../../core/api/api-client';
+import type { ConversationDto, ConversationEntryDto, NotificationDto, UserDto } from '../../core/api/api-client';
 import { ConversationsClient, UsersClient } from '../../core/api/api-client';
 import { AuthService } from '../../core/auth/auth.service';
+import { NotificationsService } from '../../core/notifications/notifications.service';
 import { OffersService } from '../offers/offers.service';
 import { conversationFixture, offerFixture } from '../offers/testing/offer-fixtures';
 
@@ -25,6 +26,20 @@ describe('ConversationPage', () => {
     currentUser: signal<UserDto | null>({ id: 'owner-1' } as UserDto),
     loadCurrentUser: vi.fn(() => of()),
   };
+  const received = new Subject<NotificationDto>();
+  const notifications = {
+    received$: received.asObservable(),
+    openConversation: vi.fn(),
+    closeConversation: vi.fn(),
+  };
+  const providers = (): unknown[] => [
+    provideRouter([]),
+    { provide: ConversationsClient, useValue: conversations },
+    { provide: UsersClient, useValue: users },
+    { provide: OffersService, useValue: offers },
+    { provide: AuthService, useValue: auth },
+    { provide: NotificationsService, useValue: notifications },
+  ];
 
   const messageEntry: ConversationEntryDto = {
     type: 'Message',
@@ -47,16 +62,7 @@ describe('ConversationPage', () => {
     render: () => Promise<void>;
   } {
     conversations.getById.mockReturnValue(of(conversation));
-    TestBed.configureTestingModule({
-      imports: [ConversationPage],
-      providers: [
-        provideRouter([]),
-        { provide: ConversationsClient, useValue: conversations },
-        { provide: UsersClient, useValue: users },
-        { provide: OffersService, useValue: offers },
-        { provide: AuthService, useValue: auth },
-      ],
-    });
+    TestBed.configureTestingModule({ imports: [ConversationPage], providers: providers() });
     const fixture = TestBed.createComponent(ConversationPage);
     fixture.componentRef.setInput('conversationId', 'c1');
     fixture.componentInstance.ionViewWillEnter();
@@ -91,6 +97,22 @@ describe('ConversationPage', () => {
 
     const buttons = [...element.querySelectorAll('.offer-actions ion-button')].map((b) => b.textContent?.trim());
     expect(buttons).toEqual(['Odrzuć', 'Kontroferta', 'Przyjmij']);
+  });
+
+  it('tells notifications the thread is open and reloads on a live notification from it', async () => {
+    const { page, render } = create(conversationFixture());
+    await render();
+    expect(notifications.openConversation).toHaveBeenCalledWith('c1');
+    expect(conversations.getById).toHaveBeenCalledTimes(1);
+
+    received.next({ id: 'n1', type: 'MessageReceived', conversationId: 'other' } as NotificationDto);
+    expect(conversations.getById).toHaveBeenCalledTimes(1);
+
+    received.next({ id: 'n2', type: 'MessageReceived', conversationId: 'c1' } as NotificationDto);
+    expect(conversations.getById).toHaveBeenCalledTimes(2);
+
+    page.ionViewWillLeave();
+    expect(notifications.closeConversation).toHaveBeenCalledWith('c1');
   });
 
   it('offers only a counter-offer for an outdated offer', async () => {
@@ -145,16 +167,7 @@ describe('ConversationPage', () => {
 
   it('shows a not-found state for a foreign thread', async () => {
     conversations.getById.mockReturnValue(throwError(() => ({ status: 404 })));
-    TestBed.configureTestingModule({
-      imports: [ConversationPage],
-      providers: [
-        provideRouter([]),
-        { provide: ConversationsClient, useValue: conversations },
-        { provide: UsersClient, useValue: users },
-        { provide: OffersService, useValue: offers },
-        { provide: AuthService, useValue: auth },
-      ],
-    });
+    TestBed.configureTestingModule({ imports: [ConversationPage], providers: providers() });
     const fixture = TestBed.createComponent(ConversationPage);
     fixture.componentRef.setInput('conversationId', 'c1');
     fixture.componentInstance.ionViewWillEnter();

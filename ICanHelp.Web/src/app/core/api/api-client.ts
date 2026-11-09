@@ -2699,11 +2699,17 @@ export class NotificationsClient {
     }
 
     /**
-     * Oznacza wszystkie moje powiadomienia jako przeczytane.
+     * Oznacza wszystkie moje powiadomienia jako przeczytane; z `conversationId` – tylko te z jednego wątku
+    (aplikacja otworzyła wątek, więc jego wiadomości i oferty są widziane). Cudzy wątek – nic się nie zmienia.
+     * @param conversationId (optional) 
      * @return No Content
      */
-    markAllAsRead(): Observable<void> {
-        let url_ = this.baseUrl + "/api/me/notifications/read-all";
+    markAllAsRead(conversationId?: string | undefined): Observable<void> {
+        let url_ = this.baseUrl + "/api/me/notifications/read-all?";
+        if (conversationId === null)
+            throw new globalThis.Error("The parameter 'conversationId' cannot be null.");
+        else if (conversationId !== undefined)
+            url_ += "conversationId=" + encodeURIComponent("" + conversationId) + "&";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_ : any = {

@@ -144,6 +144,23 @@
   `announcement-negotiations`, szczegóły (+5 scenariuszy ról).
   9.11.2026 lokalnie (`verify.cmd`, Docker): build + dotnet 411/411 (Core 186, Application 142, integracyjne 83), `npm run api`
   (klient zgodny z ręczną poprawką), lint + Vitest 157/157 + build zielone.
+- [x] Krok F6 (frontend + mały backend, 9.11.2026) – powiadomienia w aplikacji (SignalR).
+  Backend: `POST api/me/notifications/read-all?conversationId=` (`MarkAllNotificationsAsRead.ConversationId`, filtr w handlerze) –
+  otwarcie wątku gasi jego powiadomienia (inaczej plakietka świeciłaby po przeczytaniu wiadomości w „Rozmowach”). Bez migracji.
+  Testy: `MarkNotificationsAsReadHandlerTests` (2), `NotificationTests.MarkAll_WithConversation_MarksOnlyThatThread`, przykład w `.http`.
+  Frontend: `@microsoft/signalr`; `core/notifications/` – `notification-hub.ts` (token `NOTIFICATION_HUB_FACTORY`: `HubConnectionBuilder`,
+  `accessTokenFactory`, `withAutomaticReconnect` 0/2/5/10/30 s), `NotificationsService` (połączenie, dopóki zalogowany – efekt na
+  `isAuthenticated`; pierwsze połączenie ponawiane samo, gdy API nie odpowiada; token odświeżany przed wygaśnięciem; `unreadCount`
+  z `unread-count` przy zalogowaniu, po wznowieniu połączenia i powrocie do karty; nowe → licznik +1, `received$`, toast z „Pokaż”
+  (nie na liście powiadomień); z otwartego wątku → od razu przeczytane, bez toastu), `notification-texts.ts` (teksty po polsku
+  z `type` + `parameters` dla 9 typów, cena „120.00 PLN” → „120 zł”, pola zmian, alert obszar/trasa, `notificationLink`: oferty
+  i wiadomości → wątek, edycja i alert → ogłoszenie, skrót → lista). `ToastService.action`. Zakładka „Powiadomienia”: lista
+  (nieprzeczytane wyróżnione, przewijanie bez końca, pociągnij-odśwież, „Oznacz wszystkie”, nowe z huba na górze, odnowiony skrót
+  przesuwa się), plakietka na zakładce (99+), `TabsPage` uruchamia serwis. Wątek: `openConversation`/`closeConversation`,
+  przeładowanie przy powiadomieniu z tego wątku; lista rozmów przeładowuje się przy powiadomieniu o wątku.
+  Testy Vitest: teksty, serwis (fałszywe połączenie), strona listy, zakładki, wątek i lista rozmów (+24).
+  9.11.2026 lokalnie (`verify.cmd`, Docker): build + dotnet 414/414 (Core 186, Application 144, integracyjne 84), `npm run api`
+  (klient zgodny z ręczną poprawką co do działania), lint + Vitest 181/181 + build zielone.
 - [ ] Krok 15 – kanał push (FCM): `docs/PLAN-POWIADOMIENIA.md`
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

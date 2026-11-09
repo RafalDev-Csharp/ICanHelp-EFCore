@@ -1,4 +1,5 @@
 import { Component, computed, inject, input, signal, viewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
@@ -19,7 +20,7 @@ import {
   IonTitle,
   IonToolbar,
 } from '@ionic/angular';
-import type { ViewWillEnter } from '@ionic/angular';
+import type { ViewWillEnter, ViewWillLeave } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
   alertCircleOutline,
@@ -30,12 +31,13 @@ import {
   send,
   warningOutline,
 } from 'ionicons/icons';
-import { catchError, of } from 'rxjs';
+import { catchError, filter, of } from 'rxjs';
 
 import type { ConversationDto, OfferDto } from '../../core/api/api-client';
 import { ConversationsClient, UsersClient } from '../../core/api/api-client';
 import { errorStatus } from '../../core/api/api-errors';
 import { AuthService } from '../../core/auth/auth.service';
+import { NotificationsService } from '../../core/notifications/notifications.service';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { PricePipe } from '../../shared/pipes/price.pipe';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
@@ -51,8 +53,8 @@ type LoadState = 'loading' | 'ready' | 'not-found' | 'failed';
 /**
  * Wątek negocjacji (`/conversations/:conversationId`, tylko uczestnicy): wiadomości, oferty z akcjami (przyjmij /
  * odrzuć / kontroferta / wycofaj – zgodnie z rolą) i zmiany ogłoszenia, od najstarszych. Wejście oznacza wątek jako
- * przeczytany. Pisać można, dopóki API pozwala (`canWrite`) – potem wątek jest tylko do odczytu.
- * Nowe wiadomości bez odświeżania – Krok F6 (SignalR); na razie „pociągnij, aby odświeżyć”.
+ * przeczytany (razem z jego powiadomieniami). Pisać można, dopóki API pozwala (`canWrite`) – potem wątek jest tylko
+ * do odczytu. Nowa wiadomość / oferta w tym wątku (powiadomienie z huba SignalR) – wątek przeładowany od razu.
  */
 @Component({
   selector: 'app-conversation',
@@ -82,11 +84,12 @@ type LoadState = 'loading' | 'ready' | 'not-found' | 'failed';
     TimeAgoPipe,
   ],
 })
-export class ConversationPage implements ViewWillEnter {
+export class ConversationPage implements ViewWillEnter, ViewWillLeave {
   private readonly conversations = inject(ConversationsClient);
   private readonly users = inject(UsersClient);
   private readonly offers = inject(OffersService);
   private readonly auth = inject(AuthService);
+  private readonly notifications = inject(NotificationsService);
   private readonly content = viewChild(IonContent);
 
   /** Z adresu `/conversations/:conversationId` (`withComponentInputBinding`). */
@@ -154,13 +157,25 @@ export class ConversationPage implements ViewWillEnter {
       send,
       warningOutline,
     });
+
+    this.notifications.received$
+      .pipe(
+        filter((notification) => notification.conversationId === this.conversationId()),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => this.load());
   }
 
   ionViewWillEnter(): void {
     if (!this.auth.currentUser()) {
       this.auth.loadCurrentUser().subscribe({ error: () => undefined });
     }
+    this.notifications.openConversation(this.conversationId());
     this.load();
+  }
+
+  ionViewWillLeave(): void {
+    this.notifications.closeConversation(this.conversationId());
   }
 
   refresh(event: Event): void {

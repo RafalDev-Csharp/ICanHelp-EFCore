@@ -24,7 +24,19 @@ export class ToastService {
     await this.show(message, 'dark');
   }
 
-  private async show(message: string, color: 'danger' | 'success' | 'dark'): Promise<void> {
+  /** Informacja z przyciskiem akcji (np. nowe powiadomienie → „Pokaż”). */
+  async action(message: string, actionText: string, onAction: () => void): Promise<void> {
+    await this.show(message, 'dark', [
+      { text: actionText, handler: onAction },
+      { text: 'OK', role: 'cancel' },
+    ]);
+  }
+
+  private async show(
+    message: string,
+    color: 'danger' | 'success' | 'dark',
+    buttons: { text: string; role?: 'cancel'; handler?: () => void }[] = [{ text: 'OK', role: 'cancel' }],
+  ): Promise<void> {
     const now = Date.now();
     if (message === this.lastMessage && now - this.lastShownAt < DUPLICATE_WINDOW_MS) {
       return;
@@ -37,7 +49,7 @@ export class ToastService {
       color,
       duration: 4_000,
       position: 'top',
-      buttons: [{ text: 'OK', role: 'cancel' }],
+      buttons,
     });
     await toast.present();
   }

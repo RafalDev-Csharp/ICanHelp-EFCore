@@ -21,6 +21,9 @@ core/             jedno miejsce na całą aplikację: config/locale.ts (pl-PL, P
                   między zapytaniami, `approximatePoint`);
                   auth/ – `AuthService` (sygnały `currentUser`, `isAuthenticated`; tokeny w localStorage `icanhelp.auth`, synchronizacja kart,
                   jedno odświeżenie naraz), `authGuard` (+ `loginUrlTree`, `safeReturnUrl`);
+                  notifications/ – `NotificationsService` (hub SignalR `/hubs/notifications`, dopóki zalogowany; `unreadCount`,
+                  `received$`, toast „Pokaż”, `openConversation` = wątek na ekranie), `notification-texts` (tekst i link
+                  z `type` + `parameters`), `NOTIFICATION_HUB_FACTORY` (w specs – fałszywe połączenie);
                   interceptors/ – `authInterceptor` (Bearer, odświeżenie przed wygaśnięciem i raz po 401), `errorInterceptor`
                   (ProblemDetails → toast, mapa `error-messages.ts`, `SKIP_ERROR_TOAST`); ui/ – `ToastService` (error/success/info);
                   testing/ – helpery do specs
@@ -37,9 +40,11 @@ features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poz
                   → API → toast, wspólny dla wątku i szczegółów; `testing/offer-fixtures`),
                   conversations (`/conversations` – lista z filtrem roli, `/conversations/:conversationId` – wątek: wiadomości,
                   oferty z akcjami, zmiany ogłoszenia; `conversation-timeline.ts`),
-                  notifications, profile (bez logowania: „Zaloguj się”; `/profile/announcements` – moje,
+                  notifications (`/notifications` – lista, „Oznacz wszystkie”, nowe z huba na górze),
+                  profile (bez logowania: „Zaloguj się”; `/profile/announcements` – moje,
                   `/profile/liked` – polubione); alerts dojdą w F8
-tabs/             TabsPage – dolny pasek zakładek, rejestruje ikony zakładek (`addIcons`)
+tabs/             TabsPage – dolny pasek zakładek, rejestruje ikony zakładek (`addIcons`), uruchamia `NotificationsService`,
+                  plakietka nieprzeczytanych. Strony używające `NotificationsService` – w specs obiekt z `received$` (Subject)
 ```
 Trasy `/add`, `/announcements/:id/edit`, `/conversations` (+ `/:conversationId`), `/notifications`, `/profile/announcements`, `/profile/liked` mają `authGuard`; ogłoszenia (lista, szczegóły) i profil są publiczne –
 akcje wymagające konta same prowadzą na `/login?returnUrl=…`.

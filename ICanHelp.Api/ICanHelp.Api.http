@@ -318,6 +318,11 @@ POST {{baseUrl}}/api/me/notifications/read-all
 Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
 
 ###
+# Tylko z jednego wątku (aplikacja otworzyła rozmowę) -> 204
+POST {{baseUrl}}/api/me/notifications/read-all?conversationId={{myNotifications.response.body.$[0].conversationId}}
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
 # ---------- Alerty o nowych ogłoszeniach (Krok 14) ----------
 # Pasujące nowe ogłoszenie (strefa + kategoria/podkategoria, nie własne) -> powiadomienie NewAnnouncementNearby
 # (announcementTitle, categoryName, alertName, alertKind, distanceKm). Powyżej Alerts:DailyLimit dziennie -> jeden skrót

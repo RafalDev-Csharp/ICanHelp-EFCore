@@ -55,7 +55,10 @@ internal sealed class MarkAllNotificationsAsReadHandler : ICommandHandler<MarkAl
             var userId = new UserId(command.UserId);
             var now = _clock.UtcNow;
 
-            foreach (var notification in await _notifications.GetUnreadAsync(userId, cancellationToken))
+            var unread = await _notifications.GetUnreadAsync(userId, cancellationToken);
+            Id? conversationId = command.ConversationId is { } id ? new Id(id) : null;
+
+            foreach (var notification in unread.Where(n => conversationId is null || n.ConversationId == conversationId))
             {
                 notification.MarkAsRead(userId, now);
             }

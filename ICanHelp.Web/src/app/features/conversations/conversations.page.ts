@@ -1,4 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import {
   IonBadge,
@@ -25,10 +26,13 @@ import type { ViewWillEnter } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { chatbubblesOutline, cloudOfflineOutline, imageOutline, warningOutline } from 'ionicons/icons';
 import type { Observable } from 'rxjs';
+import { filter } from 'rxjs';
 
 import type { MyConversationDto, OfferParty } from '../../core/api/api-client';
 import { ConversationsClient } from '../../core/api/api-client';
 import { apiResourceUrl } from '../../core/api/api.providers';
+import { concernsConversation } from '../../core/notifications/notification-texts';
+import { NotificationsService } from '../../core/notifications/notifications.service';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { PricePipe } from '../../shared/pipes/price.pipe';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
@@ -95,6 +99,11 @@ export class ConversationsPage implements ViewWillEnter {
 
   constructor() {
     addIcons({ chatbubblesOutline, cloudOfflineOutline, imageOutline, warningOutline });
+
+    // Nowa wiadomość / oferta (SignalR) – lista od razu z nowym podglądem i licznikiem.
+    inject(NotificationsService)
+      .received$.pipe(filter(concernsConversation), takeUntilDestroyed())
+      .subscribe(() => this.reload());
   }
 
   ionViewWillEnter(): void {

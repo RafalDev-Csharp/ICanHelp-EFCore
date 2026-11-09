@@ -18,6 +18,9 @@
     <ion-tab-button tab="notifications" href="/notifications">
       <ion-icon aria-hidden="true" name="notifications-outline"></ion-icon>
       <ion-label>Powiadomienia</ion-label>
+      @if (unreadBadge(); as badge) {
+      <ion-badge color="danger" [attr.aria-label]="badge + ' nieprzeczytanych'">{{ badge }}</ion-badge>
+      }
     </ion-tab-button>
 
     <ion-tab-button tab="profile" href="/profile">

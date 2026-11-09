@@ -1,19 +1,62 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
     <ion-title>Powiadomienia</ion-title>
+    @if (hasUnread()) {
+    <ion-buttons slot="end">
+      <ion-button (click)="markAll()" class="mark-all">
+        <ion-icon slot="start" name="checkmark-done-outline" aria-hidden="true"></ion-icon>
+        Oznacz wszystkie
+      </ion-button>
+    </ion-buttons>
+    }
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">Powiadomienia</ion-title>
-    </ion-toolbar>
-  </ion-header>
+<ion-content>
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
 
+  @switch (state()) { @case ('loading') {
+  <div class="ion-text-center ion-padding" aria-busy="true">
+    <ion-spinner name="crescent"></ion-spinner>
+  </div>
+  } @case ('failed') {
+  <app-empty-state
+    icon="cloud-offline-outline"
+    heading="Nie udało się wczytać powiadomień"
+    message="Sprawdź połączenie z internetem i spróbuj ponownie."
+  >
+    <ion-button (click)="reload()">Spróbuj ponownie</ion-button>
+  </app-empty-state>
+  } @case ('ready') { @if (items().length === 0) {
   <app-empty-state
     icon="notifications-outline"
     heading="Brak powiadomień"
     message="Tu zobaczysz nowe oferty, odpowiedzi i wiadomości."
   ></app-empty-state>
+  } @else {
+  <ion-list>
+    @for (item of items(); track item.id) { @let text = describe(item);
+    <ion-item button [detail]="false" (click)="open(item)" class="notification" [class.unread]="!isRead(item)">
+      <ion-icon slot="start" [name]="text.icon" aria-hidden="true"></ion-icon>
+      <ion-label>
+        <h2>{{ text.title }}</h2>
+        @if (text.body) {
+        <p class="body">{{ text.body }}</p>
+        }
+      </ion-label>
+      <div slot="end" class="side">
+        <ion-note>{{ item.createdAt | timeAgo }}</ion-note>
+        @if (!isRead(item)) {
+        <span class="dot" aria-label="nieprzeczytane"></span>
+        }
+      </div>
+    </ion-item>
+    }
+  </ion-list>
+  <ion-infinite-scroll [disabled]="complete()" (ionInfinite)="loadMore($event)">
+    <ion-infinite-scroll-content></ion-infinite-scroll-content>
+  </ion-infinite-scroll>
+  } } }
 </ion-content>

@@ -1,19 +1,26 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 
+import type { NotificationDto } from '../../core/api/api-client';
 import { ConversationsClient } from '../../core/api/api-client';
+import { NotificationsService } from '../../core/notifications/notifications.service';
 import { myConversationFixture } from '../offers/testing/offer-fixtures';
 
 import { CONVERSATIONS_PAGE_SIZE, ConversationsPage } from './conversations.page';
 
 describe('ConversationsPage', () => {
   const client = { getMine: vi.fn() };
+  const received = new Subject<NotificationDto>();
 
   function create(): { page: ConversationsPage; element: HTMLElement; render: () => Promise<void> } {
     TestBed.configureTestingModule({
       imports: [ConversationsPage],
-      providers: [provideRouter([]), { provide: ConversationsClient, useValue: client }],
+      providers: [
+        provideRouter([]),
+        { provide: ConversationsClient, useValue: client },
+        { provide: NotificationsService, useValue: { received$: received.asObservable() } },
+      ],
     });
     const fixture = TestBed.createComponent(ConversationsPage);
     fixture.componentInstance.ionViewWillEnter();
@@ -71,6 +78,19 @@ describe('ConversationsPage', () => {
     page.setRole('Helper');
 
     expect(client.getMine).toHaveBeenLastCalledWith('Helper', undefined, undefined, 1, CONVERSATIONS_PAGE_SIZE);
+  });
+
+  it('reloads when a notification about a thread arrives', async () => {
+    client.getMine.mockReturnValue(of([]));
+    const { render } = create();
+    await render();
+    expect(client.getMine).toHaveBeenCalledTimes(1);
+
+    received.next({ id: 'n1', type: 'NewAnnouncementNearby', announcementId: 'a1' } as NotificationDto);
+    expect(client.getMine).toHaveBeenCalledTimes(1);
+
+    received.next({ id: 'n2', type: 'MessageReceived', conversationId: 'c1' } as NotificationDto);
+    expect(client.getMine).toHaveBeenCalledTimes(2);
   });
 
   it('shows a retry state when loading fails', async () => {

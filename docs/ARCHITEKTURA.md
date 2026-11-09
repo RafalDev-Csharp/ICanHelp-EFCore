@@ -106,7 +106,9 @@
   metoda `notification` z `NotificationDto`; JWT z query `access_token` dla ścieżek `/hubs`). `IEmailSender` → `LoggingEmailSender`
   (tylko log; zbiorczy skrót e-mail – później).
 - Api (`NotificationsController`): `GET api/me/notifications` (`unreadOnly`, `page`, `pageSize`, od najnowszych), `GET …/unread-count`,
-  `POST …/{id}/read` (cudze/nieistniejące → 404 `NotificationNotFound`), `POST …/read-all`.
+  `POST …/{id}/read` (cudze/nieistniejące → 404 `NotificationNotFound`), `POST …/read-all` (F6: `?conversationId=` – tylko jeden wątek).
+- Frontend (F6): `ICanHelp.Web/src/app/core/notifications/` – `NotificationsService` (SignalR, licznik, toast, `received$`), teksty
+  z `type` + `parameters` w `notification-texts.ts`.
 - Tabele `Notifications` (FK UserId Restrict; AnnouncementId/ConversationId bez FK – historia; indeksy UserId+SourceEventId unikalny,
   UserId+ReadAt+CreatedAt) i `OutboxMessages` (indeks ProcessedAt+OccurredAt). Migracja `Notifications` (20261108100000, ręczna).
 - Testy integracyjne: `Outbox:Enabled=false`, outbox przetwarza `TestApi.ProcessOutboxAsync()` (`IOutboxProcessor`, semafor – nie biegnie

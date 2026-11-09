@@ -80,20 +80,24 @@ public sealed class NotificationsController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Oznacza wszystkie moje powiadomienia jako przeczytane.</summary>
+    /// <summary>
+    /// Oznacza wszystkie moje powiadomienia jako przeczytane; z <c>conversationId</c> – tylko te z jednego wątku
+    /// (aplikacja otworzyła wątek, więc jego wiadomości i oferty są widziane). Cudzy wątek – nic się nie zmienia.
+    /// </summary>
     [HttpPost("read-all")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> MarkAllAsRead(
         [FromServices] ICommandHandler<MarkAllNotificationsAsRead> handler,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [FromQuery] Guid? conversationId = null)
     {
         if (!User.TryGetUserId(out var userId))
         {
             return Unauthorized();
         }
 
-        await handler.HandleAsync(new MarkAllNotificationsAsRead(userId), cancellationToken);
+        await handler.HandleAsync(new MarkAllNotificationsAsRead(userId, conversationId), cancellationToken);
         return NoContent();
     }
 }

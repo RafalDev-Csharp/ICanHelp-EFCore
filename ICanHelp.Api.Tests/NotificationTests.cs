@@ -143,6 +143,34 @@ public sealed class NotificationTests
     }
 
     [Fact]
+    public async Task MarkAll_WithConversation_MarksOnlyThatThread()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var firstHelper = await _factory.CreateUserAsync();
+        var secondHelper = await _factory.CreateUserAsync();
+        var announcementId = await owner.CreateAnnouncementAsync();
+        await firstHelper.MakeOfferAsync(announcementId, 120m);
+        await secondHelper.MakeOfferAsync(announcementId, 110m);
+        await _factory.ProcessOutboxAsync();
+
+        var notifications = await owner.GetNotificationsAsync();
+        notifications.Count.ShouldBe(2);
+        var opened = notifications[0];
+
+        // Obcy wątek (stranger nie ma tam powiadomień) – nic się nie dzieje, 204.
+        var stranger = await _factory.CreateUserAsync();
+        (await stranger.Client.PostEmptyAsync($"/api/me/notifications/read-all?conversationId={opened.ConversationId}"))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await owner.GetUnreadNotificationCountAsync()).ShouldBe(2);
+
+        (await owner.Client.PostEmptyAsync($"/api/me/notifications/read-all?conversationId={opened.ConversationId}"))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        (await owner.GetUnreadNotificationCountAsync()).ShouldBe(1);
+        (await owner.GetNotificationsAsync(unreadOnly: true)).ShouldHaveSingleItem().Id.ShouldBe(notifications[1].Id);
+    }
+
+    [Fact]
     public async Task Stranger_CannotSeeOrMarkSomebodyElsesNotification()
     {
         var owner = await _factory.CreateUserAsync();

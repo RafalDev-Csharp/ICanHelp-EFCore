@@ -130,10 +130,17 @@ Nowe wiadomości bez odświeżania – F6 (SignalR); do tego czasu „pociągnij
 
 ## Krok F6 – powiadomienia w aplikacji (SignalR)
 
-- [ ] `@microsoft/signalr`, połączenie z `/hubs/notifications` (token w `accessTokenFactory`), automatyczne wznawianie.
-- [ ] Licznik nieprzeczytanych na zakładce (`unread-count` + zdarzenia z huba), lista, „oznacz wszystkie”, toast przy nowym.
-- [ ] Teksty powiadomień z `Type` + `Payload` (albo z backendu, jeśli Krok 15 doda `Title`/`Body` do `NotificationDto` – wtedy jedno źródło).
-- [ ] Kliknięcie → właściwy ekran (ogłoszenie, wątek). Nowa wiadomość w otwartym wątku – dopisana od razu.
+- [x] `@microsoft/signalr`, połączenie z `/hubs/notifications` (token w `accessTokenFactory`), automatyczne wznawianie.
+- [x] Licznik nieprzeczytanych na zakładce (`unread-count` + zdarzenia z huba), lista, „oznacz wszystkie”, toast przy nowym.
+- [x] Teksty powiadomień z `Type` + `Payload` (albo z backendu, jeśli Krok 15 doda `Title`/`Body` do `NotificationDto` – wtedy jedno źródło).
+- [x] Kliknięcie → właściwy ekran (ogłoszenie, wątek). Nowa wiadomość w otwartym wątku – dopisana od razu.
+
+Zrobione 9.11.2026 (szczegóły: `docs/HISTORIA-KROKOW.md`). Decyzje: serwis w `core/notifications/` (używają go zakładki, wątek,
+lista rozmów), łączy się tylko zalogowany, hub tylko przyspiesza – licznik zawsze z `unread-count` (po zalogowaniu, wznowieniu,
+powrocie do karty). Teksty w jednym pliku `notification-texts.ts` – przy Kroku 15 (push potrzebuje tekstu na serwerze) rozważyć
+`Title`/`Body` w `NotificationDto` i usunięcie tekstów z frontu. Oferty i wiadomości prowadzą do wątku (tam akcje), edycja i alert –
+do ogłoszenia. Nowa wiadomość w otwartym wątku = przeładowanie wątku z API (kolejność i godziny z serwera), bez toastu, od razu
+przeczytana. Backend: `read-all?conversationId=` – wejście do wątku gasi jego powiadomienia.
 
 ## Krok F7 – PWA i push (po backendowym Kroku 15)
 
