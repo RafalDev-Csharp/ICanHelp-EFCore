@@ -1,7 +1,42 @@
 # ICanHelpApp – szczegóły techniczne
 
 > Szczegóły przeniesione z `CLAUDE.md`, żeby tamten został krótki. Czytaj sekcję, której dotyczy bieżący krok.
-> Sekcje: Infrastructure, Api, Uwierzytelnianie (z prywatnością), Zdjęcia, Rozmowa (z „moimi negocjacjami”).
+> Sekcje: Model domeny, Infrastructure, Api, Uwierzytelnianie (z prywatnością), Zdjęcia, Rozmowa, Powiadomienia,
+> Push i urządzenia, Alerty.
+
+## Model domeny (Core)
+- `User` (agregat): UserName, FullName, PasswordHash, Role (enum User/Admin), CreatedAt, IsLocked, Description?,
+  ContactData (VO: Email, PhoneNumber, Country, City, PostalCode – w tabeli Users, Email unikalny).
+- `Announcement` (agregat): OwnerId, CategoryId, SubcategoryId, Difficulty (enum), Title, Description, Budget (Price),
+  Location (VO lat/lon), Status, CreatedAt, AcceptedOfferId?, **Offers**, **Images** (max 5),
+  **Revision** (0 = opublikowane, +1 przy realnej edycji; token współbieżności), UpdatedAt?, **Changes** (`AnnouncementChange`:
+  rewizja, czas, `AnnouncementFields` [Flags]).
+  - metody: `Update(actor, ..., at)` (tylko właściciel, `Open`), `GetChangesSince(rev)`, `AddOffer`, `CounterOffer`, `AcceptOffer`,
+    `RejectOffer`, `WithdrawOffer`, `AddImage(actor,…,at)`, `RemoveImage(actor, id, at)`, `GetThumbnail()`, `Start(actor)`,
+    `Complete(actor)`, `Cancel(actor)`, `GetAcceptedHelperId()`, `IsParticipant(user)`, `CreateRating(...)`,
+    `GetOffersVisibleTo(viewer?)`, `StartConversation(...)`, `AllowsConversationWith(helper)`.
+  - `Offer` (część agregatu): HelperId, ProposedBy (Client/Helper), Price, ProposedStart/End, Message?, Status, ParentOfferId?,
+    AnnouncementRevision (kontroferta = nowy `Offer` wskazujący poprzedni; poprzedni dostaje status `Countered`).
+  - `Image` (część agregatu): FileName (do wyświetlania), FileExtension, FilePath (ścieżka w magazynie, nie trafia do DTO), AddedAt
+    (najstarsze = miniatura). Dodanie/usunięcie = nowa rewizja z flagą `Images` (stare/nowe = lista id zdjęć „id1, id2”).
+- `Category` (agregat) → `Subcategory` (część agregatu, unikalna nazwa w kategorii).
+- `RefreshToken` (agregat, `Entities/Users`): UserId, TokenHash (SHA-256), ExpiresAt, RevokedAt?, ReplacedByTokenId? – `Rotate`, `Revoke`.
+- `UserDevice` (agregat, `Entities/Users`) – sekcja „Push i urządzenia”.
+- `Rating`: AnnouncementId, RaterId, RateeId, Rate (1–5), Comment?; unikalne (AnnouncementId, RaterId). Ocenianego (druga strona)
+  wybiera domena; „raz na ogłoszenie” – handler (`AlreadyRatedException`) + unikalny indeks.
+- `LikedAnnouncement` (UserId, AnnouncementId) i `LikedUser` (LikerId, LikedId) – klucze złożone, istnienie wiersza = polubione.
+- `Conversation` (agregat, `Entities/Negotiations`): AnnouncementId, ClientId (= właściciel), HelperId, CreatedAt,
+  `Client/HelperLastReadAt`, **Messages** (`ConversationMessage`: SenderId, Text (Description ≤ 500), SentAt, AnnouncementRevision).
+  Jeden na parę (AnnouncementId, HelperId). Tworzy go `announcement.StartConversation` (tylko Open, nie właściciel);
+  `SendMessage(..., announcement, at)` sprawdza `announcement.AllowsConversationWith(HelperId)`: Open – każdy, Accepted/InProgress –
+  tylko zaakceptowany pomocnik, Completed/Cancelled – nikt (wątek tylko do odczytu). `MarkAsRead` (znacznik nie cofa się; wysłanie =
+  przeczytane), `CountUnread`. Rozmowa ≠ oferta (wiadomości nie da się zaakceptować).
+- `AggregateRoot` (baza `Announcement`, `Conversation`): `DomainEvents` (`Core/Events`: `AnnouncementPublished/Edited`,
+  `OfferMade/Countered/Accepted/Rejected/Withdrawn`, `MessageSent`), czas = parametr metody. `SqlUnitOfWork` przenosi je do outboksa.
+- `Notification` (agregat, `Entities/Notifications`): UserId (odbiorca), Type, Payload (JSON parametrów), AnnouncementId?,
+  ConversationId?, CreatedAt, ReadAt?, SourceEventId (unikalne z UserId) – sekcja „Powiadomienia”.
+- `AnnouncementAlert` (agregat, `Entities/Alerts`): Area (1 punkt) | Route (2–1000), kategoria + podkategorie, RadiusKm 0,5–50,
+  dni/godziny, IsEnabled, max 10/użytkownik. Geometria tylko w bazie (`Shape` z EF, `Zone` z triggera SQL) – sekcja „Alerty”.
 
 ## Infrastructure (jak jest zbudowane)
 - `ICanHelpDbContext.ConfigureConventions` – globalne konwertery VO (`DAL/Converters`) i enumy jako string.
