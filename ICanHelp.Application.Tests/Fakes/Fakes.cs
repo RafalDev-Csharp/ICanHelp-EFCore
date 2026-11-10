@@ -328,6 +328,60 @@ internal sealed class FakeRefreshTokenService : IRefreshTokenService
     public string Hash(string token) => "h:" + token;
 }
 
+internal sealed class InMemoryUserDeviceRepository : IUserDeviceRepository
+{
+    public List<UserDevice> Devices { get; } = new();
+
+    public Task<UserDevice?> GetByIdAsync(Id id, CancellationToken cancellationToken = default)
+        => Task.FromResult(Devices.SingleOrDefault(d => d.Id == id));
+
+    public Task<UserDevice?> GetByTokenAsync(string token, CancellationToken cancellationToken = default)
+        => Task.FromResult(Devices.SingleOrDefault(d => d.Token == token));
+
+    public Task<IReadOnlyList<UserDevice>> GetByUserAsync(UserId userId, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<UserDevice>>(Devices.Where(d => d.UserId == userId).ToList());
+
+    public Task AddAsync(UserDevice device, CancellationToken cancellationToken = default)
+    {
+        Devices.Add(device);
+        return Task.CompletedTask;
+    }
+
+    public void Remove(UserDevice device) => Devices.Remove(device);
+}
+
+/// <summary>Zapamiętuje wysyłki push; <see cref="InvalidTokens"/> – tokeny, które „FCM odrzuci”.</summary>
+internal sealed class RecordingPushSender : IPushSender
+{
+    public List<(IReadOnlyCollection<string> Tokens, PushMessage Message)> Sent { get; } = new();
+    public HashSet<string> InvalidTokens { get; } = new();
+
+    public Task<PushSendResult> SendAsync(IReadOnlyCollection<string> tokens, PushMessage message,
+        CancellationToken cancellationToken = default)
+    {
+        Sent.Add((tokens.ToList(), message));
+        return Task.FromResult(new PushSendResult(tokens.Where(InvalidTokens.Contains).ToList()));
+    }
+}
+
+/// <summary>Kanał, który zapamiętuje wysyłki albo zawsze rzuca wyjątek (awaria kanału).</summary>
+internal sealed class RecordingChannel : INotificationChannel
+{
+    public bool Fail { get; init; }
+    public List<(Guid UserId, NotificationDto Notification)> Sent { get; } = new();
+
+    public Task SendAsync(Guid userId, NotificationDto notification, CancellationToken cancellationToken = default)
+    {
+        if (Fail)
+        {
+            throw new InvalidOperationException("Channel is down.");
+        }
+
+        Sent.Add((userId, notification));
+        return Task.CompletedTask;
+    }
+}
+
 /// <summary>Zegar, który można przesuwać w teście.</summary>
 internal sealed class MutableClock : IClock
 {

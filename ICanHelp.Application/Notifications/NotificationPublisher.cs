@@ -78,14 +78,25 @@ internal sealed class NotificationPublisher
 
 public static class NotificationMapping
 {
-    public static NotificationDto ToDto(this Notification notification) => new()
+    public static NotificationDto ToDto(this Notification notification)
     {
-        Id = notification.Id,
-        Type = notification.Type.ToString(),
-        Parameters = NotificationPayload.Deserialize(notification.Payload),
-        AnnouncementId = notification.AnnouncementId?.Value,
-        ConversationId = notification.ConversationId?.Value,
-        CreatedAt = notification.CreatedAt,
-        ReadAt = notification.ReadAt
-    };
+        var parameters = NotificationPayload.Deserialize(notification.Payload);
+        var text = NotificationTextFormatter.Format(notification.Type, parameters);
+        var announcementId = notification.AnnouncementId?.Value;
+        var conversationId = notification.ConversationId?.Value;
+
+        return new NotificationDto
+        {
+            Id = notification.Id,
+            Title = text.Title,
+            Body = text.Body,
+            Url = NotificationTextFormatter.Link(notification.Type, announcementId, conversationId),
+            Type = notification.Type.ToString(),
+            Parameters = parameters,
+            AnnouncementId = announcementId,
+            ConversationId = conversationId,
+            CreatedAt = notification.CreatedAt,
+            ReadAt = notification.ReadAt
+        };
+    }
 }

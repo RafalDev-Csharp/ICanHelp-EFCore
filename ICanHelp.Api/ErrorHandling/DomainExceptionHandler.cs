@@ -10,7 +10,7 @@ namespace ICanHelp.Api.ErrorHandling;
 /// <list type="bullet">
 /// <item><see cref="OfferNotFoundException"/>, <see cref="AnnouncementNotFoundException"/>, <see cref="UserNotFoundException"/>,
 /// <see cref="ImageNotFoundException"/>, <see cref="ConversationNotFoundException"/>,
-/// <see cref="NotificationNotFoundException"/>, <see cref="AlertNotFoundException"/> → 404</item>
+/// <see cref="NotificationNotFoundException"/>, <see cref="AlertNotFoundException"/>, <see cref="DeviceNotFoundException"/> → 404</item>
 /// <item><see cref="DomainRuleException"/> (złamana reguła biznesowa), zajęta nazwa/e-mail, ponowna ocena,
 /// <see cref="ConcurrencyConflictException"/> (równoczesna zmiana) → 409</item>
 /// <item><see cref="InvalidCredentialsException"/>, <see cref="InvalidRefreshTokenException"/> → 401, <see cref="UserLockedException"/> → 403</item>
@@ -41,6 +41,7 @@ internal sealed class DomainExceptionHandler : IExceptionHandler
         {
             OfferNotFoundException or AnnouncementNotFoundException or UserNotFoundException or ImageNotFoundException
                 or ConversationNotFoundException or NotificationNotFoundException or AlertNotFoundException
+                or DeviceNotFoundException
                 => (StatusCodes.Status404NotFound, "Resource not found"),
             DomainRuleException => (StatusCodes.Status409Conflict, "Business rule violated"),
             ConcurrencyConflictException => (StatusCodes.Status409Conflict, "Concurrent change"),

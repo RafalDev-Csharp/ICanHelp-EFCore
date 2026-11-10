@@ -138,7 +138,8 @@ Nowe wiadomości bez odświeżania – F6 (SignalR); do tego czasu „pociągnij
 Zrobione 9.11.2026 (szczegóły: `docs/HISTORIA-KROKOW.md`). Decyzje: serwis w `core/notifications/` (używają go zakładki, wątek,
 lista rozmów), łączy się tylko zalogowany, hub tylko przyspiesza – licznik zawsze z `unread-count` (po zalogowaniu, wznowieniu,
 powrocie do karty). Teksty w jednym pliku `notification-texts.ts` – przy Kroku 15 (push potrzebuje tekstu na serwerze) rozważyć
-`Title`/`Body` w `NotificationDto` i usunięcie tekstów z frontu. Oferty i wiadomości prowadzą do wątku (tam akcje), edycja i alert –
+`Title`/`Body` w `NotificationDto` i usunięcie tekstów z frontu. (Krok 15: zrobione – API zwraca `title`/`body`/`url`, front je
+bierze; teksty z `parameters` zostały jako zapas.) Oferty i wiadomości prowadzą do wątku (tam akcje), edycja i alert –
 do ogłoszenia. Nowa wiadomość w otwartym wątku = przeładowanie wątku z API (kolejność i godziny z serwera), bez toastu, od razu
 przeczytana. Backend: `read-all?conversationId=` – wejście do wątku gasi jego powiadomienia.
 

@@ -29,7 +29,8 @@ builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 // Powiadomienia na żywo (Krok 13). Enumy jako tekst – tak jak w kontrolerach.
 builder.Services.AddSignalR()
     .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-builder.Services.AddSingleton<INotificationSender, SignalRNotificationSender>();
+// Kanał SignalR; push (Krok 15) rejestruje Application, a wysyłacz FCM – Infrastructure.
+builder.Services.AddSingleton<INotificationChannel, SignalRNotificationSender>();
 
 builder.Services.AddHealthChecks();
 

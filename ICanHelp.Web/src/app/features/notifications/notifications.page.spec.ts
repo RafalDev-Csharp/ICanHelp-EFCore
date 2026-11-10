@@ -12,6 +12,9 @@ import { NOTIFICATIONS_PAGE_SIZE, NotificationsPage } from './notifications.page
 function notification(id: string, overrides: Partial<NotificationDto> = {}): NotificationDto {
   return {
     id,
+    title: '',
+    body: '',
+    url: undefined,
     type: 'OfferReceived',
     parameters: { announcementTitle: 'Cieknący kran', price: '120.00 PLN' },
     announcementId: 'a1',

@@ -6,6 +6,9 @@ function notification(type: string, parameters: Record<string, string> = {}, ove
   return {
     id: 'n1',
     type,
+    title: '',
+    body: '',
+    url: undefined,
     parameters,
     announcementId: 'a1',
     conversationId: 'c1',
@@ -31,6 +34,13 @@ describe('notification texts', () => {
     );
     expect(describeNotification(notification('OfferAccepted', title)).title).toBe('Twoja oferta została przyjęta');
     expect(describeNotification(notification('OfferWithdrawn', title)).title).toBe('Oferta wycofana');
+  });
+
+  it('prefers the ready text from the API and keeps the icon from the type', () => {
+    const text = describeNotification(
+      notification('OfferReceived', { ...title, price: '120.00 PLN' }, { title: 'Z serwera', body: 'Treść' }),
+    );
+    expect(text).toEqual({ title: 'Z serwera', body: 'Treść', icon: 'pricetag-outline' });
   });
 
   it('tells a rejection apart from choosing another helper', () => {

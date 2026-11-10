@@ -1,12 +1,21 @@
 namespace ICanHelp.Application.DTO;
 
 /// <summary>
-/// One notification of the reader. The client builds the text from <see cref="Type"/> and <see cref="Parameters"/>
-/// (e.g. OfferReceived + announcementTitle + price → "Nowa oferta 120.00 PLN: Cieknący kran").
+/// One notification of the reader. <see cref="Title"/> and <see cref="Body"/> are ready texts in Polish (Krok 15,
+/// the same as in the push message); <see cref="Type"/> + <see cref="Parameters"/> stay for icons and own formatting.
 /// </summary>
 public sealed record NotificationDto
 {
     public Guid Id { get; init; }
+
+    /// <summary>E.g. „Nowa oferta: 120 zł”.</summary>
+    public string Title { get; init; } = string.Empty;
+
+    /// <summary>E.g. the announcement title or the beginning of the message (may be empty).</summary>
+    public string Body { get; init; } = string.Empty;
+
+    /// <summary>Path in the app that a click opens, e.g. <c>/conversations/{id}</c>; null = nothing to open.</summary>
+    public string? Url { get; init; }
 
     /// <summary>
     /// OfferReceived, OfferCountered, OfferAccepted, OfferRejected, OfferWithdrawn, MessageReceived, AnnouncementEdited,

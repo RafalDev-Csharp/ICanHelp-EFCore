@@ -323,6 +323,31 @@ POST {{baseUrl}}/api/me/notifications/read-all?conversationId={{myNotifications.
 Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
 
 ###
+# ---------- Urządzenia z push (Krok 15) ----------
+# Token FCM z aplikacji (Firebase getToken). Każde powiadomienie idzie też pushem na wszystkie urządzenia odbiorcy
+# (title/body jak w NotificationDto, data: notificationId, type, announcementId, conversationId, url).
+# Bez klucza (Push:Enabled=false / brak Push:Fcm:CredentialsJson) push tylko w logu.
+# Ten sam token ponownie -> to samo urządzenie (200, nowe lastSeenAt). Pusty token -> 400.
+# @name registerDevice
+POST {{baseUrl}}/api/me/devices
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "token": "fcm-token-z-przegladarki-123",
+  "platform": "Web"
+}
+
+###
+GET {{baseUrl}}/api/me/devices
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# Wylogowanie / wyłączenie powiadomień -> 204 (cudze / nieistniejące -> 404)
+DELETE {{baseUrl}}/api/me/devices/{{registerDevice.response.body.$.id}}
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
 # ---------- Alerty o nowych ogłoszeniach (Krok 14) ----------
 # Pasujące nowe ogłoszenie (strefa + kategoria/podkategoria, nie własne) -> powiadomienie NewAnnouncementNearby
 # (announcementTitle, categoryName, alertName, alertKind, distanceKm). Powyżej Alerts:DailyLimit dziennie -> jeden skrót

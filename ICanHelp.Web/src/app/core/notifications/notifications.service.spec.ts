@@ -34,6 +34,9 @@ class FakeConnection implements NotificationHubConnection {
 function notification(overrides: Partial<NotificationDto> = {}): NotificationDto {
   return {
     id: 'n1',
+    title: '',
+    body: '',
+    url: undefined,
     type: 'MessageReceived',
     parameters: { announcementTitle: 'Cieknący kran', messagePreview: 'Mogę jutro.' },
     announcementId: 'a1',

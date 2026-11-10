@@ -131,28 +131,44 @@ Zrobione w Kroku 14 (odstępstwa od planu / decyzje):
 
 ## Krok 15 – kanał push (FCM) i urządzenia użytkownika
 
-- [ ] Core: agregat `UserDevice` (Id, UserId, Token (FCM, unikalny), Platform: `Web` | `Android` | `Ios`, CreatedAt, LastSeenAt).
+- [x] Core: agregat `UserDevice` (Id, UserId, Token (FCM, unikalny), Platform: `Web` | `Android` | `Ios`, CreatedAt, LastSeenAt).
       Ten sam token zgłoszony ponownie → odświeżenie `LastSeenAt` (i właściciela, jeśli na urządzeniu zalogował się ktoś inny).
       Limit urządzeń na użytkownika (np. 10, najstarsze wypada).
-- [ ] Application: `IPushSender` (wysyłka na listę tokenów, wynik: które tokeny są nieważne). `NotificationTextFormatter` – tytuł
+- [x] Application: `IPushSender` (wysyłka na listę tokenów, wynik: które tokeny są nieważne). `NotificationTextFormatter` – tytuł
       i treść po polsku z `Type` + `Payload` (np. „Nowa oferta: 150 zł – *Cieknący kran*”). Te same teksty przyda się frontend
       (albo backend zwraca je w `NotificationDto`).
-- [ ] Application: `CompositeNotificationSender` – woła wszystkie kanały (SignalR + push); błąd jednego nie blokuje drugiego
+- [x] Application: `CompositeNotificationSender` – woła wszystkie kanały (SignalR + push); błąd jednego nie blokuje drugiego
       (dziś w `Program.cs` jest jeden `INotificationSender` – zamienić na listę kanałów). Push wysyłamy zawsze; gdy aplikacja jest
       otwarta, frontend nie pokazuje systemowego dymka (FCM w aktywnej karcie trafia do `onMessage`) – bez podwójnych powiadomień.
       Cisza nocna jak dziś (alerty w ciszy nie idą na żywo, więc nie idą też pushem); powiadomienia o transakcji – zawsze.
-- [ ] Infrastructure: `FcmPushSender` (NuGet `FirebaseAdmin`, HTTP v1). Klucz konta serwisowego **poza repo** (env / user-secrets,
+- [x] Infrastructure: `FcmPushSender` (NuGet `FirebaseAdmin`, HTTP v1). Klucz konta serwisowego **poza repo** (env / user-secrets,
       `Push:Fcm:CredentialsJson`), `Push:Enabled` – w Testing i bez klucza: implementacja logująca. Odpowiedź `UNREGISTERED` /
       `INVALID_ARGUMENT` → usunięcie `UserDevice`. W wiadomości `data`: `notificationId`, `announcementId?`, `conversationId?`,
       `url` (głęboki link, np. `/announcements/{id}`) – kliknięcie otwiera właściwy ekran.
-- [ ] Api: `POST api/me/devices` (token + platforma, zwraca id; idempotentne), `DELETE api/me/devices/{id}` (wylogowanie /
+- [x] Api: `POST api/me/devices` (token + platforma, zwraca id; idempotentne), `DELETE api/me/devices/{id}` (wylogowanie /
       wyłączenie powiadomień), `GET api/me/devices`. Cudze urządzenie → 404.
-- [ ] Migracja `UserDevices` (unikalny indeks na `Token`, indeks na `UserId`).
-- [ ] Testy: Core (rejestracja, ponowne zgłoszenie, limit), Application (formatter dla każdego `NotificationType`, composite –
+- [x] Migracja `UserDevices` (unikalny indeks na `Token`, indeks na `UserId`).
+- [x] Testy: Core (rejestracja, ponowne zgłoszenie, limit), Application (formatter dla każdego `NotificationType`, composite –
       awaria kanału, nieważny token usuwa urządzenie), Api (rejestracja/usuwanie, obcy → 404, oferta → fake `IPushSender`
       dostał wysyłkę do właściciela, nie do autora).
 - [ ] Ręcznie (po starcie frontendu): projekt w konsoli Firebase, klucz VAPID dla Web, test na Androidzie i iPhonie (PWA na ekranie głównym).
-- [ ] `dotnet build` + `dotnet test`, commit.
+- [x] `dotnet build` + `dotnet test`, commit – 10.11.2026: 468/468 zielone (Core 198, Application 179, integracyjne 91)
+
+Zrobione w Kroku 15 (10.11.2026, decyzje):
+- `NotificationDto` ma gotowe `Title`, `Body` i `Url` (`NotificationTextFormatter` – te same teksty co dotąd we frontendzie,
+  ceny „120 zł”, odległości „2,5 km”); frontend bierze je z API, `type` służy już tylko do ikony (teksty z `parameters` zostały
+  jako zapas). Ten sam tekst idzie w push.
+- Kanały: handlery wołają jeden `INotificationSender` = `CompositeNotificationSender`, a ten wszystkie `INotificationChannel`
+  (SignalR z Api, `PushNotificationChannel` z Application). Wyjątek kanału – log, pozostałe dostarczają; anulowanie nie jest łapane.
+- `POST api/me/devices` zwraca 200 z `DeviceDto` (bez tokenu) – nie 201, bo ten sam token zwraca istniejące urządzenie. Token innego
+  użytkownika (ktoś inny zalogował się na tej przeglądarce) przechodzi na nowego. Limit 10 – wypada najdawniej widziane.
+  Zły token → 400 `InvalidDevice`.
+- `FcmPushSender`: `SendEachForMulticastAsync`; nieważne = `UNREGISTERED`, `SENDER_ID_MISMATCH`, `INVALID_ARGUMENT` – ale gdy wszystkie
+  tokeny (≥ 2) dostały `INVALID_ARGUMENT`, winna jest wiadomość i nic nie usuwamy. `Push:Fcm:WebAppUrl` (opcjonalnie) → absolutny link
+  w Web Push (`fcm_options.link`). FirebaseAdmin 3.7 oznacza `MulticastMessage.Tokens` jako przestarzałe (na rzecz `Fids`) –
+  używamy tokenów (dają je `getToken` i Capacitor), ostrzeżenie wyłączone lokalnie.
+- W testach integracyjnych `IPushSender` = `RecordingPushSender` (`ApiFactory.Push`, `ConfigureTestServices`).
+- Ręcznie (konsola Firebase, VAPID, telefony) – zostaje na F7.
 
 ## Krok 16 – „Jestem w okolicy” (dostępność na żądanie)
 

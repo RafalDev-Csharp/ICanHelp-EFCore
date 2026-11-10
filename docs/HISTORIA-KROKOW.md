@@ -161,6 +161,23 @@
   Testy Vitest: teksty, serwis (fałszywe połączenie), strona listy, zakładki, wątek i lista rozmów (+24).
   9.11.2026 lokalnie (`verify.cmd`, Docker): build + dotnet 414/414 (Core 186, Application 144, integracyjne 84), `npm run api`
   (klient zgodny z ręczną poprawką co do działania), lint + Vitest 181/181 + build zielone.
-- [ ] Krok 15 – kanał push (FCM): `docs/PLAN-POWIADOMIENIA.md`
+- [x] Krok 15 (backend, 10.11.2026) – kanał push (FCM) i urządzenia użytkownika.
+  Core: `UserDevice` (token FCM unikalny, platforma, `LastSeenAt`, `Refresh` – ponowne zgłoszenie / przejęcie tokenu przez innego
+  użytkownika, limit 10 – `SelectToRemoveBeforeAdding` wybiera najdawniej widziane), `DevicePlatform`, `InvalidDeviceException` (400),
+  `IUserDeviceRepository`.
+  Application: `RegisterDevice`/`RemoveDevice` (+ handlery, `DeviceNotFoundException` → 404), `GetMyDevices`/`GetMyDeviceByToken`,
+  `DeviceDto` (bez tokenu); `IPushSender` (`PushMessage`, `PushSendResult.InvalidTokens`); `NotificationTextFormatter` (tytuł
+  i treść po polsku dla 9 typów + link); `NotificationDto` ma `Title`, `Body`, `Url`; `INotificationChannel` +
+  `CompositeNotificationSender` (awaria kanału = log) + `PushNotificationChannel` (nieważne tokeny → usunięcie urządzeń).
+  Pakiet `Microsoft.Extensions.Logging.Abstractions`.
+  Infrastructure: `UserDeviceConfiguration`, repozytorium, query handlery, `Push/` (`PushOptions` – sekcja `Push`, `FcmPushSender`
+  – NuGet `FirebaseAdmin` 3.7.0, `LoggingPushSender`), migracja `UserDevices` (wygenerowana `dotnet ef`, bez GeoPoint).
+  Api: `DevicesController` (`api/me/devices`), SignalR jako `INotificationChannel`, `Push` w `appsettings.json`, przykłady w `.http`.
+  Testy: Core `UserDeviceTests`, Application `NotificationTextFormatterTests`, `NotificationChannelsTests`, `DeviceHandlersTests`,
+  Api `DeviceTests` (7: idempotencja, obcy → 404, przejęcie tokenu, 400, 401, push do właściciela a nie autora, nieważny token usuwa
+  urządzenie; `RecordingPushSender` w `ApiFactory`).
+  Frontend: `describeNotification` bierze `title`/`body` z API (ikona z `type`), klient przegenerowany (`DevicesClient`).
+  10.11.2026 lokalnie (`verify.cmd`, Docker): build + dotnet 468/468 (Core 198, Application 179, integracyjne 91), `npm run api`,
+  lint + Vitest 182/182 + build zielone. Ręczny test FCM (konsola Firebase, VAPID, telefony) – w F7.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

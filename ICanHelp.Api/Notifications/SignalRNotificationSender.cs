@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.SignalR;
 namespace ICanHelp.Api.Notifications;
 
 /// <summary>Kanał SignalR. Błąd dostarczenia tylko logujemy – powiadomienie jest już zapisane na liście.</summary>
-internal sealed class SignalRNotificationSender : INotificationSender
+internal sealed class SignalRNotificationSender : INotificationChannel
 {
     private readonly IHubContext<NotificationsHub> _hub;
     private readonly ILogger<SignalRNotificationSender> _logger;

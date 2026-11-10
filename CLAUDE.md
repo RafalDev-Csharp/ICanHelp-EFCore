@@ -64,6 +64,7 @@ Jeden użytkownik może być raz klientem, raz pomocnikiem (rola w transakcji, n
   `MarkAsRead` (znacznik nie cofa się; wysłanie = przeczytane), `CountUnread`. Rozmowa ≠ oferta (wiadomości nie da się zaakceptować).
 - `AggregateRoot` (baza `Announcement`, `Conversation`): `DomainEvents` – zdarzenia (`Core/Events`: `AnnouncementPublished/Edited`,
   `OfferMade/Countered/Accepted/Rejected/Withdrawn`, `MessageSent`), czas = parametr metody. `SqlUnitOfWork` przenosi je do outboksa.
+- `UserDevice` (agregat, `Entities/Users`): token FCM (unikalny), Platform, LastSeenAt, max 10/użytkownik → `docs/ARCHITEKTURA.md` „Push”.
 - `Notification` (agregat, `Entities/Notifications`): UserId (odbiorca), Type, Payload (JSON parametrów), AnnouncementId?, ConversationId?,
   CreatedAt, ReadAt?, SourceEventId (unikalne z UserId). Powstaje w tle z outboksa → `docs/ARCHITEKTURA.md` „Powiadomienia”.
 - `AnnouncementAlert` (agregat, `Entities/Alerts`): Area (1 punkt) | Route (2–1000), kategoria + podkategorie, RadiusKm 0,5–50, dni/godziny,
@@ -121,7 +122,7 @@ Wspólne: `RepositoryExtensions` (`GetOrThrowAsync` → `AnnouncementNotFound`, 
   i pomocnik (swoje), reszta tylko `HelperCount`; kontakt po akceptacji; wątki tylko dla dwóch uczestników (obcy → 404).
 - Refresh tokeny (F2): `RefreshToken` (tylko hash), rotacja przy każdym `refresh`, wykrycie ponownego użycia → `docs/ARCHITEKTURA.md`.
 - Endpointy: `api/users` (+ `refresh`, `sign-out`), `api/categories`, `api/announcements` (+ offers, images, conversations, contact, ratings, like),
-  `api/conversations/{id}`, `api/me/conversations`, `api/me/notifications` (+ hub `/hubs/notifications`), `api/me/alerts`. Przykłady wszystkich w `ICanHelp.Api.http`. Porty 5080/7080, `/health`, Swagger w Development.
+  `api/conversations/{id}`, `api/me/conversations`, `api/me/notifications` (+ hub `/hubs/notifications`), `api/me/alerts`, `api/me/devices`. Przykłady wszystkich w `ICanHelp.Api.http`. Porty 5080/7080, `/health`, Swagger w Development.
 
 ## Komendy
 ```bash
@@ -150,7 +151,8 @@ cd ICanHelp.Web && npm ci && npm start   # frontend http://localhost:4200 (proxy
   8.11.2026: build + 320/320 testów zielone.
 - [x] Krok 14 – alerty o nowych ogłoszeniach: obszar i trasa, `api/me/alerts`, migracja `AnnouncementAlerts` (trigger + indeks przestrzenny).
   8.11.2026: build + 371/371 testów zielone.
-- [ ] Krok 15 – kanał push (FCM) + `api/me/devices` – `docs/PLAN-POWIADOMIENIA.md`
+- [x] Krok 15 – push (FCM): `UserDevice`, `api/me/devices`, kanały (`CompositeNotificationSender`: SignalR + push), `Title/Body/Url`
+  w `NotificationDto`, migracja `UserDevices`. 10.11.2026: build + 468/468 testów, lint + 182/182 Vitest + build zielone.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie (alert `Presence` z wygaśnięciem, trasa „aktywuj teraz”), bez śledzenia w tle
 - [ ] Krok 17 (później) – Capacitor (sklepy) + opcjonalna lokalizacja w tle
 - [ ] Frontend (PWA, Angular + Ionic): Kroki F1–F10 i kolejność z backendem – `docs/PLAN-FRONTEND.md`

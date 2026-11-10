@@ -16,6 +16,7 @@ public sealed class ICanHelpDbContext : DbContext
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<UserDevice> UserDevices => Set<UserDevice>();
     public DbSet<Announcement> Announcements => Set<Announcement>();
     public DbSet<Offer> Offers => Set<Offer>();
     public DbSet<Image> Images => Set<Image>();
@@ -102,6 +103,7 @@ public sealed class ICanHelpDbContext : DbContext
         configurationBuilder.Properties<UserRole>().HaveConversion<string>().HaveMaxLength(20);
         configurationBuilder.Properties<NotificationType>().HaveConversion<string>().HaveMaxLength(40);
         configurationBuilder.Properties<AlertKind>().HaveConversion<string>().HaveMaxLength(20);
+        configurationBuilder.Properties<DevicePlatform>().HaveConversion<string>().HaveMaxLength(20);
         // [Flags] as text, e.g. "Workdays" or "Monday, Saturday".
         configurationBuilder.Properties<WeekDays>().HaveConversion<string>().HaveMaxLength(100);
         // [Flags] enum as text, e.g. "Description, Budget" (Enum.Parse reads it back).

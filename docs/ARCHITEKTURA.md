@@ -114,6 +114,19 @@
 - Testy integracyjne: `Outbox:Enabled=false`, outbox przetwarza `TestApi.ProcessOutboxAsync()` (`IOutboxProcessor`, semafor – nie biegnie
   równolegle z pętlą). Kilka instancji API wymagałoby blokowania wierszy (`UPDLOCK, READPAST`) – na razie niepotrzebne.
 
+## Push i urządzenia (Krok 15)
+- `UserDevice` (agregat, `Core/Entities/Users`): Token FCM (unikalny, ≤ 512, bez spacji), Platform (`Web`/`Android`/`Ios`),
+  CreatedAt, LastSeenAt; `Refresh` (ten sam token ponownie – także przejęcie przez innego użytkownika), `SelectToRemoveBeforeAdding`
+  (limit 10). Tabela `UserDevices` (FK UserId Restrict, indeksy Token unikalny i UserId), migracja `UserDevices` (20261110091546).
+- Dostarczanie: handlery → `INotificationSender` = `CompositeNotificationSender` → każdy `INotificationChannel`:
+  `SignalRNotificationSender` (Api) i `PushNotificationChannel` (Application: tokeny odbiorcy → `IPushSender` → nieważne tokeny =
+  usunięte urządzenia). Cisza nocna alertów działa przed kanałami, więc obejmuje też push.
+- `IPushSender`: `Infrastructure/Push/FcmPushSender` (FirebaseAdmin, HTTP v1) gdy `Push:Enabled` i `Push:Fcm:CredentialsJson`
+  (sekret – env `Push__Fcm__CredentialsJson` / user-secrets), inaczej `LoggingPushSender`. Wiadomość: `notification` (title/body)
+  + `data` (notificationId, type, announcementId?, conversationId?, url).
+- Teksty: `Application/Notifications/NotificationTextFormatter` – `Title`/`Body`/`Url` w `NotificationDto` (lista, SignalR, push).
+- Api: `DevicesController` – `GET/POST api/me/devices`, `DELETE api/me/devices/{id}` (cudze → 404 `DeviceNotFound`).
+
 ## Alerty (Krok 14)
 - `Core/Entities/Alerts/AnnouncementAlert`: obszar (1 punkt) albo trasa (2–1000 punktów), promień 0,5–50 km, kategoria + podkategorie
   (puste = cała), `ActiveDays`/`ActiveFrom`/`ActiveTo` (czas lokalny, przez północ OK), `IsEnabled`, max 10 na użytkownika.

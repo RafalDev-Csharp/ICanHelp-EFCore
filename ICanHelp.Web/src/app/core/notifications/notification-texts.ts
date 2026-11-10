@@ -22,10 +22,18 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 /**
- * Tekst z `type` + `parameters` (backend zapisuje tylko parametry – `Application/Notifications/NotificationPayload`).
- * Jedno miejsce; jeśli Krok 15 doda `title`/`body` do `NotificationDto` (push), tu przejdziemy na teksty z API.
+ * Tekst powiadomienia. Od Kroku 15 backend zwraca gotowe `title`/`body` (te same co w push –
+ * `Application/Notifications/NotificationTextFormatter`), więc je bierzemy; ikona zawsze z `type`.
+ * Bez tekstu z API (starsze dane, testy) – składamy go sami z `type` + `parameters`.
  */
 export function describeNotification(notification: NotificationDto): NotificationText {
+  const fallback = describeFromParameters(notification);
+  return notification.title
+    ? { title: notification.title, body: notification.body ?? '', icon: fallback.icon }
+    : fallback;
+}
+
+function describeFromParameters(notification: NotificationDto): NotificationText {
   const p = notification.parameters ?? {};
   const title = p['announcementTitle'] ?? '';
   const price = formatApiPrice(p['price']);

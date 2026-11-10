@@ -6,6 +6,7 @@ using ICanHelp.Application.Time;
 using ICanHelp.Infrastructure.DAL;
 using ICanHelp.Infrastructure.Notifications;
 using ICanHelp.Infrastructure.Outbox;
+using ICanHelp.Infrastructure.Push;
 using ICanHelp.Infrastructure.Security;
 using ICanHelp.Infrastructure.Storage;
 using ICanHelp.Infrastructure.Time;
@@ -44,6 +45,9 @@ public static class Extensions
         services.AddSingleton<IOutboxProcessor, OutboxProcessor>();
         services.AddHostedService<OutboxBackgroundService>();
         services.AddSingleton<IEmailSender, LoggingEmailSender>();
+
+        // Krok 15: push to the devices of the user (FCM; without the key – logging only).
+        services.AddPush(configuration);
 
         // Krok 14: alerts about new announcements – daily limit, quiet hours, time zone (section "Alerts").
         services.AddSingleton(configuration.GetSection(AlertOptions.SectionName).Get<AlertOptions>() ?? new AlertOptions());

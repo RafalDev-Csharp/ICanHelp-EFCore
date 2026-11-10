@@ -1,6 +1,9 @@
+using ICanHelp.Application.Notifications;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.MsSql;
 
 namespace ICanHelp.Api.Tests.Infrastructure;
@@ -49,7 +52,12 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Storage:ImagesPath", ImagesPath);
         // Outbox bez pętli w tle: testy przetwarzają go same (TestApi.ProcessOutboxAsync), żeby nie czekać na interwał.
         builder.UseSetting("Outbox:Enabled", "false");
+
+        // Krok 15: push bez FCM – testy sprawdzają, co „wysłano” (Push).
+        builder.ConfigureTestServices(services => services.AddSingleton<IPushSender>(Push));
     }
+
+    public RecordingPushSender Push { get; } = new();
 
     async Task IAsyncLifetime.DisposeAsync()
     {
