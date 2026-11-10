@@ -10,6 +10,7 @@ import {
 } from 'ionicons/icons';
 
 import { NotificationsService } from '../core/notifications/notifications.service';
+import { PushService } from '../core/pwa/push.service';
 
 @Component({
   selector: 'app-tabs',
@@ -31,5 +32,7 @@ export class TabsPage {
     addIcons({ megaphoneOutline, addCircleOutline, chatbubblesOutline, notificationsOutline, personCircleOutline });
     // Zakładki = aplikacja działa: od teraz powiadomienia na żywo (gdy użytkownik jest zalogowany).
     this.notifications.start();
+    // Push (F7): ponowny zapis urządzenia, gdy zgoda już jest; o zgodę pytamy dopiero po akcji użytkownika.
+    inject(PushService).start();
   }
 }

@@ -3,6 +3,7 @@ import { Router, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { AnnouncementsClient, CategoriesClient } from '../../core/api/api-client';
+import { PushService } from '../../core/pwa/push.service';
 import { ToastService } from '../../core/ui/toast.service';
 
 import { AddAnnouncementPage } from './add-announcement.page';
@@ -12,6 +13,7 @@ import { AnnouncementFormStubComponent } from './testing/announcement-form.stub'
 describe('AddAnnouncementPage', () => {
   const client = { create: vi.fn(), postImage: vi.fn(), deleteImage: vi.fn() };
   const toast = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
+  const push = { suggest: vi.fn(() => Promise.resolve()) };
 
   function create(): AddAnnouncementPage {
     TestBed.configureTestingModule({
@@ -21,6 +23,7 @@ describe('AddAnnouncementPage', () => {
         { provide: AnnouncementsClient, useValue: client },
         { provide: CategoriesClient, useValue: { getAll: () => of([]) } },
         { provide: ToastService, useValue: toast },
+        { provide: PushService, useValue: push },
       ],
     });
     TestBed.overrideComponent(AddAnnouncementPage, {
@@ -93,6 +96,7 @@ describe('AddAnnouncementPage', () => {
     expect(client.postImage).toHaveBeenCalledWith('new-1', { data: blob, fileName: 'kran.jpg' });
     expect(toast.success).toHaveBeenCalledWith('Ogłoszenie dodane.');
     expect(navigate).toHaveBeenCalledWith(['/announcements', 'new-1']);
+    expect(push.suggest).toHaveBeenCalledTimes(1);
     // Zakładka zostaje w pamięci – formularz jest gotowy na kolejne ogłoszenie.
     expect(page.form.controls.title.value).toBe('');
     expect(page.photos()).toEqual([]);

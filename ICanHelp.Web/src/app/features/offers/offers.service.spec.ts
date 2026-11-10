@@ -4,6 +4,7 @@ import { of, throwError } from 'rxjs';
 
 import type { MakeOffer } from '../../core/api/api-client';
 import { AnnouncementsClient } from '../../core/api/api-client';
+import { PushService } from '../../core/pwa/push.service';
 import { ToastService } from '../../core/ui/toast.service';
 
 import { OfferFormModalComponent } from './offer-form-modal.component';
@@ -21,6 +22,7 @@ describe('OffersService', () => {
     postRating: vi.fn(),
   };
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
+  const push = { suggest: vi.fn(() => Promise.resolve()) };
   /** Wynik zamknięcia okna (modal) i rola wybrana w potwierdzeniu (alert). */
   let modalResult: { data?: unknown; role?: string } = {};
   let alertRole = 'confirm';
@@ -48,6 +50,7 @@ describe('OffersService', () => {
         { provide: ModalController, useValue: modals },
         { provide: AlertController, useValue: alerts },
         { provide: ToastService, useValue: toast },
+        { provide: PushService, useValue: push },
       ],
     });
     return TestBed.inject(OffersService);
@@ -70,6 +73,7 @@ describe('OffersService', () => {
     expect(modals.create.mock.calls[0][0].componentProps).toMatchObject({ suggestedPrice: 150 });
     expect(client.postOffer).toHaveBeenCalledWith('a1', command);
     expect(toast.success).toHaveBeenCalledWith('Oferta wysłana.');
+    expect(push.suggest).toHaveBeenCalledWith('Powiadomić Cię, gdy zleceniodawca odpowie na ofertę?');
   });
 
   it('sends nothing when the form is closed', async () => {
@@ -78,6 +82,7 @@ describe('OffersService', () => {
 
     await expect(service.make('a1')).resolves.toBeNull();
     expect(client.postOffer).not.toHaveBeenCalled();
+    expect(push.suggest).not.toHaveBeenCalled();
   });
 
   it('counters an outdated offer with a note about the change', async () => {

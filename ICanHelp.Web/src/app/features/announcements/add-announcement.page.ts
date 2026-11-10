@@ -8,6 +8,7 @@ import { map, switchMap } from 'rxjs';
 import { AnnouncementsClient } from '../../core/api/api-client';
 import { CategoriesService } from '../../core/categories/categories.service';
 import type { GeoPoint } from '../../core/geo/geo-point';
+import { PushService } from '../../core/pwa/push.service';
 import { ToastService } from '../../core/ui/toast.service';
 
 import type { PhotoItem } from './form/announcement-form';
@@ -30,6 +31,7 @@ export class AddAnnouncementPage implements ViewWillEnter {
   private readonly categories = inject(CategoriesService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly push = inject(PushService);
 
   readonly form = createAnnouncementForm(inject(NonNullableFormBuilder));
   readonly location = signal<GeoPoint | null>(null);
@@ -66,6 +68,7 @@ export class AddAnnouncementPage implements ViewWillEnter {
             : this.toast.success('Ogłoszenie dodane.'));
           this.reset();
           void this.router.navigate(['/announcements', id]);
+          void this.push.suggest('Powiadomić Cię, gdy ktoś złoży ofertę do tego ogłoszenia?');
         },
         // Komunikat (np. zła kategoria) pokazał interceptor – formularz zostaje, można poprawić i wysłać znowu.
         error: () => this.saving.set(false),

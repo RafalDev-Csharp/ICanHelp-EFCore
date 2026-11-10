@@ -20,6 +20,7 @@
     <ion-button routerLink="/login" [queryParams]="{ returnUrl: '/profile' }">Zaloguj się</ion-button>
     <ion-button fill="clear" routerLink="/register" [queryParams]="{ returnUrl: '/profile' }"> Załóż konto </ion-button>
   </app-empty-state>
+  <app-app-settings></app-app-settings>
   } @else { @let user = auth.currentUser(); @if (user) {
   <ion-list inset="true">
     <ion-list-header>
@@ -68,6 +69,8 @@
     <ion-spinner name="crescent"></ion-spinner>
   </div>
   }
+
+  <app-app-settings></app-app-settings>
 
   <div class="ion-padding">
     <ion-button expand="block" fill="outline" color="danger" (click)="signOut()">Wyloguj się</ion-button>

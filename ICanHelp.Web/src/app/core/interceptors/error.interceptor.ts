@@ -14,9 +14,9 @@ export const SKIP_ERROR_TOAST = new HttpContextToken<boolean>(() => false);
 
 /**
  * Żądania sesji: o błędach odświeżenia/wylogowania mówi błąd żądania, które je wywołało (bez podwójnego toastu),
- * a wylogowanie ma się udać zawsze.
+ * a wylogowanie ma się udać zawsze. Urządzenia push (`api/me/devices`) zapisujemy w tle – błąd mówi `PushService`.
  */
-const SILENT_PATHS = ['/api/users/refresh', '/api/users/sign-out'];
+const SILENT_PATHS = ['/api/users/refresh', '/api/users/sign-out', '/api/me/devices'];
 
 /**
  * Jedno miejsce na błędy API: ProblemDetails → toast po polsku (`errorCode` → tekst, inaczej komunikat dla kodu HTTP).

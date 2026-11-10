@@ -1,0 +1,41 @@
+@if (visible()) {
+<ion-list inset="true">
+  <ion-list-header>
+    <ion-label>Aplikacja</ion-label>
+  </ion-list-header>
+
+  @if (install.canPrompt()) {
+  <ion-item>
+    <ion-icon name="download-outline" slot="start" aria-hidden="true"></ion-icon>
+    <ion-label class="ion-text-wrap">
+      <h3>Zainstaluj aplikację</h3>
+      <p>Ikona na ekranie telefonu, szybszy start, powiadomienia.</p>
+    </ion-label>
+    <ion-button slot="end" (click)="installApp()" data-testid="install">Zainstaluj</ion-button>
+  </ion-item>
+  } @else if (install.showIosHint()) {
+  <ion-item data-testid="ios-hint">
+    <ion-icon name="share-outline" slot="start" aria-hidden="true"></ion-icon>
+    <ion-label class="ion-text-wrap">
+      <h3>Dodaj do ekranu początkowego</h3>
+      <p>W Safari stuknij „Udostępnij”, potem „Do ekranu początkowego”. Dopiero wtedy iPhone pokaże powiadomienia.</p>
+    </ion-label>
+  </ion-item>
+  } @if (auth.isAuthenticated() && pushNote(); as note) {
+  <ion-item lines="none">
+    <ion-icon name="notifications-outline" slot="start" aria-hidden="true"></ion-icon>
+    <ion-label class="ion-text-wrap">
+      <h3>Powiadomienia push</h3>
+      <ion-note data-testid="push-note">{{ note }}</ion-note>
+    </ion-label>
+    @if (push.state() === 'default') {
+    <ion-button slot="end" [disabled]="push.busy()" (click)="enablePush()" data-testid="enable-push">
+      @if (push.busy()) {
+      <ion-spinner name="crescent"></ion-spinner>
+      } @else { Włącz }
+    </ion-button>
+    }
+  </ion-item>
+  }
+</ion-list>
+}

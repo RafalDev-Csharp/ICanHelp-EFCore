@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 
 import type { MakeOffer, OfferDto, RateAnnouncement } from '../../core/api/api-client';
 import { AnnouncementsClient } from '../../core/api/api-client';
+import { PushService } from '../../core/pwa/push.service';
 import { ToastService } from '../../core/ui/toast.service';
 import { formatPrice } from '../../shared/pipes/price.pipe';
 
@@ -23,6 +24,7 @@ export class OffersService {
   private readonly modals = inject(ModalController);
   private readonly alerts = inject(AlertController);
   private readonly toast = inject(ToastService);
+  private readonly push = inject(PushService);
 
   /** Pierwsza oferta pomocnika (cena podpowiedziana z budżetu). Zwraca id oferty albo `null`. */
   async make(announcementId: string, suggestedPrice?: number): Promise<string | null> {
@@ -31,6 +33,10 @@ export class OffersService {
       return null;
     }
     const created = await this.run(this.client.postOffer(announcementId, command), 'Oferta wysłana.');
+    if (created) {
+      // Dobry moment na pytanie o push: czeka na odpowiedź zleceniodawcy.
+      void this.push.suggest('Powiadomić Cię, gdy zleceniodawca odpowie na ofertę?');
+    }
     return created?.result?.id ?? null;
   }
 

@@ -12,6 +12,9 @@ import type { NotificationHubConnection } from './notification-hub';
 import { NOTIFICATION_HUB_FACTORY, NOTIFICATION_METHOD, RECONNECT_DELAYS_MS } from './notification-hub';
 import { describeNotification, notificationLink } from './notification-texts';
 
+/** Ile ostatnich id powiadomień pamiętamy do odsiewania duplikatów (hub + push). */
+const SEEN_LIMIT = 200;
+
 /**
  * Powiadomienia w aplikacji (F6): połączenie z hubem SignalR, dopóki użytkownik jest zalogowany, licznik
  * nieprzeczytanych (plakietka na zakładce), toast przy nowym i strumień `received$` dla otwartych ekranów
@@ -34,6 +37,11 @@ export class NotificationsService {
   private retryCount = 0;
   /** Wątek otwarty na ekranie (`ConversationPage`). */
   private activeConversationId: string | null = null;
+  /**
+   * Ostatnio pokazane powiadomienia (id). To samo może przyjść dwiema drogami – hubem i pushem przy otwartej
+   * aplikacji (F7); toast pokazujemy raz, a licznik zwiększamy tylko za pierwszym razem.
+   */
+  private readonly seen = new Set<string>();
 
   /** Liczba nieprzeczytanych (plakietka zakładki „Powiadomienia”). */
   readonly unreadCount = signal(0);
@@ -119,6 +127,32 @@ export class NotificationsService {
     }
   }
 
+  /**
+   * Push przyszedł przy otwartej aplikacji (service worker nie pokazał systemowego dymka): toast jak z huba, chyba że
+   * hub już to powiadomienie dostarczył albo użytkownik patrzy na ten wątek.
+   */
+  showPush(push: PushNotice): void {
+    if (!push.notificationId || !this.remember(push.notificationId) || !this.auth.isAuthenticated()) {
+      return;
+    }
+    if (push.conversationId && push.conversationId === this.activeConversationId) {
+      return;
+    }
+    this.refreshCount();
+    if (!this.router.url.startsWith('/notifications')) {
+      const message = push.body ? `${push.title} – ${push.body}` : push.title;
+      void this.toast.action(message, 'Pokaż', () => void this.openPush(push.url, push.notificationId));
+    }
+  }
+
+  /** Kliknięcie w push (albo toast z pusha): przeczytane + ekran z `data.url`. */
+  async openPush(url: string | undefined, notificationId?: string): Promise<void> {
+    if (notificationId && this.auth.isAuthenticated()) {
+      this.client.markAsRead(notificationId).subscribe({ next: () => this.refreshCount(), error: () => undefined });
+    }
+    await this.router.navigateByUrl(url && url.startsWith('/') && !url.startsWith('//') ? url : '/notifications');
+  }
+
   private connect(): void {
     if (this.connection) {
       return;
@@ -185,16 +219,42 @@ export class NotificationsService {
       return;
     }
 
-    this.unreadCount.update((count) => count + 1);
+    const firstTime = this.remember(notification.id);
+    if (firstTime) {
+      this.unreadCount.update((count) => count + 1);
+    } else {
+      this.refreshCount(); // push był pierwszy (i już odświeżył licznik) – tu tylko pewność, bez podwójnego +1
+    }
     this.receivedSubject.next(notification);
 
     // Na liście powiadomień nowe pojawia się na górze – toast byłby powtórzeniem.
-    if (!this.router.url.startsWith('/notifications')) {
+    if (firstTime && !this.router.url.startsWith('/notifications')) {
       const text = describeNotification(notification);
       const message = text.body ? `${text.title} – ${text.body}` : text.title;
       void this.toast.action(message, 'Pokaż', () => void this.open(notification));
     }
   }
+
+  /** `true`, gdy to powiadomienie widzimy pierwszy raz. */
+  private remember(notificationId: string): boolean {
+    if (this.seen.has(notificationId)) {
+      return false;
+    }
+    this.seen.add(notificationId);
+    if (this.seen.size > SEEN_LIMIT) {
+      this.seen.delete(this.seen.values().next().value as string);
+    }
+    return true;
+  }
+}
+
+/** Powiadomienie z pusha (FCM `notification` + `data`) przekazane przez service worker do otwartej aplikacji. */
+export interface PushNotice {
+  notificationId?: string;
+  title: string;
+  body?: string;
+  url?: string;
+  conversationId?: string;
 }
 
 export function isRead(notification: NotificationDto): boolean {
