@@ -77,7 +77,7 @@ Api.Tests       Infrastructure/ApiFactory (kontener, RecordingPushSender), Infra
   Przykłady w `ICanHelp.Api.http`. Porty 5080/7080, `/health`, Swagger w Development.
 - Migracje w `Infrastructure/DAL/Migrations`: `dotnet ef migrations add` działa (Krok 15), ale sprawdź wynik – EF nie zna indeksu
   przestrzennego `IX_Announcements_GeoPoint` (kolumna `GeoPoint`); linie, które go dotykają, usuń.
-- Sekrety poza repo (env / user-secrets): `Auth:SigningKey`, `Push:Fcm:CredentialsJson`.
+- Sekrety poza repo (env / user-secrets projektu Api): `Auth:SigningKey`, `Push:Fcm:CredentialsPath` (plik JSON konta serwisowego).
 
 ## Komendy
 ```bash

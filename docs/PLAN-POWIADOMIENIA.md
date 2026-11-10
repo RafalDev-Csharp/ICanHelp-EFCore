@@ -169,6 +169,10 @@ Zrobione w Kroku 15 (10.11.2026, decyzje):
   używamy tokenów (dają je `getToken` i Capacitor), ostrzeżenie wyłączone lokalnie.
 - W testach integracyjnych `IPushSender` = `RecordingPushSender` (`ApiFactory.Push`, `ConfigureTestServices`).
 - Ręcznie (konsola Firebase, VAPID, telefony) – zostaje na F7.
+- 10.11.2026, po kroku: `Push:Fcm:CredentialsPath` (plik zamiast treści JSON – na Windowsie łatwiej), user-secrets w Api,
+  leniwe tworzenie klienta Firebase (wcześniej zły klucz wywracał obsługę zdarzenia z outboksa – bez powiadomień w ogóle).
+  Sprawdzone na żywo 10.11.2026 z prawdziwym projektem Firebase: logowanie kontem serwisowym działa, FCM odrzucił fałszywy token,
+  a backend usunął urządzenie.
 
 ## Krok 16 – „Jestem w okolicy” (dostępność na żądanie)
 

@@ -156,8 +156,12 @@
 - Dostarczanie: handlery → `INotificationSender` = `CompositeNotificationSender` → każdy `INotificationChannel`:
   `SignalRNotificationSender` (Api) i `PushNotificationChannel` (Application: tokeny odbiorcy → `IPushSender` → nieważne tokeny =
   usunięte urządzenia). Cisza nocna alertów działa przed kanałami, więc obejmuje też push.
-- `IPushSender`: `Infrastructure/Push/FcmPushSender` (FirebaseAdmin, HTTP v1) gdy `Push:Enabled` i `Push:Fcm:CredentialsJson`
-  (sekret – env `Push__Fcm__CredentialsJson` / user-secrets), inaczej `LoggingPushSender`. Wiadomość: `notification` (title/body)
+- `IPushSender`: `Infrastructure/Push/FcmPushSender` (FirebaseAdmin, HTTP v1) gdy `Push:Enabled` i klucz konta serwisowego:
+  `Push:Fcm:CredentialsPath` (ścieżka do pliku JSON poza repo) albo `Push:Fcm:CredentialsJson` (treść); inaczej `LoggingPushSender`.
+  Lokalnie: user-secrets projektu Api (`dotnet user-secrets set "Push:Fcm:CredentialsPath" "C:\...\icanhelp-firebase.json"`,
+  `"Push:Enabled" "true"`), na serwerze – zmienne `Push__Fcm__…`. Klient Firebase powstaje przy pierwszym pushu (`Lazy`): zły klucz
+  psuje tylko kanał push (ostrzeżenie w logu), powiadomienia i SignalR działają dalej. Klucz VAPID (Cloud Messaging) to coś innego –
+  potrzebuje go tylko frontend (F7). Wiadomość: `notification` (title/body)
   + `data` (notificationId, type, announcementId?, conversationId?, url).
 - Teksty: `Application/Notifications/NotificationTextFormatter` – `Title`/`Body`/`Url` w `NotificationDto` (lista, SignalR, push).
 - Api: `DevicesController` – `GET/POST api/me/devices`, `DELETE api/me/devices/{id}` (cudze → 404 `DeviceNotFound`).

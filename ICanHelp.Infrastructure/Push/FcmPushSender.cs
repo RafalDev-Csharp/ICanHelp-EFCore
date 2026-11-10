@@ -18,7 +18,9 @@ internal sealed class FcmPushSender : IPushSender
 {
     private const string AppName = "icanhelp-push";
 
-    private readonly FirebaseMessaging _messaging;
+    // Created on the first push, not in the constructor: a wrong key must only break this channel (the composite
+    // logs it), not the resolving of the event handlers – then no notification would be saved at all.
+    private readonly Lazy<FirebaseMessaging> _messaging;
     private readonly FcmOptions _options;
     private readonly ILogger<FcmPushSender> _logger;
 
@@ -26,15 +28,31 @@ internal sealed class FcmPushSender : IPushSender
     {
         _options = options.Value.Fcm;
         _logger = logger;
+        _messaging = new Lazy<FirebaseMessaging>(CreateMessaging, LazyThreadSafetyMode.ExecutionAndPublication);
+    }
+
+    private FirebaseMessaging CreateMessaging()
+    {
+        GoogleCredential credential;
+        try
+        {
+            credential = CredentialFactory.FromJson<ServiceAccountCredential>(_options.ReadCredentialsJson())
+                .ToGoogleCredential();
+        }
+        catch (Exception exception) when (exception is not InvalidOperationException { InnerException: null })
+        {
+            throw new InvalidOperationException(
+                "Push:Fcm key is not a Firebase service account JSON (Project settings → Service accounts → " +
+                "Generate new private key). The VAPID key from Cloud Messaging is a different thing.", exception);
+        }
 
         var app = FirebaseApp.GetInstance(AppName) ?? FirebaseApp.Create(new FirebaseAdmin.AppOptions
         {
-            Credential = CredentialFactory.FromJson<ServiceAccountCredential>(_options.CredentialsJson!)
-                .ToGoogleCredential(),
+            Credential = credential,
             ProjectId = string.IsNullOrWhiteSpace(_options.ProjectId) ? null : _options.ProjectId
         }, AppName);
 
-        _messaging = FirebaseMessaging.GetMessaging(app);
+        return FirebaseMessaging.GetMessaging(app);
     }
 
     public async Task<PushSendResult> SendAsync(IReadOnlyCollection<string> tokens, PushMessage message,
@@ -46,7 +64,7 @@ internal sealed class FcmPushSender : IPushSender
         }
 
         var tokenList = tokens.ToList();
-        var response = await _messaging.SendEachForMulticastAsync(ToMulticast(tokenList, message), cancellationToken);
+        var response = await _messaging.Value.SendEachForMulticastAsync(ToMulticast(tokenList, message), cancellationToken);
         if (response.FailureCount == 0)
         {
             return PushSendResult.None;
@@ -81,6 +99,12 @@ internal sealed class FcmPushSender : IPushSender
         {
             _logger.LogWarning("Push rejected for every device (INVALID_ARGUMENT) – the message is wrong, no device removed.");
             return PushSendResult.None;
+        }
+
+        if (invalid.Count > 0)
+        {
+            _logger.LogInformation("FCM rejected {Count} of {Total} device token(s) as invalid – they will be removed.",
+                invalid.Count, tokenList.Count);
         }
 
         return new PushSendResult(invalid);
