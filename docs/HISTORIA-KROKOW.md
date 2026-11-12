@@ -225,5 +225,23 @@
   Do zrobienia ręcznie: klucz ORS w `environment*.ts`, sprawdzenie trasy i pasa na telefonie.
   12.11.2026 lokalnie (`verify.cmd`, Docker): build + dotnet 468/468 (Core 198, Application 179, integracyjne 91), `npm run api`
   (klient bez zmian), lint + Vitest 250/250 + build zielone.
+- [ ] Krok F10 (w toku) – wdrożenie. Część 1 (12.11.2026): lokalny test PWA i pusha przez HTTPS.
+  Backend: `ICanHelp.Api/Frontend/FrontendExtensions.cs` – API serwuje zbudowany frontend z `Frontend:Path` (domyślnie
+  `wwwroot`, w `.gitignore`), fallback na `index.html` (bez `/api`, `/hubs`, `/swagger`, `/health`), `no-cache` dla
+  `index.html` / `ngsw.json` / workerów / manifestu, typ `.webmanifest`; bez builda w katalogu – jak dotąd (Development:
+  `/` → Swagger). `FcmPushSender` loguje kody błędów FCM przy usuwaniu tokenów. `serve-local.cmd` (`scripts/serve-local.ps1`):
+  `docker compose up` → `npm run build` → `www/` → `ICanHelp.Api/wwwroot` (robocopy /MIR) → API `--launch-profile https`
+  (`-NoBuild` – bez builda). Testy: `FrontendHostingTests` (12 integracyjnych), przykłady w `ICanHelp.Api.http`.
+  Test na żywo (Chrome przez Playwright, https://localhost:7080, certyfikat dev zaufany, push z prawdziwym FCM): service worker
+  `app-sw.js` aktywny, cache ngsw, `/profile` działa offline; manifest bez błędów, Chrome zgłasza `beforeinstallprompt`
+  (Lighthouse nie ma już kategorii PWA – instalowalność sprawdzona przez CDP `Page.getInstallabilityErrors`). Push: zgoda →
+  token FCM → `POST api/me/devices` → oferta drugiego konta → przy otwartej aplikacji worker przekazuje push do strony (toast,
+  ~0,6–2,6 s), przy zamkniętej – systemowe powiadomienie z `tag` = id i linkiem do wątku (~2 s); 4/4 na trwałym profilu Chrome.
+  Uwagi: na świeżo utworzonym profilu Chrome FCM bywa, że od razu odpowiada `Unregistered` (aplikacja rejestruje token raz,
+  bez usuwania – to po stronie Chrome/GCM); backend usuwa wtedy urządzenie, a aplikacja zapisze token ponownie przy następnym
+  starcie. Panel przeglądarki w aplikacji Claude nie rejestruje service workerów (także na http://localhost) – testy w Chrome.
+  Kliknięcia w systemowy dymek nie da się zautomatyzować – do sprawdzenia ręcznie (razem z telefonem przez tunel).
+  12.11.2026 lokalnie (`verify.cmd`, Docker): build + dotnet 479/479 (Core 198, Application 179, integracyjne 102),
+  `npm run api` (klient bez zmian), lint + Vitest 250/250 + build zielone.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

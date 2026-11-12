@@ -26,8 +26,19 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     // Zdjęcia z testów (Krok 10) – osobny katalog tymczasowy, usuwany po przebiegu.
     public string ImagesPath { get; } = Path.Combine(Path.GetTempPath(), "icanhelp-tests-images-" + Guid.NewGuid().ToString("N"));
 
+    // Krok F10: udawany zbudowany frontend (index.html + worker) – API serwuje go jak www/ z ICanHelp.Web.
+    public string FrontendPath { get; } = Path.Combine(Path.GetTempPath(), "icanhelp-tests-frontend-" + Guid.NewGuid().ToString("N"));
+
+    public const string FrontendIndexMarker = "<app-root>icanhelp-test-index</app-root>";
+
     public async Task InitializeAsync()
     {
+        Directory.CreateDirectory(FrontendPath);
+        await File.WriteAllTextAsync(Path.Combine(FrontendPath, "index.html"), $"<!doctype html><html><body>{FrontendIndexMarker}</body></html>");
+        await File.WriteAllTextAsync(Path.Combine(FrontendPath, "app-sw.js"), "importScripts('./ngsw-worker.js');");
+        await File.WriteAllTextAsync(Path.Combine(FrontendPath, "manifest.webmanifest"), "{\"name\":\"ICanHelp\"}");
+        await File.WriteAllTextAsync(Path.Combine(FrontendPath, "main-ABC123.js"), "console.log('app');");
+
         await _sql.StartAsync();
 
         // Start hosta od razu: DbInitializer (migracje + seed) wykona się raz, przed pierwszym testem.
@@ -52,6 +63,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Storage:ImagesPath", ImagesPath);
         // Outbox bez pętli w tle: testy przetwarzają go same (TestApi.ProcessOutboxAsync), żeby nie czekać na interwał.
         builder.UseSetting("Outbox:Enabled", "false");
+        builder.UseSetting("Frontend:Path", FrontendPath);
 
         // Krok 15: push bez FCM – testy sprawdzają, co „wysłano” (Push).
         builder.ConfigureTestServices(services => services.AddSingleton<IPushSender>(Push));
@@ -67,6 +79,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         if (Directory.Exists(ImagesPath))
         {
             Directory.Delete(ImagesPath, recursive: true);
+        }
+
+        if (Directory.Exists(FrontendPath))
+        {
+            Directory.Delete(FrontendPath, recursive: true);
         }
     }
 }

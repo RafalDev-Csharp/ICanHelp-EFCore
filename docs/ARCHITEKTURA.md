@@ -66,8 +66,14 @@
   wyjątki auth (wyżej), inne `CustomExceptions` (np. `InvalidCategory`) → 400
   (pole `errorCode` = nazwa wyjątku bez „Exception”), reszta → 500 bez szczegółów. Każda odpowiedź ma `traceId`.
 - Enumy w JSON jako string (`JsonStringEnumConverter`). Swagger (Swashbuckle) tylko w Development, z komentarzy `///`.
-- `GET /health` – health check (bez sprawdzania bazy). Porty: http 5080, https 7080. W Development `/` → `/swagger`,
-  `UseHttpsRedirection` tylko poza Development.
+- `GET /health` – health check (bez sprawdzania bazy). Porty: http 5080, https 7080. W Development `/` → `/swagger`
+  (tylko gdy nie ma frontendu, niżej), `UseHttpsRedirection` tylko poza Development.
+- Frontend z API (F10, `Api/Frontend/FrontendExtensions.cs`): gdy w `Frontend:Path` (domyślnie `wwwroot` projektu Api) jest
+  `index.html`, API serwuje pliki statyczne (`.webmanifest` → `application/manifest+json`; `index.html`, `ngsw.json`,
+  `app-sw.js`, `ngsw-worker.js`, manifest – `no-cache`, reszta 1 dzień) i fallback `{*path:nonfile}` → `index.html` dla adresów
+  aplikacji. `/api`, `/hubs`, `/swagger`, `/health` nigdy nie dostają `index.html` – nieznany adres to dalej 404 ProblemDetails.
+  `wwwroot` jest w `.gitignore`; kopiuje tam `serve-local.cmd` (build `ICanHelp.Web/www`). Testy: `FrontendHostingTests`
+  (fabryka ustawia `Frontend:Path` na katalog tymczasowy z udawanym buildem).
 - Connection string (`appsettings.json`) wskazuje SQL Server z `docker-compose.yml` (localhost,1433, sa / hasło dev).
   Na produkcji nadpisać zmienną `ConnectionStrings__DefaultConnection`.
 - `public partial class Program` – pod `WebApplicationFactory` w testach integracyjnych.

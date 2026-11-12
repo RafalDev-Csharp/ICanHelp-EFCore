@@ -64,7 +64,8 @@ Okna (Ionic modal) dostają dane przez `componentProps` → w komponentach okien
 `firebase` + `vapidKey` – publiczna konfiguracja FCM (puste = push wyłączony); `openRouteServiceKey` – trasy alertów (pusty =
 linia prosta).
 PWA: jeden service worker `public/app-sw.js` (push + `importScripts('./ngsw-worker.js')`), `ngsw-config.json`, manifest i ikony
-w `public/`. W `ng serve` service worker jest wyłączony – PWA i push sprawdzamy na `npm run build` (`www/`) przez HTTPS.
+w `public/`. W `ng serve` service worker jest wyłączony – PWA i push sprawdzamy na buildzie: `..\serve-local.cmd` (API serwuje
+`www/` z `wwwroot`, https://localhost:7080). Panel przeglądarki w aplikacji Claude nie rejestruje service workerów – test w Chrome.
 
 ## Zasady (z `docs/PLAN-FRONTEND.md` „Dlaczego tak”)
 1. Mobile first – najpierw telefon (Ionic), komputer ma działać.
@@ -90,4 +91,4 @@ npm run api            # regeneracja core/api/api-client.ts z http://localhost:5
 Testy z HTTP: `provideHttpClientTesting()` + `HttpTestingController`; klient NSwag chce odpowiedzi jako Blob → `jsonBlob()` /
 `problemBlob()` z `core/testing/api-testing.ts`, a kolejne żądanie (po FileReader) łap przez `await vi.waitFor(() => http.expectOne(...))`.
 Test na telefonie: `npm start -- --host 0.0.0.0` w tej samej sieci Wi-Fi, a gdy potrzebny HTTPS (geolokalizacja, PWA, push) –
-tunel (Dev Tunnels / ngrok) na port 4200. CI: job `frontend` w `../.github/workflows/ci.yml` (`npm ci`, lint, test, build).
+tunel (Dev Tunnels / ngrok) na port 4200, a dla PWA / pusha – `serve-local.cmd` i tunel na port 5080. CI: job `frontend` w `../.github/workflows/ci.yml` (`npm ci`, lint, test, build).

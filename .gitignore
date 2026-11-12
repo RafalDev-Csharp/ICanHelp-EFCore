@@ -367,3 +367,6 @@ App_Data/
 
 # Raport skryptu verify.cmd (scripts/verify.ps1)
 .verify/
+
+# Krok F10: kopia zbudowanego frontendu (serve-local.cmd)
+ICanHelp.Api/wwwroot/

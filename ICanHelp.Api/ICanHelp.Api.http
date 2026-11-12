@@ -3,6 +3,14 @@
 GET {{baseUrl}}/health
 
 ###
+# Krok F10: frontend z wwwroot (serve-local.cmd) – adres aplikacji → index.html; bez builda w wwwroot → 404 / Swagger
+GET {{baseUrl}}/announcements
+
+###
+# Worker PWA – zawsze Cache-Control: no-cache
+GET {{baseUrl}}/app-sw.js
+
+###
 GET {{baseUrl}}/api/categories
 
 ###

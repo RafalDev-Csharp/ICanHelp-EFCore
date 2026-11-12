@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
 using ICanHelp.Api.ErrorHandling;
+using ICanHelp.Api.Frontend;
 using ICanHelp.Api.Notifications;
 using ICanHelp.Application;
 using ICanHelp.Application.Notifications;
@@ -70,6 +71,9 @@ builder.Services.AddSwaggerGen(o =>
 
 var app = builder.Build();
 
+// Krok F10: zbudowany frontend (wwwroot / Frontend:Path) – null, gdy go nie ma (praca na ng serve + proxy).
+var frontend = FrontendExtensions.FindFrontend(app.Configuration, app.Environment);
+
 // Wyjątek -> DomainExceptionHandler (400/404/409), a jeśli go nie obsłuży -> 500 jako ProblemDetails.
 app.UseExceptionHandler();
 // Puste odpowiedzi 4xx/5xx (np. nieistniejący adres) też dostają ciało ProblemDetails.
@@ -79,13 +83,21 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
-    // Wygoda: http://localhost:5080/ -> Swagger.
-    app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
+    if (frontend is null)
+    {
+        // Wygoda: http://localhost:5080/ -> Swagger (z frontendem "/" to aplikacja).
+        app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
+    }
 }
 else
 {
     // W Development profil "http" nie ma portu https – przekierowanie tylko logowałoby ostrzeżenie.
     app.UseHttpsRedirection();
+}
+
+if (frontend is not null)
+{
+    app.UseFrontendFiles(frontend);
 }
 
 // Najpierw "kim jesteś" (JWT z nagłówka Authorization), potem "czy możesz" ([Authorize]).
@@ -95,6 +107,10 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<NotificationsHub>(NotificationsHub.Path);
 app.MapHealthChecks("/health");
+if (frontend is not null)
+{
+    app.MapFrontendFallback(frontend);
+}
 
 app.Run();
 

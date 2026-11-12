@@ -82,6 +82,7 @@ Api.Tests       Infrastructure/ApiFactory (kontener, RecordingPushSender), Infra
 ## Komendy
 ```bash
 verify.cmd                                    # wszystko po kroku (Windows) → .verify/report.md; -Quick = bez Dockera
+serve-local.cmd                               # build frontu → Api/wwwroot → https://localhost:7080 (PWA, push); -NoBuild
 dotnet build
 dotnet test                                   # integracyjne wymagają działającego Dockera
 dotnet test --filter "Category!=Integration"  # tylko jednostkowe
@@ -102,7 +103,8 @@ cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /ap
   `PushService` → `api/me/devices`. Zostało ręcznie: `firebase` + `vapidKey` w `environment*.ts`, test Android / iPhone przez HTTPS.
 - [x] F8 – alerty (12.11.2026, `verify.cmd`: dotnet 468/468, Vitest 250/250): `/profile/alerts` (lista, włącz/wyłącz, usuń),
   obszar / trasa (OpenRouteService), podgląd `/preview`. Zostało ręcznie: `openRouteServiceKey` w `environment*.ts`.
-- [ ] **Następny: F10 wdrożenie** = MVP (Augustów / Suwałki)
+- [ ] **W toku: F10 wdrożenie** = MVP (Augustów / Suwałki). 12.11.2026: API serwuje frontend (`wwwroot`, `serve-local.cmd`),
+  PWA + push sprawdzone lokalnie przez HTTPS w Chrome (`verify.cmd`: dotnet 479/479, Vitest 250/250). Dalej: telefon, hosting.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)

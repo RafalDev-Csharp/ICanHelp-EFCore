@@ -72,6 +72,7 @@ internal sealed class FcmPushSender : IPushSender
 
         var invalid = new List<string>();
         var invalidArgument = 0;
+        var codes = new List<string>();
 
         for (var i = 0; i < response.Responses.Count; i++)
         {
@@ -79,6 +80,8 @@ internal sealed class FcmPushSender : IPushSender
             {
                 continue;
             }
+
+            codes.Add($"{exception.MessagingErrorCode?.ToString() ?? exception.ErrorCode.ToString()}: {exception.Message}");
 
             if (exception.MessagingErrorCode is MessagingErrorCode.Unregistered or MessagingErrorCode.SenderIdMismatch)
             {
@@ -103,8 +106,8 @@ internal sealed class FcmPushSender : IPushSender
 
         if (invalid.Count > 0)
         {
-            _logger.LogInformation("FCM rejected {Count} of {Total} device token(s) as invalid – they will be removed.",
-                invalid.Count, tokenList.Count);
+            _logger.LogInformation("FCM rejected {Count} of {Total} device token(s) as invalid – they will be removed ({Codes}).",
+                invalid.Count, tokenList.Count, string.Join("; ", codes));
         }
 
         return new PushSendResult(invalid);

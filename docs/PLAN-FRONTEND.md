@@ -153,8 +153,10 @@ przeczytana. Backend: `read-all?conversationId=` – wejście do wątku gasi jeg
       Uwaga: Angular ma swój service worker (`ngsw`), Firebase chce swojego – użyć jednego (własny SW importujący `ngsw-worker.js`
       i obsługę FCM, rejestracja przekazana do `getToken({ serviceWorkerRegistration })`). Sprawdzić przy implementacji.
 - [x] Kliknięcie w push → otwarcie aplikacji na `data.url`. W otwartej aplikacji – toast zamiast systemowego dymka.
-- [ ] Test ręczny: Android (Chrome) i iPhone (PWA z ekranu głównego) przez tunel HTTPS. Lighthouse (kategoria PWA).
-      Wymaga uzupełnienia `firebase` + `vapidKey` w `src/environments/environment*.ts` (autor).
+- [x] Test lokalny przez HTTPS (12.11.2026, F10): `serve-local.cmd` → https://localhost:7080 – SW, offline, instalowalność,
+      push przy otwartej i zamkniętej aplikacji w Chrome (szczegóły: `docs/HISTORIA-KROKOW.md`, Krok F10).
+- [ ] Test ręczny: Android (Chrome) i iPhone (PWA z ekranu głównego) przez tunel HTTPS na port 5080
+      (`devtunnel host -p 5080 --allow-anonymous` / `ngrok http 5080`), kliknięcie w dymek → właściwy wątek.
 
 Zrobione 10.11.2026 (szczegóły: `docs/HISTORIA-KROKOW.md`). Decyzje: jeden service worker `public/app-sw.js` – sam obsługuje
 `push` i `notificationclick` (bez SDK Firebase w workerze), rejestruje słuchacze **przed** `importScripts('./ngsw-worker.js')`
@@ -200,8 +202,10 @@ Podgląd liczy backend dla zapisanego alertu – odświeża się po „Zapisz zm
 
 ## Krok F10 – wdrożenie i wymagania przed testem z ludźmi
 
-- [ ] Hosting z HTTPS: API (np. Azure App Service / VPS z Dockerem) + baza; frontend jako pliki statyczne – najprościej serwowane
-      przez to samo API (`wwwroot`, fallback na `index.html`) → jedna domena, bez CORS. Alternatywa: Azure Static Web Apps + CORS.
+- [x] Frontend serwowany przez API (`wwwroot` / `Frontend:Path`, fallback na `index.html`, nagłówki cache dla workera) →
+      jedna domena, bez CORS. Lokalnie: `serve-local.cmd` (12.11.2026).
+- [ ] Hosting z HTTPS: API (np. Azure App Service / VPS z Dockerem) + baza; obraz/publikacja z buildem frontendu w `wwwroot`,
+      `Push:Fcm:WebAppUrl` = adres produkcyjny. Alternatywa: Azure Static Web Apps + CORS.
 - [ ] Konfiguracja produkcyjna: `Auth:SigningKey`, połączenie z bazą, Firebase, klucz ORS, dostawca kafelków map – z env, nie z repo.
 - [ ] Zdjęcia: magazyn trwały (dysk/Blob), kopie zapasowe bazy.
 - [ ] Prawne: regulamin, polityka prywatności (lokalizacja, push, e-mail), zgoda przy rejestracji, usunięcie konta (RODO) –
