@@ -34,6 +34,7 @@ describe('AnnouncementListStore', () => {
       undefined,
       undefined,
       undefined,
+      undefined,
       1,
       PAGE_SIZE,
     );
@@ -53,7 +54,7 @@ describe('AnnouncementListStore', () => {
     client.getAll.mockReturnValueOnce(of([announcement(`a${PAGE_SIZE}`), announcement('b1')]));
     await store.loadMore();
 
-    expect(client.getAll.mock.calls[1][7]).toBe(2);
+    expect(client.getAll.mock.calls[1][8]).toBe(2);
     expect(store.items()).toHaveLength(PAGE_SIZE + 1);
     expect(store.items().at(-1)?.id).toBe('b1');
     expect(store.complete()).toBe(true);
@@ -68,9 +69,25 @@ describe('AnnouncementListStore', () => {
     await store.reload();
 
     client.getAll.mockReturnValue(of([announcement('n1', { distanceKm: 1.2 })]));
-    await store.setFilters({ categoryId: 'cat', near: { latitude: 53.8, longitude: 23 }, radiusKm: 5 });
+    await store.setFilters({
+      phrase: ' kran ',
+      categoryId: 'cat',
+      near: { latitude: 53.8, longitude: 23 },
+      radiusKm: 5,
+    });
 
-    expect(client.getAll).toHaveBeenLastCalledWith(undefined, 'cat', undefined, 'Open', 53.8, 23, 5, 1, PAGE_SIZE);
+    expect(client.getAll).toHaveBeenLastCalledWith(
+      undefined,
+      'cat',
+      undefined,
+      'Open',
+      53.8,
+      23,
+      5,
+      'kran',
+      1,
+      PAGE_SIZE,
+    );
     expect(store.items().map((item) => item.id)).toEqual(['n1']);
   });
 

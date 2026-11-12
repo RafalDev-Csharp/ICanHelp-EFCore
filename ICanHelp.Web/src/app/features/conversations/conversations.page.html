@@ -1,9 +1,10 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
     <ion-buttons slot="start">
+      <ion-back-button defaultHref="/conversations"></ion-back-button>
       <app-brand></app-brand>
     </ion-buttons>
-    <ion-title>Rozmowy</ion-title>
+    <ion-title>Wszystkie rozmowy</ion-title>
   </ion-toolbar>
   <ion-toolbar>
     <ion-segment [value]="role()" (ionChange)="setRole($event.detail.value)" aria-label="Rola w rozmowie">
@@ -35,52 +36,14 @@
   <app-empty-state
     icon="chatbubbles-outline"
     heading="Brak rozmów"
-    message="Tu pojawią się Twoje negocjacje – jako zleceniodawca i jako pomocnik."
+    message="Tu pojawią się Twoje pytania i negocjacje – jako zleceniodawca i jako pomocnik."
   >
     <ion-button routerLink="/announcements" fill="outline">Przeglądaj ogłoszenia</ion-button>
   </app-empty-state>
   } @else {
   <ion-list>
     @for (item of items(); track item.conversationId) {
-    <ion-item [routerLink]="['/conversations', item.conversationId]" [detail]="false" class="conversation">
-      <ion-thumbnail slot="start">
-        @if (thumbnail(item.thumbnailUrl); as url) {
-        <img [src]="url" alt="" loading="lazy" />
-        } @else {
-        <div class="no-photo"><ion-icon name="image-outline" aria-hidden="true"></ion-icon></div>
-        }
-      </ion-thumbnail>
-      <ion-label>
-        <h2 [class.unread]="item.unreadCount > 0">{{ item.title }}</h2>
-        <p>
-          {{ item.myRole === 'Client' ? 'Pomocnik' : 'Zleceniodawca' }}: {{ item.otherParty.userName }}
-          <ion-badge [color]="statusColor(item.announcementStatus)"
-            >{{ statusLabel(item.announcementStatus) }}</ion-badge
-          >
-        </p>
-        @if (item.lastOffer; as offer) {
-        <p class="last-offer">
-          {{ offer.price.amount | price }} · {{ offerStatusLabel(offer.status) }} @if (offer.isOutdated && offer.status
-          === 'Pending') { · <span class="outdated">nieaktualna</span> }
-        </p>
-        } @if (item.lastMessagePreview) {
-        <p class="preview">{{ item.lastMessagePreview }}</p>
-        } @if (item.announcementChangedSinceLastRead) {
-        <p class="changed">
-          <ion-icon name="warning-outline" color="warning" aria-hidden="true"></ion-icon>
-          Ogłoszenie zmienione od Twojej ostatniej wizyty
-        </p>
-        }
-      </ion-label>
-      <div slot="end" class="side">
-        <ion-note>{{ item.lastActivityAt | timeAgo }}</ion-note>
-        @if (item.unreadCount > 0) {
-        <ion-badge color="primary" [attr.aria-label]="item.unreadCount + ' nieprzeczytanych'"
-          >{{ item.unreadCount }}</ion-badge
-        >
-        }
-      </div>
-    </ion-item>
+    <app-conversation-item [conversation]="item"></app-conversation-item>
     }
   </ion-list>
   <ion-infinite-scroll [disabled]="complete()" (ionInfinite)="loadMore($event)">

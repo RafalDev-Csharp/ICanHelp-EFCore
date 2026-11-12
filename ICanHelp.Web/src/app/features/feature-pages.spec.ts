@@ -11,7 +11,7 @@ import { ProfilePage } from './profile/profile.page';
 // Rozmowy – F5: `conversations/conversations.page.spec.ts`).
 const pages: [string, Type<unknown>, string][] = [
   ['NotificationsPage', NotificationsPage, 'Powiadomienia'],
-  ['ProfilePage', ProfilePage, 'Profil'],
+  ['ProfilePage', ProfilePage, 'Konto'],
 ];
 
 describe.each(pages)('%s', (_name, page, title) => {

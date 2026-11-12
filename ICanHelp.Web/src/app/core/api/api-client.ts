@@ -591,11 +591,12 @@ export class AnnouncementsClient {
      * @param latitude (optional) 
      * @param longitude (optional) 
      * @param radiusKm (optional) 
+     * @param phrase (optional) 
      * @param page (optional) 
      * @param pageSize (optional) 
      * @return OK
      */
-    getAll(ownerId?: string | undefined, categoryId?: string | undefined, subcategoryId?: string | undefined, status?: AnnouncementStatus | undefined, latitude?: number | undefined, longitude?: number | undefined, radiusKm?: number | undefined, page?: number | undefined, pageSize?: number | undefined): Observable<AnnouncementDto[]> {
+    getAll(ownerId?: string | undefined, categoryId?: string | undefined, subcategoryId?: string | undefined, status?: AnnouncementStatus | undefined, latitude?: number | undefined, longitude?: number | undefined, radiusKm?: number | undefined, phrase?: string | undefined, page?: number | undefined, pageSize?: number | undefined): Observable<AnnouncementDto[]> {
         let url_ = this.baseUrl + "/api/announcements?";
         if (ownerId === null)
             throw new globalThis.Error("The parameter 'ownerId' cannot be null.");
@@ -625,6 +626,10 @@ export class AnnouncementsClient {
             throw new globalThis.Error("The parameter 'radiusKm' cannot be null.");
         else if (radiusKm !== undefined)
             url_ += "RadiusKm=" + encodeURIComponent("" + radiusKm) + "&";
+        if (phrase === null)
+            throw new globalThis.Error("The parameter 'phrase' cannot be null.");
+        else if (phrase !== undefined)
+            url_ += "Phrase=" + encodeURIComponent("" + phrase) + "&";
         if (page === null)
             throw new globalThis.Error("The parameter 'page' cannot be null.");
         else if (page !== undefined)

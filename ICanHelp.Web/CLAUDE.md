@@ -12,11 +12,13 @@
 
 ## Struktura `src/app/`
 ```
-app.config.ts     providery (router, Ionic, locale) · app.routes.ts → tabs/tabs.routes.ts (zakładki bez prefiksu: /announcements, /add,
-                  /conversations, /notifications, /profile; nieznany adres → /announcements)
+app.config.ts     providery (router, Ionic, locale) · app.routes.ts → tabs/tabs.routes.ts (zakładki bez prefiksu, F11 B: Szukaj
+                  /announcements · Ulubione /liked · Dodaj /add · Zlecenia /conversations · Konto /profile; /notifications
+                  bez zakładki – dzwonek; nieznany adres → /announcements)
 core/             jedno miejsce na całą aplikację: config/locale.ts (pl-PL, PLN), config/map.ts (kafelki, środek domyślny);
                   api/ – `api-client.ts` (NSwag, generowany), `provideApi()` (API_BASE_URL), `isApiUrl`, `apiResourceUrl`
-                  (adresy zdjęć), `errorStatus`; categories/ – `CategoriesService` (raz na sesję, `name(id)`);
+                  (adresy zdjęć), `errorStatus`; categories/ – `CategoriesService` (raz na sesję, `name(id)`),
+                  `category-icons` (kafelki „Szukaj”);
                   geo/ – `GeoPoint`, `GeolocationService` (tylko po kliknięciu, ~100 m), `GeocodingService` (Nominatim, ≥ 1,1 s
                   między zapytaniami, `approximatePoint`), `RoutingService` (OpenRouteService, `prepareRoute`; bez klucza –
                   linia prosta);
@@ -30,12 +32,13 @@ core/             jedno miejsce na całą aplikację: config/locale.ts (pl-PL, P
                   w specs zaślepka), `InstallPromptService` (`beforeinstallprompt`, instrukcja iPhone);
                   interceptors/ – `authInterceptor` (Bearer, odświeżenie przed wygaśnięciem i raz po 401), `errorInterceptor`
                   (ProblemDetails → toast, mapa `error-messages.ts`, `SKIP_ERROR_TOAST`); ui/ – `ToastService` (error/success/info);
-                  testing/ – helpery do specs
-shared/           components/ (EmptyStateComponent, `app-brand` – logo w nagłówku każdej strony → `/announcements`, `app-map` – Leaflet: pinezki, okrąg promienia, trasa z pasem, tryb poglądowy,
+                  testing/ – helpery do specs (`provideNotificationsStub` – strony z dzwonkiem)
+shared/           components/ (EmptyStateComponent, `app-brand` – logo w nagłówku każdej strony → `/announcements`,
+                  `app-notifications-bell` – dzwonek z plakietką w nagłówku korzeni zakładek, `app-map` – Leaflet: pinezki, okrąg promienia, trasa z pasem, tryb poglądowy,
                   `app-place-search` – moja pozycja + adres),
                   pipes/ (`price`, `distance` – km z API, `timeAgo` – „2 h temu”), text/ (`pluralPl` – „1 ocena / 2 oceny / 5 ocen”)
 features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poza zakładkami, `?returnUrl=`),
-                  announcements (lista ↔ mapa: `list/` – store, filtry, karta; `details/` – `/announcements/:announcementId`;
+                  announcements („Szukaj”: fraza, kafelki kategorii, lista ↔ mapa: `list/` – store, filtry, karta; `details/` – `/announcements/:announcementId`;
                   `form/` – formularz ogłoszenia (pola, miejsce, zdjęcia + `resizeImage`, `syncPhotos`), wspólny dla
                   `add-announcement.page` (`/add`) i `edit/` (`/announcements/:id/edit`); `likes/` – `LikesService`;
                   `details/announcement-negotiations.ts` – negocjacje per pomocnik i „Historia ogłoszenia” właściciela;
@@ -43,20 +46,24 @@ features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poz
                   offers (`offer-labels` – teksty i `offerActions` = reguły domeny, `offer-form` – formularz oferty /
                   kontroferty, okna `OfferFormModalComponent` i `RatingModalComponent`, `OffersService` – okno → potwierdzenie
                   → API → toast, wspólny dla wątku i szczegółów; `testing/offer-fixtures`),
-                  conversations (`/conversations` – lista z filtrem roli, `/conversations/:conversationId` – wątek: wiadomości,
-                  oferty z akcjami, zmiany ogłoszenia; `conversation-timeline.ts`),
+                  orders (zakładka „Zlecenia” `/conversations`: Zlecam = moje ogłoszenia, Pomagam = moje wątki pomocnika,
+                  grupy po statusie – `order-groups.ts`),
+                  conversations (`/conversations/all` – wszystkie wątki z filtrem roli, `conversation-item` – wiersz wątku,
+                  `/conversations/:conversationId` – wątek: wiadomości, oferty z akcjami, zmiany ogłoszenia, bez ofert =
+                  „Pytania i odpowiedzi”; `conversation-timeline.ts`),
                   notifications (`/notifications` – lista, „Oznacz wszystkie”, nowe z huba na górze),
-                  profile (bez logowania: „Zaloguj się”; `/profile/announcements` – moje,
-                  `/profile/liked` – polubione),
+                  profile (zakładka „Konto”, bez logowania: „Zaloguj się”; `liked-announcements` = zakładka „Ulubione” `/liked`;
+                  `my-announcements` – bez trasy od F11 B, do usunięcia),
                   alerts (`/profile/alerts` – lista, `/profile/alerts/new?kind=Area|Route`, `/profile/alerts/:alertId` – edycja
                   + „Pasujące teraz”; `alert-form.ts` – stan, walidacja, `WeekDays` ↔ maska; `route-picker` – start/cel → trasa)
-tabs/             TabsPage – dolny pasek zakładek, rejestruje ikony zakładek (`addIcons`), uruchamia `NotificationsService`,
-                  plakietka nieprzeczytanych; stuknięcie zakładki = jej korzeń (`openTabRoot`, nie ostatni ekran). Strony używające `NotificationsService` – w specs obiekt z `received$` (Subject)
+tabs/             TabsPage – dolny pasek zakładek, rejestruje ikony zakładek (`addIcons`), uruchamia `NotificationsService`
+                  i push; stuknięcie zakładki = jej korzeń (`openTabRoot`, nie ostatni ekran). Strony używające `NotificationsService` – w specs obiekt z `received$` (Subject)
 ```
-Trasy `/add`, `/announcements/:id/edit`, `/conversations` (+ `/:conversationId`), `/notifications`, `/profile/announcements`, `/profile/liked`, `/profile/alerts` (+ `/new`, `/:alertId`) mają `authGuard`; ogłoszenia (lista, szczegóły) i profil są publiczne –
+Trasy `/add`, `/liked`, `/announcements/:id/edit`, `/conversations` (+ `/all`, `/:conversationId`), `/notifications`, `/profile/alerts` (+ `/new`, `/:alertId`) mają `authGuard`; ogłoszenia (lista, szczegóły) i konto są publiczne –
 akcje wymagające konta same prowadzą na `/login?returnUrl=…`.
 Szeroki ekran: nowa strona dostaje `class="page-column"` na `ion-content` (i na treści stopki) – kolumna 720 px (`global.scss`);
-w nagłówku `<app-brand>` w `ion-buttons slot="start"` (po `ion-back-button`).
+w nagłówku `<app-brand>` w `ion-buttons slot="start"` (po `ion-back-button`); korzeń zakładki dostaje też
+`<app-notifications-bell>` w `ion-buttons slot="end"` (w specs `provideNotificationsStub()` + `provideHttpClient()`).
 Mapy: Leaflet (`import * as L from 'leaflet'`, style w `global.scss`, kolory pinezek – klasy `.map-pin/.map-user/.map-radius`).
 W specs stron z mapą podmieniamy `MapComponent` zaślepką (`TestBed.overrideComponent`) – jsdom nie rysuje map; strony z formularzem
 ogłoszenia – `AnnouncementFormStubComponent` (`features/announcements/testing/announcement-form.stub.ts`).

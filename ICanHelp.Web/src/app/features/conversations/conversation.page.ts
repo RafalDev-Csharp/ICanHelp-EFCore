@@ -27,6 +27,7 @@ import {
   checkmarkDoneOutline,
   cloudOfflineOutline,
   createOutline,
+  helpCircleOutline,
   imageOutline,
   lockClosedOutline,
   playOutline,
@@ -130,6 +131,11 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
     }
     return this.otherName() || partyLabel(conversation.myRole === 'Client' ? 'Helper' : 'Client');
   });
+  /** Wątek bez żadnej oferty = pytania i odpowiedzi przed ofertą (oferta to osobny przycisk). */
+  readonly questionsOnly = computed(() => {
+    const conversation = this.conversation();
+    return !!conversation && offersOf(conversation).length === 0;
+  });
   /** Miniatura ogłoszenia w karcie u góry (pierwsze zdjęcie); brak zdjęć albo błąd – ikona. */
   readonly thumbnailUrl = signal<string | undefined>(undefined);
   /** Wątek z przyjętym pomocnikiem – tu są akcje zlecenia (jak w szczegółach ogłoszenia). */
@@ -181,6 +187,7 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
       checkmarkDoneOutline,
       cloudOfflineOutline,
       createOutline,
+      helpCircleOutline,
       imageOutline,
       lockClosedOutline,
       playOutline,

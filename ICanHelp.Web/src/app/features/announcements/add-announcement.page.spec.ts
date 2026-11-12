@@ -1,9 +1,11 @@
+import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { AnnouncementsClient, CategoriesClient } from '../../core/api/api-client';
 import { PushService } from '../../core/pwa/push.service';
+import { provideNotificationsStub } from '../../core/testing/notifications-stub';
 import { ToastService } from '../../core/ui/toast.service';
 
 import { AddAnnouncementPage } from './add-announcement.page';
@@ -24,6 +26,8 @@ describe('AddAnnouncementPage', () => {
         { provide: CategoriesClient, useValue: { getAll: () => of([]) } },
         { provide: ToastService, useValue: toast },
         { provide: PushService, useValue: push },
+        provideHttpClient(),
+        provideNotificationsStub(),
       ],
     });
     TestBed.overrideComponent(AddAnnouncementPage, {

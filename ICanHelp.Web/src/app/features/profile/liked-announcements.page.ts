@@ -1,7 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
-  IonBackButton,
   IonButton,
   IonButtons,
   IonContent,
@@ -23,6 +22,7 @@ import { AnnouncementsClient } from '../../core/api/api-client';
 import { CategoriesService } from '../../core/categories/categories.service';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { NotificationsBellComponent } from '../../shared/components/notifications-bell/notifications-bell.component';
 import { LikesService } from '../announcements/likes/likes.service';
 import { AnnouncementCardComponent } from '../announcements/list/announcement-card.component';
 
@@ -30,7 +30,7 @@ import { AnnouncementCardComponent } from '../announcements/list/announcement-ca
 export const MAX_LIKED_SHOWN = 50;
 
 /**
- * „Polubione” (profil): ogłoszenia, którym użytkownik dał serduszko, od ostatnio polubionego.
+ * Zakładka „Ulubione” (`/liked`): ogłoszenia, którym użytkownik dał serduszko, od ostatnio polubionego.
  * API zwraca same id (`liked-announcements`), więc szczegóły dociągamy po jednym – przy tej skali wystarczy.
  */
 @Component({
@@ -38,11 +38,11 @@ export const MAX_LIKED_SHOWN = 50;
   templateUrl: './liked-announcements.page.html',
   imports: [
     BrandComponent,
+    NotificationsBellComponent,
     RouterLink,
     IonHeader,
     IonToolbar,
     IonButtons,
-    IonBackButton,
     IonTitle,
     IonContent,
     IonRefresher,

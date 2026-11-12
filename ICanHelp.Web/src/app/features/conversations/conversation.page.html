@@ -67,7 +67,12 @@
   </ion-refresher>
 
   <div class="timeline">
-    @for (item of items(); track item.key) { @if (item.kind === 'message') {
+    @if (questionsOnly() && items().length > 0) {
+    <p class="change questions-note">
+      <ion-icon name="help-circle-outline" aria-hidden="true"></ion-icon>
+      Pytania i odpowiedzi – oferty jeszcze nie ma{{ canMakeOffer() ? ', złożysz ją przyciskiem poniżej' : '' }}.
+    </p>
+    } @for (item of items(); track item.key) { @if (item.kind === 'message') {
     <div class="message" [class.mine]="item.mine">
       <p class="bubble">{{ item.message.text }}</p>
       <span class="when">{{ item.at | timeAgo }}</span>
@@ -123,7 +128,10 @@
       Ogłoszenie zmienione{{ item.fields ? ': ' + item.fields : '' }} · {{ item.at | timeAgo }}
     </p>
     } } @empty {
-    <p class="change">Zadaj pytanie albo złóż ofertę – zleceniodawca zobaczy ją tutaj.</p>
+    <p class="change">
+      {{ conversation()?.myRole === 'Helper' ? 'Zadaj pytanie o zlecenie albo złóż ofertę – zleceniodawca zobaczy je
+      tutaj.' : 'Pomocnik nie napisał jeszcze nic w tej rozmowie.' }}
+    </p>
     }
   </div>
   } }
@@ -167,7 +175,7 @@
       <ion-textarea
         [(ngModel)]="draft"
         aria-label="Wiadomość"
-        placeholder="Napisz wiadomość…"
+        [placeholder]="questionsOnly() ? (thread.myRole === 'Helper' ? 'Zadaj pytanie…' : 'Odpowiedz…') : 'Napisz wiadomość…'"
         [autoGrow]="true"
         [rows]="1"
         [maxlength]="maxMessage"

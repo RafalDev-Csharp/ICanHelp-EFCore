@@ -13,6 +13,7 @@ import {
   IonList,
   IonRefresher,
   IonRefresherContent,
+  IonSearchbar,
   IonSegment,
   IonSegmentButton,
   IonSelect,
@@ -27,18 +28,20 @@ import { addIcons } from 'ionicons';
 import { close, cloudOfflineOutline, locateOutline, searchOutline } from 'ionicons/icons';
 
 import { CategoriesService } from '../../core/categories/categories.service';
+import { categoryIcon, registerCategoryIcons } from '../../core/categories/category-icons';
 import { GeolocationError, GeolocationService } from '../../core/geo/geolocation.service';
 import { ToastService } from '../../core/ui/toast.service';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import type { MapCircle, MapMarker } from '../../shared/components/map/map.component';
 import { MapComponent } from '../../shared/components/map/map.component';
+import { NotificationsBellComponent } from '../../shared/components/notifications-bell/notifications-bell.component';
 import { formatPrice } from '../../shared/pipes/price.pipe';
 import { pluralPl } from '../../shared/text/plural';
 
 import { LikesService } from './likes/likes.service';
 import { AnnouncementCardComponent } from './list/announcement-card.component';
-import { RADIUS_OPTIONS_KM, activeFilterCount } from './list/announcement-filters';
+import { RADIUS_OPTIONS_KM, activeFilterCount, normalizePhrase } from './list/announcement-filters';
 import { AnnouncementListStore } from './list/announcement-list.store';
 
 export type AnnouncementsView = 'list' | 'map';
@@ -49,8 +52,8 @@ interface CompletableTarget {
 }
 
 /**
- * Przeglądanie ogłoszeń (bez logowania): lista z przewijaniem bez końca albo mapa, filtry kategorii i „blisko mnie”.
- * Pokazujemy tylko ogłoszenia czekające na oferty.
+ * Zakładka „Szukaj” (bez logowania): wyszukiwarka tekstowa, kafelki kategorii, lista z przewijaniem bez końca albo
+ * mapa, „blisko mnie”. Pokazujemy tylko ogłoszenia czekające na oferty – zlecenia po akceptacji są w „Zleceniach”.
  */
 @Component({
   selector: 'app-announcements',
@@ -59,6 +62,8 @@ interface CompletableTarget {
   providers: [AnnouncementListStore],
   imports: [
     BrandComponent,
+    NotificationsBellComponent,
+    IonSearchbar,
     IonHeader,
     IonToolbar,
     IonTitle,
@@ -92,6 +97,7 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
   protected readonly likes = inject(LikesService);
 
   protected readonly radiusOptions = RADIUS_OPTIONS_KM;
+  protected readonly categoryIcon = categoryIcon;
   protected readonly skeletons = [1, 2, 3, 4, 5];
   protected readonly view = signal<AnnouncementsView>('list');
   protected readonly locating = signal(false);
@@ -123,6 +129,7 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
 
   constructor() {
     addIcons({ locateOutline, searchOutline, cloudOfflineOutline, close });
+    registerCategoryIcons();
   }
 
   ngOnInit(): void {
@@ -158,6 +165,19 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
     }
   }
 
+  /** Kafelek kategorii: stuknięcie wybiera kategorię, ponowne stuknięcie wybranej – wyłącza filtr. */
+  toggleCategory(categoryId: string): void {
+    this.setCategory(this.filters().categoryId === categoryId ? undefined : categoryId);
+  }
+
+  /** Wyszukiwarka (`ion-searchbar` z opóźnieniem 400 ms): nowa fraza = lista od pierwszej strony. */
+  setPhrase(value: unknown): void {
+    const phrase = normalizePhrase(value);
+    if (phrase !== normalizePhrase(this.filters().phrase)) {
+      void this.store.setFilters({ phrase });
+    }
+  }
+
   setSubcategory(value: unknown): void {
     const subcategoryId = typeof value === 'string' && value !== '' ? value : undefined;
     if (subcategoryId !== this.filters().subcategoryId) {
@@ -190,7 +210,7 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
   }
 
   clearFilters(): void {
-    void this.store.setFilters({ categoryId: undefined, subcategoryId: undefined, near: undefined });
+    void this.store.setFilters({ phrase: undefined, categoryId: undefined, subcategoryId: undefined, near: undefined });
   }
 
   refresh(event: Event): void {

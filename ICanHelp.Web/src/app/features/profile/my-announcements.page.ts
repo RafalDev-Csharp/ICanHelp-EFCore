@@ -131,6 +131,7 @@ export class MyAnnouncementsPage implements ViewWillEnter {
           undefined,
           undefined,
           undefined,
+          undefined,
           page,
           PAGE_SIZE,
         ),

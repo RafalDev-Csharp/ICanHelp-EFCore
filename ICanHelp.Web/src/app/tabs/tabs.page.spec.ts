@@ -26,23 +26,13 @@ describe('TabsPage', () => {
     }).compileComponents();
   });
 
-  it('starts live notifications and shows the unread badge', () => {
+  it('starts live notifications and push (the unread badge is on the bell in page headers)', () => {
     const fixture = TestBed.createComponent(TabsPage);
     fixture.detectChanges();
-    const element = fixture.nativeElement as HTMLElement;
 
     expect(notifications.start).toHaveBeenCalledTimes(1);
     expect(push.start).toHaveBeenCalledTimes(1);
-    expect(element.querySelector('ion-badge')).toBeNull();
-
-    notifications.unreadCount.set(3);
-    fixture.detectChanges();
-    expect(element.querySelector('ion-tab-button[tab="notifications"] ion-badge')?.getAttribute('aria-label')).toBe(
-      '3 nieprzeczytanych',
-    );
-
-    notifications.unreadCount.set(150);
-    expect(fixture.componentInstance.unreadBadge()).toBe('99+');
+    expect((fixture.nativeElement as HTMLElement).querySelector('ion-tab-button[tab="notifications"]')).toBeNull();
   });
 
   it('opens the root of the tapped tab instead of its last screen', () => {
@@ -77,11 +67,12 @@ describe('TabsPage', () => {
       button.getAttribute('tab'),
       button.getAttribute('href'),
     ]);
+    // Szukaj · Ulubione · Dodaj · Zlecenia · Konto
     expect(tabs).toEqual([
       ['announcements', '/announcements'],
+      ['liked', '/liked'],
       ['add', '/add'],
       ['conversations', '/conversations'],
-      ['notifications', '/notifications'],
       ['profile', '/profile'],
     ]);
   });

@@ -4,7 +4,37 @@
     <ion-buttons slot="start">
       <app-brand></app-brand>
     </ion-buttons>
-    <ion-title>Ogłoszenia</ion-title>
+    <ion-title>Szukaj</ion-title>
+    <ion-buttons slot="end">
+      <app-notifications-bell></app-notifications-bell>
+    </ion-buttons>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-searchbar
+      class="page-column"
+      placeholder="Czego szukasz? np. kran, malowanie"
+      aria-label="Szukaj w ogłoszeniach"
+      inputmode="search"
+      [debounce]="400"
+      [value]="current.phrase ?? ''"
+      (ionInput)="setPhrase($event.detail.value)"
+    ></ion-searchbar>
+  </ion-toolbar>
+  <ion-toolbar class="filters-toolbar">
+    <div class="category-tiles page-column" role="group" aria-label="Kategorie">
+      @for (category of categories.categories(); track category.id) {
+      <button
+        type="button"
+        class="category-tile"
+        [class.selected]="current.categoryId === category.id"
+        [attr.aria-pressed]="current.categoryId === category.id"
+        (click)="toggleCategory(category.id)"
+      >
+        <ion-icon [name]="categoryIcon(category.name)" aria-hidden="true"></ion-icon>
+        <span>{{ category.name }}</span>
+      </button>
+      }
+    </div>
   </ion-toolbar>
   <ion-toolbar>
     <ion-segment [value]="view()" (ionChange)="setView($event.detail.value)" aria-label="Widok ogłoszeń">
@@ -43,25 +73,7 @@
         <ion-select-option [value]="radius">do {{ radius }} km</ion-select-option>
         }
       </ion-select>
-      }
-
-      <ion-select
-        class="filter"
-        aria-label="Kategoria"
-        interface="action-sheet"
-        fill="outline"
-        cancelText="Anuluj"
-        placeholder="Kategoria"
-        [value]="current.categoryId ?? ''"
-        (ionChange)="setCategory($event.detail.value)"
-      >
-        <ion-select-option value="">Wszystkie kategorie</ion-select-option>
-        @for (category of categories.categories(); track category.id) {
-        <ion-select-option [value]="category.id">{{ category.name }}</ion-select-option>
-        }
-      </ion-select>
-
-      @if (subcategories().length > 0) {
+      } @if (subcategories().length > 0) {
       <ion-select
         class="filter"
         aria-label="Podkategoria"
@@ -128,7 +140,7 @@
     [message]="
           current.near
             ? 'W tym promieniu nikt teraz nie szuka pomocy – zwiększ promień albo zmień kategorię.'
-            : 'Zmień kategorię albo wyczyść filtry.'
+            : 'Zmień szukany tekst lub kategorię albo wyczyść filtry.'
         "
   >
     <ion-button fill="outline" (click)="clearFilters()">Wyczyść filtry</ion-button>

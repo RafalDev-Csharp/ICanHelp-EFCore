@@ -4,8 +4,11 @@ import { authGuard } from '../core/auth/auth.guard';
 
 import { TabsPage } from './tabs.page';
 
-// Zakładki bez prefiksu `/tabs` – krótkie adresy, pod które później prowadzą powiadomienia i push (`/announcements/…`).
-// Ogłoszenia i profil są dostępne bez logowania (profil pokazuje wtedy „Zaloguj się”), reszta – przez authGuard.
+// Zakładki bez prefiksu `/tabs` – krótkie adresy, pod które prowadzą powiadomienia i push (`/announcements/…`,
+// `/conversations/…`). Pasek (F11 B): Szukaj (`/announcements`) · Ulubione (`/liked`) · Dodaj (`/add`) · Zlecenia
+// (`/conversations` – adres zostaje, żeby wątki z powiadomień były w stosie tej zakładki) · Konto (`/profile`).
+// Powiadomienia (`/notifications`) – z dzwonka w nagłówku, bez zakładki.
+// Szukaj i Konto są dostępne bez logowania (Konto pokazuje wtedy „Zaloguj się”), reszta – przez authGuard.
 export const routes: Routes = [
   {
     path: '',
@@ -16,17 +19,23 @@ export const routes: Routes = [
         loadComponent: () => import('../features/announcements/announcements.page').then((m) => m.AnnouncementsPage),
       },
       {
-        // Szczegóły w stosie zakładki Ogłoszenia (pasek zakładek zostaje). Publiczne – akcje same proszą o logowanie.
+        // Szczegóły w stosie zakładki Szukaj (pasek zakładek zostaje). Publiczne – akcje same proszą o logowanie.
         path: 'announcements/:announcementId',
         loadComponent: () =>
           import('../features/announcements/details/announcement-details.page').then((m) => m.AnnouncementDetailsPage),
       },
       {
-        // Edycja w stosie zakładki Ogłoszenia (wejście ze szczegółów). Strona sama sprawdza właściciela i status.
+        // Edycja w stosie zakładki Szukaj (wejście ze szczegółów). Strona sama sprawdza właściciela i status.
         path: 'announcements/:announcementId/edit',
         canActivate: [authGuard],
         loadComponent: () =>
           import('../features/announcements/edit/edit-announcement.page').then((m) => m.EditAnnouncementPage),
+      },
+      {
+        path: 'liked',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('../features/profile/liked-announcements.page').then((m) => m.LikedAnnouncementsPage),
       },
       {
         path: 'add',
@@ -35,12 +44,19 @@ export const routes: Routes = [
           import('../features/announcements/add-announcement.page').then((m) => m.AddAnnouncementPage),
       },
       {
+        // Zakładka „Zlecenia”: Zlecam / Pomagam.
         path: 'conversations',
+        canActivate: [authGuard],
+        loadComponent: () => import('../features/orders/orders.page').then((m) => m.OrdersPage),
+      },
+      {
+        // Wszystkie rozmowy (z nagłówka „Zleceń”). Przed `:conversationId`, żeby „all” nie było traktowane jak id.
+        path: 'conversations/all',
         canActivate: [authGuard],
         loadComponent: () => import('../features/conversations/conversations.page').then((m) => m.ConversationsPage),
       },
       {
-        // Wątek w stosie zakładki Rozmowy (wejście też ze szczegółów ogłoszenia; obcy → „Nie ma takiej rozmowy”).
+        // Wątek w stosie zakładki Zlecenia (wejście też ze szczegółów ogłoszenia; obcy → „Nie ma takiej rozmowy”).
         path: 'conversations/:conversationId',
         canActivate: [authGuard],
         loadComponent: () => import('../features/conversations/conversation.page').then((m) => m.ConversationPage),
@@ -54,17 +70,9 @@ export const routes: Routes = [
         path: 'profile',
         loadComponent: () => import('../features/profile/profile.page').then((m) => m.ProfilePage),
       },
-      {
-        path: 'profile/announcements',
-        canActivate: [authGuard],
-        loadComponent: () => import('../features/profile/my-announcements.page').then((m) => m.MyAnnouncementsPage),
-      },
-      {
-        path: 'profile/liked',
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('../features/profile/liked-announcements.page').then((m) => m.LikedAnnouncementsPage),
-      },
+      // Stare adresy z profilu (F4–F6): moje ogłoszenia są teraz w „Zleceniach → Zlecam”, polubione – w zakładce.
+      { path: 'profile/announcements', redirectTo: '/conversations', pathMatch: 'full' },
+      { path: 'profile/liked', redirectTo: '/liked', pathMatch: 'full' },
       {
         path: 'profile/alerts',
         canActivate: [authGuard],

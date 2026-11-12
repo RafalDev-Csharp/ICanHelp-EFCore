@@ -69,6 +69,7 @@ export class AnnouncementListStore {
           query.latitude,
           query.longitude,
           query.radiusKm,
+          query.phrase,
           query.page,
           query.pageSize,
         )

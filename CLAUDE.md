@@ -107,7 +107,8 @@ cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /ap
   PWA + push sprawdzone lokalnie przez HTTPS w Chrome (`verify.cmd`: dotnet 479/479, Vitest 250/250). Android OK (tunel cloudflared). Dalej: iPhone, hosting.
 - [ ] F11 – poprawki po teście autora (`docs/PLAN-FRONTEND.md`) – przed testem z ludźmi. **A (błędy, czytelność) zrobione
   12.11.2026** (kolumna 720 px, logo, zakładki → korzeń, odświeżanie listy, karta i akcje w wątku, Brave; `verify.cmd`: dotnet 479/479, Vitest 259/259).
-  Zostało: B nawigacja, C aktualizacja oferty.
+  **B nawigacja zrobiona 12.11.2026** (zakładki Szukaj · Ulubione · Dodaj · Zlecenia · Konto, dzwonek, „Zapytaj”, fraza
+  `phrase` w `GET api/announcements`; `verify.cmd`: dotnet 489/489, Vitest 275/275). Zostało: C aktualizacja oferty.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)

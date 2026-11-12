@@ -20,6 +20,7 @@ import type { GeoPoint } from '../../core/geo/geo-point';
 import { PushService } from '../../core/pwa/push.service';
 import { ToastService } from '../../core/ui/toast.service';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
+import { NotificationsBellComponent } from '../../shared/components/notifications-bell/notifications-bell.component';
 
 import type { PhotoItem } from './form/announcement-form';
 import { createAnnouncementForm, toCreateCommand } from './form/announcement-form';
@@ -36,6 +37,7 @@ import { syncPhotos } from './form/photo-upload';
   templateUrl: './add-announcement.page.html',
   imports: [
     BrandComponent,
+    NotificationsBellComponent,
     IonHeader,
     IonToolbar,
     IonButtons,

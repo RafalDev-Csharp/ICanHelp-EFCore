@@ -1,10 +1,13 @@
 import { expect, test } from '@playwright/test';
 
-test('opens the announcements tab by default', async ({ page }) => {
+test('opens the search tab by default', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveURL(/\/announcements$/);
-  await expect(page.locator('ion-tab-bar')).toContainText('Ogłoszenia');
-  await expect(page.locator('ion-tab-bar')).toContainText('Powiadomienia');
+  const tabBar = page.locator('ion-tab-bar');
+  for (const label of ['Szukaj', 'Ulubione', 'Dodaj', 'Zlecenia', 'Konto']) {
+    await expect(tabBar).toContainText(label);
+  }
+  await expect(tabBar).not.toContainText('Powiadomienia');
 });
 
 test('asks to sign in before opening conversations and offers registration', async ({ page }) => {

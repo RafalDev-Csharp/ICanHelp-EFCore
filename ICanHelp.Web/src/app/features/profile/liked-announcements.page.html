@@ -1,10 +1,12 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/profile"></ion-back-button>
       <app-brand></app-brand>
     </ion-buttons>
-    <ion-title>Polubione</ion-title>
+    <ion-title>Ulubione</ion-title>
+    <ion-buttons slot="end">
+      <app-notifications-bell></app-notifications-bell>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
@@ -20,7 +22,7 @@
   } @case ('failed') {
   <app-empty-state
     icon="cloud-offline-outline"
-    heading="Nie udało się wczytać polubionych"
+    heading="Nie udało się wczytać ulubionych"
     message="Sprawdź połączenie z internetem i spróbuj ponownie."
   >
     <ion-button (click)="reload()">Spróbuj ponownie</ion-button>
@@ -28,10 +30,10 @@
   } @case ('ready') { @if (items().length === 0) {
   <app-empty-state
     icon="heart-outline"
-    heading="Nic jeszcze nie polubiłeś"
+    heading="Nie masz jeszcze ulubionych"
     message="Dotknij serduszka w ogłoszeniu, żeby mieć je pod ręką."
   >
-    <ion-button routerLink="/announcements" fill="outline">Przeglądaj ogłoszenia</ion-button>
+    <ion-button routerLink="/announcements" fill="outline">Szukaj ogłoszeń</ion-button>
   </app-empty-state>
   } @else {
   <ion-list>

@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
+  IonBackButton,
   IonButton,
   IonButtons,
   IonContent,
@@ -51,7 +52,7 @@ interface CompletableTarget {
 }
 
 /**
- * Zakładka „Powiadomienia” (tylko zalogowani): od najnowszych, nieprzeczytane wyróżnione, kliknięcie → właściwy
+ * „Powiadomienia” (tylko zalogowani; z dzwonka w nagłówku albo z „Konta” – bez własnej zakładki): od najnowszych, nieprzeczytane wyróżnione, kliknięcie → właściwy
  * ekran (wątek / ogłoszenie) i przeczytane, „Oznacz wszystkie”. Nowe z huba dopisują się na górze bez odświeżania.
  */
 @Component({
@@ -64,6 +65,7 @@ interface CompletableTarget {
     IonToolbar,
     IonTitle,
     IonButtons,
+    IonBackButton,
     IonButton,
     IonContent,
     IonRefresher,

@@ -38,6 +38,7 @@ import {
   createOutline,
   heart,
   heartOutline,
+  helpCircleOutline,
   locationOutline,
   mailOutline,
   peopleOutline,
@@ -92,8 +93,8 @@ const AFTER_ACCEPTANCE = ['Accepted', 'InProgress', 'Completed'];
 
 /**
  * Szczegóły ogłoszenia (publiczne): zdjęcia, opis, mapa, właściciel z ocenami, serduszko. Akcje zależą od roli:
- * - gość: „Złóż ofertę” / „Napisz” → logowanie i powrót tutaj;
- * - pomocnik: oferta (okno), wątek rozmowy, po przyjęciu jego oferty – kontakt, „Rozpocznij”, ocena po zakończeniu;
+ * - gość: „Złóż ofertę” / „Zapytaj” → logowanie i powrót tutaj;
+ * - pomocnik: „Zapytaj” (wątek przed ofertą = pytania i odpowiedzi), oferta osobno (okno), po przyjęciu jego oferty – kontakt, „Rozpocznij”, ocena po zakończeniu;
  * - właściciel: „Edytuj” (Open), „Anuluj” (Open/Accepted), lista negocjacji i historia ogłoszenia (oferty,
  *   kontroferty, edycje), po akceptacji – kontakt, „Rozpocznij” / „Zakończ”, ocena po zakończeniu.
  * Akcje na samych ofertach (przyjmij, odrzuć, kontroferta, wycofaj) są w wątku – tam widać całą negocjację.
@@ -269,6 +270,7 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
       createOutline,
       heart,
       heartOutline,
+      helpCircleOutline,
       locationOutline,
       mailOutline,
       peopleOutline,
@@ -347,7 +349,7 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     }
   }
 
-  /** „Napisz” / „Rozmowa” (pomocnik): istniejący wątek albo nowy (`POST …/conversations` – istniał → ten sam id). */
+  /** „Zapytaj” / „Rozmowa” (pomocnik): istniejący wątek albo nowy (`POST …/conversations` – istniał → ten sam id). */
   async writeMessage(): Promise<void> {
     const announcement = this.announcement();
     if (!announcement || !this.requireSignIn()) {

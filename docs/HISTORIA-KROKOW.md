@@ -264,5 +264,22 @@
   12.11.2026 lokalnie (`verify.cmd`, Docker): dotnet 479/479 (Core 198, Application 179, integracyjne 102), `npm run api`
   (klient bez zmian), lint + Vitest 259/259 + build zielone. Podgląd `ng serve` (bez backendu): kolumna 720 px i logo
   na 1400 px, na telefonie sama ikona – OK; szczegóły z danymi i Brave – do sprawdzenia ręcznie.
+  Część B (12.11.2026): nawigacja. Zakładki Szukaj (`/announcements`) · Ulubione (`/liked`) · Dodaj · Zlecenia
+  (`/conversations` – adres zostaje, linki z powiadomień / pusha `/conversations/{id}` trafiają do jej stosu) · Konto
+  (`/profile`). Szukaj: `ion-searchbar` → nowy filtr `phrase`, kafelki kategorii (`core/categories/category-icons.ts`,
+  Ionicons po nazwie z seeda) zamiast listy rozwijanej. Backend: `GetAnnouncements.Phrase` + `GetPhrasePattern()` (trim,
+  escape `%_[\`, > 100 znaków → `InvalidSearchPhraseException` 400), w handlerze `EF.Functions.Like((string)(object)…)`
+  na tytule lub opisie; testy `GetAnnouncementsPhraseTests` (Application) i `PhraseSearchTests` (Api), przykład w `.http`,
+  `api-client.ts` z `phrase`. Zlecenia: `features/orders` – Zlecam (moje ogłoszenia, wszystkie statusy) / Pomagam (moje
+  wątki pomocnika), grupy `order-groups.ts` (W trakcie negocjacji / Przyjęte / W realizacji / Zakończone; pomocnik
+  w grupie zlecenia tylko z przyjętą ofertą). Wiersz wątku – wspólny `ConversationItemComponent`; skrzynka wszystkich
+  wątków → `/conversations/all`. Dzwonek `app-notifications-bell` w nagłówkach korzeni zakładek (powiadomienia bez
+  zakładki, ze strzałką wstecz). „Zapytaj” w szczegółach; wątek bez ofert = „Pytania i odpowiedzi” (notka, pole
+  „Zadaj pytanie…”). Konto: bez „Moich ogłoszeń” / „Polubionych”, z „Powiadomieniami”; przekierowania
+  `/profile/liked` → `/liked`, `/profile/announcements` → `/conversations`; `MyAnnouncementsPage` bez trasy (do usunięcia).
+  Testy: nowe `notifications-bell`, `category-icons`, `order-groups`, `orders.page`; dopisane w filtrach, store,
+  `announcements.page`, `conversation.page`, `tabs`, e2e `app.spec`. Część C – osobno.
+  12.11.2026 lokalnie (`verify.cmd`, Docker): dotnet 489/489 (Core 198, Application 186, integracyjne 105), `npm run api`
+  (klient bez zmian względem ręcznej edycji), lint + Vitest 275/275 + build zielone. Wygląd na telefonie – do sprawdzenia ręcznie.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

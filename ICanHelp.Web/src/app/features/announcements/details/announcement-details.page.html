@@ -297,9 +297,13 @@
     <p class="footer-note">{{ statusLabel(status()) }} · to Twoje ogłoszenie.</p>
     } } @else if (isOpen()) {
     <div class="actions page-column">
-      <ion-button fill="outline" (click)="writeMessage()" [disabled]="busy()">
-        <ion-icon name="chatbubble-outline" slot="start" aria-hidden="true"></ion-icon>
-        {{ myConversationId() ? 'Rozmowa' : 'Napisz' }}
+      <ion-button fill="outline" class="ask-action" (click)="writeMessage()" [disabled]="busy()">
+        <ion-icon
+          [name]="myConversationId() ? 'chatbubble-outline' : 'help-circle-outline'"
+          slot="start"
+          aria-hidden="true"
+        ></ion-icon>
+        {{ myConversationId() ? 'Rozmowa' : 'Zapytaj' }}
       </ion-button>
       <ion-button class="primary-action" (click)="makeOffer()" [disabled]="busy()">
         @if (myPendingOffer(); as offer) { Twoja oferta: {{ offer.price.amount | price }} } @else { Złóż ofertę }

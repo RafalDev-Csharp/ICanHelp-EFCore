@@ -18,21 +18,27 @@ import {
 } from '@ionic/angular';
 import type { ViewWillEnter } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { documentTextOutline, heartOutline, notificationsOutline } from 'ionicons/icons';
+import { mailUnreadOutline, notificationsOutline } from 'ionicons/icons';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { PushService } from '../../core/pwa/push.service';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { NotificationsBellComponent } from '../../shared/components/notifications-bell/notifications-bell.component';
 import { parseApiDate } from '../../shared/pipes/time-ago.pipe';
 
 import { AppSettingsComponent } from './app-settings.component';
 
+/**
+ * Zakładka „Konto”: dane użytkownika, powiadomienia, alerty, ustawienia aplikacji, wylogowanie (bez logowania –
+ * „Zaloguj się”). Moje ogłoszenia i polubione mają od F11 B własne zakładki („Zlecenia”, „Ulubione”).
+ */
 @Component({
   selector: 'app-profile',
   templateUrl: './profile.page.html',
   imports: [
     BrandComponent,
+    NotificationsBellComponent,
     DatePipe,
     RouterLink,
     IonHeader,
@@ -60,7 +66,7 @@ export class ProfilePage implements ViewWillEnter {
   protected readonly parseApiDate = parseApiDate;
 
   constructor() {
-    addIcons({ documentTextOutline, heartOutline, notificationsOutline });
+    addIcons({ mailUnreadOutline, notificationsOutline });
   }
 
   /** Zakładki Ionic zostają w pamięci – dane odświeżamy przy każdym wejściu na zakładkę. */

@@ -1,40 +1,31 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { IonBadge, IonIcon, IonLabel, IonTabBar, IonTabButton, IonTabs, NavController } from '@ionic/angular';
+import { IonIcon, IonLabel, IonTabBar, IonTabButton, IonTabs, NavController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import {
-  addCircleOutline,
-  chatbubblesOutline,
-  megaphoneOutline,
-  notificationsOutline,
-  personCircleOutline,
-} from 'ionicons/icons';
+import { addCircleOutline, briefcaseOutline, heartOutline, personCircleOutline, searchOutline } from 'ionicons/icons';
 
 import { NotificationsService } from '../core/notifications/notifications.service';
 import { PushService } from '../core/pwa/push.service';
 
+/**
+ * Dolny pasek: Szukaj · Ulubione · Dodaj · Zlecenia · Konto (F11 B). Powiadomienia nie mają zakładki – dzwonek
+ * z plakietką jest w nagłówku stron zakładek (`app-notifications-bell`).
+ */
 @Component({
   selector: 'app-tabs',
   templateUrl: 'tabs.page.html',
   styleUrls: ['tabs.page.scss'],
-  imports: [IonTabs, IonTabBar, IonTabButton, IonIcon, IonLabel, IonBadge],
+  imports: [IonTabs, IonTabBar, IonTabButton, IonIcon, IonLabel],
 })
 export class TabsPage {
-  private readonly notifications = inject(NotificationsService);
   private readonly router = inject(Router);
   private readonly navCtrl = inject(NavController);
 
-  /** Plakietka zakładki „Powiadomienia” (powyżej 99 – „99+”); 0 – bez plakietki. */
-  readonly unreadBadge = computed(() => {
-    const count = this.notifications.unreadCount();
-    return count <= 0 ? '' : count > 99 ? '99+' : String(count);
-  });
-
   constructor() {
     // Ikony rejestrujemy raz tutaj – strony zakładek używają tych samych nazw.
-    addIcons({ megaphoneOutline, addCircleOutline, chatbubblesOutline, notificationsOutline, personCircleOutline });
+    addIcons({ searchOutline, heartOutline, addCircleOutline, briefcaseOutline, personCircleOutline });
     // Zakładki = aplikacja działa: od teraz powiadomienia na żywo (gdy użytkownik jest zalogowany).
-    this.notifications.start();
+    inject(NotificationsService).start();
     // Push (F7): ponowny zapis urządzenia, gdy zgoda już jest; o zgodę pytamy dopiero po akcji użytkownika.
     inject(PushService).start();
   }

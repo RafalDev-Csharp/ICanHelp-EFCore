@@ -25,6 +25,10 @@ GET {{baseUrl}}/api/announcements?latitude=52.2297&longitude=21.0122&radiusKm=5&
 GET {{baseUrl}}/api/announcements?latitude=52.2297
 
 ###
+# F11 B: wyszukiwanie tekstowe w tytule i opisie (bez rozróżniania wielkości liter, maks. 100 znaków → inaczej 400 InvalidSearchPhrase)
+GET {{baseUrl}}/api/announcements?phrase=kran&status=Open
+
+###
 # 404 jako ProblemDetails
 GET {{baseUrl}}/api/announcements/3fa85f64-5717-4562-b3fc-2c963f66afa6
 

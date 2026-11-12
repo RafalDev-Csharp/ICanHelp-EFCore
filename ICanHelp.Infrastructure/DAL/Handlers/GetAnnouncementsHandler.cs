@@ -45,6 +45,16 @@ internal sealed class GetAnnouncementsHandler : IQueryHandler<GetAnnouncements, 
             announcements = announcements.Where(a => a.Status == status);
         }
 
+        // Throws InvalidSearchPhraseException (→ 400) for a too long phrase. Title/Description have value converters,
+        // so the columns are compared as plain strings via the (string)(object) cast; the default collation of
+        // SQL Server is case-insensitive.
+        if (query.GetPhrasePattern() is { } pattern)
+        {
+            announcements = announcements.Where(a =>
+                EF.Functions.Like((string)(object)a.Title, pattern, @"\")
+                || EF.Functions.Like((string)(object)a.Description, pattern, @"\"));
+        }
+
         var (skip, take) = Extensions.ToSkipTake(query.Page, query.PageSize);
 
         // Throws InvalidDistanceFilterException (→ 400) for incomplete/out-of-range parameters.

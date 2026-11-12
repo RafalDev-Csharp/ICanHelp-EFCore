@@ -225,6 +225,19 @@ describe('ConversationPage', () => {
     expect(page.canMakeOffer()).toBe(true);
   });
 
+  it('shows a thread without offers as questions and answers', async () => {
+    const { page, element, render } = create(
+      conversationFixture({ myRole: 'Helper', announcementStatus: 'Open', timeline: [messageEntry] }),
+    );
+    await render();
+
+    expect(page.questionsOnly()).toBe(true);
+    expect(element.querySelector('.questions-note')?.textContent).toContain('Pytania i odpowiedzi');
+    const textarea = element.querySelector('ion-textarea') as (HTMLElement & { placeholder?: string }) | null;
+    expect(textarea?.placeholder).toBe('Zadaj pytanie…');
+    expect(element.querySelector('ion-footer')?.textContent).toContain('Złóż ofertę');
+  });
+
   it('is read-only when the conversation is closed', async () => {
     const { element, render } = create(conversationFixture({ announcementStatus: 'Completed', canWrite: false }));
     await render();

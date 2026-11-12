@@ -1,8 +1,13 @@
 <ion-tabs>
   <ion-tab-bar slot="bottom" (ionTabButtonClick)="openTabRoot($event)">
     <ion-tab-button tab="announcements" href="/announcements">
-      <ion-icon aria-hidden="true" name="megaphone-outline"></ion-icon>
-      <ion-label>Ogłoszenia</ion-label>
+      <ion-icon aria-hidden="true" name="search-outline"></ion-icon>
+      <ion-label>Szukaj</ion-label>
+    </ion-tab-button>
+
+    <ion-tab-button tab="liked" href="/liked">
+      <ion-icon aria-hidden="true" name="heart-outline"></ion-icon>
+      <ion-label>Ulubione</ion-label>
     </ion-tab-button>
 
     <ion-tab-button tab="add" href="/add">
@@ -11,21 +16,13 @@
     </ion-tab-button>
 
     <ion-tab-button tab="conversations" href="/conversations">
-      <ion-icon aria-hidden="true" name="chatbubbles-outline"></ion-icon>
-      <ion-label>Rozmowy</ion-label>
-    </ion-tab-button>
-
-    <ion-tab-button tab="notifications" href="/notifications">
-      <ion-icon aria-hidden="true" name="notifications-outline"></ion-icon>
-      <ion-label>Powiadomienia</ion-label>
-      @if (unreadBadge(); as badge) {
-      <ion-badge color="danger" [attr.aria-label]="badge + ' nieprzeczytanych'">{{ badge }}</ion-badge>
-      }
+      <ion-icon aria-hidden="true" name="briefcase-outline"></ion-icon>
+      <ion-label>Zlecenia</ion-label>
     </ion-tab-button>
 
     <ion-tab-button tab="profile" href="/profile">
       <ion-icon aria-hidden="true" name="person-circle-outline"></ion-icon>
-      <ion-label>Profil</ion-label>
+      <ion-label>Konto</ion-label>
     </ion-tab-button>
   </ion-tab-bar>
 </ion-tabs>

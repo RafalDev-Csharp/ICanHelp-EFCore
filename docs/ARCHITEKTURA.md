@@ -53,6 +53,9 @@
   pomocnik `DAL/Spatial.cs` (SRID, `CreatePoint(lat, lon)` – w NTS X = długość!). `GetAnnouncements`: `Latitude`+`Longitude`
   (+ `RadiusKm`, domyślnie 10, max 100) → `IsWithinDistance`, sortowanie od najbliższych, `AnnouncementDto.DistanceKm`.
   Walidacja w `GetAnnouncements.GetDistanceFilter()` → `InvalidDistanceFilterException` (400).
+- Fraza (F11 B): `GetAnnouncements.Phrase` → `GetPhrasePattern()` (trim, `%…%`, znaki `%`/`_`/`[`/`\` dosłownie, maks. 100 →
+  `InvalidSearchPhraseException` 400) → `EF.Functions.Like((string)(object)a.Title, …)` lub opis (kolumny VO z konwerterem,
+  kolacja bez rozróżniania wielkości liter). Bez indeksu pełnotekstowego.
 
 ## Api (jak jest zbudowane)
 - Kontrolery `[ApiController]`, trasy `api/<zasób>`. Handler wstrzykiwany do akcji przez `[FromServices] IQueryHandler<TQuery, TResult>`

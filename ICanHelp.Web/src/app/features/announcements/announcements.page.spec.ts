@@ -1,9 +1,11 @@
+import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { AnnouncementsClient, CategoriesClient } from '../../core/api/api-client';
 import { GeolocationError, GeolocationService } from '../../core/geo/geolocation.service';
+import { provideNotificationsStub } from '../../core/testing/notifications-stub';
 import { ToastService } from '../../core/ui/toast.service';
 
 import { AnnouncementsPage } from './announcements.page';
@@ -28,6 +30,8 @@ describe('AnnouncementsPage', () => {
         { provide: GeolocationService, useValue: geolocation },
         { provide: ToastService, useValue: toast },
         { provide: LikesService, useValue: likes },
+        provideHttpClient(),
+        provideNotificationsStub(),
       ],
     });
     const fixture = TestBed.createComponent(AnnouncementsPage);
@@ -59,6 +63,7 @@ describe('AnnouncementsPage', () => {
       undefined,
       undefined,
       'Open',
+      undefined,
       undefined,
       undefined,
       undefined,
@@ -115,6 +120,7 @@ describe('AnnouncementsPage', () => {
       53.84,
       22.98,
       10,
+      undefined,
       1,
       PAGE_SIZE,
     );
@@ -135,6 +141,7 @@ describe('AnnouncementsPage', () => {
       undefined,
       undefined,
       'Open',
+      undefined,
       undefined,
       undefined,
       undefined,
@@ -167,6 +174,58 @@ describe('AnnouncementsPage', () => {
       'cat-home',
       undefined,
       'Open',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      1,
+      PAGE_SIZE,
+    );
+  });
+
+  it('searches by phrase and toggles a category tile', async () => {
+    client.getAll.mockReturnValue(of([]));
+    const { page, element, render } = create();
+    await render();
+
+    const tiles = element.querySelectorAll<HTMLButtonElement>('.category-tile');
+    expect(tiles).toHaveLength(1);
+    expect(tiles[0].textContent).toContain('Dom');
+
+    page.setPhrase('  kran ');
+    expect(client.getAll).toHaveBeenLastCalledWith(
+      undefined,
+      undefined,
+      undefined,
+      'Open',
+      undefined,
+      undefined,
+      undefined,
+      'kran',
+      1,
+      PAGE_SIZE,
+    );
+    // Ta sama fraza (np. po spacji) – bez nowego żądania.
+    const calls = client.getAll.mock.calls.length;
+    page.setPhrase('kran ');
+    expect(client.getAll).toHaveBeenCalledTimes(calls);
+
+    tiles[0].click();
+    await render();
+    expect(client.getAll.mock.lastCall?.[1]).toBe('cat-home');
+    expect(tiles[0].getAttribute('aria-pressed')).toBe('true');
+
+    tiles[0].click();
+    await render();
+    expect(client.getAll.mock.lastCall?.[1]).toBeUndefined();
+
+    page.clearFilters();
+    expect(client.getAll).toHaveBeenLastCalledWith(
+      undefined,
+      undefined,
+      undefined,
+      'Open',
+      undefined,
       undefined,
       undefined,
       undefined,

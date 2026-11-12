@@ -243,15 +243,42 @@ Zrobione A (12.11.2026), decyzje:
 - Bez zmian backendu. Do sprawdzenia ręcznie: wygląd na komputerze (szeroki ekran) i telefonie, Brave z włączonym
   ustawieniem.
 
-**B. Nawigacja jak w aplikacjach ogłoszeniowych (do akceptacji autora)**
-- [ ] Dolne zakładki: **Szukaj** (ogłoszenia: lista ↔ mapa, wyszukiwarka tekstowa, kategorie jako kafelki z ikonami –
+**B. Nawigacja jak w aplikacjach ogłoszeniowych** – zrobione 12.11.2026 (opis niżej)
+- [x] Dolne zakładki: **Szukaj** (ogłoszenia: lista ↔ mapa, wyszukiwarka tekstowa, kategorie jako kafelki z ikonami –
       placeholdery z Material Symbols / Ionicons, docelowe kategorie później) · **Ulubione** (serce) · **Dodaj** (+) ·
       **Zlecenia** (segment **Zlecam / Pomagam**: moje ogłoszenia i moje oferty z rozmowami, pogrupowane po statusie –
       w trakcie negocjacji, przyjęte, w realizacji, zakończone) · **Konto** (profil, alerty, ustawienia).
-- [ ] Powiadomienia: dzwonek z plakietką w nagłówku (zamiast zakładki).
-- [ ] Rozmowa przed ofertą = pytania i odpowiedzi (wątek już istnieje przed ofertą – pokazać go jako „Zapytaj”, oferta osobno).
-- [ ] Zlecenia po akceptacji tylko w „Zlecenia” (nie na liście ogłoszeń ani w „Moich ogłoszeniach” w profilu).
-- [ ] Wyszukiwanie tekstowe – backend: sprawdzić, czy `GET api/announcements` ma parametr frazy (jeśli nie – zadanie backendowe).
+- [x] Powiadomienia: dzwonek z plakietką w nagłówku (zamiast zakładki).
+- [x] Rozmowa przed ofertą = pytania i odpowiedzi (wątek już istnieje przed ofertą – pokazać go jako „Zapytaj”, oferta osobno).
+- [x] Zlecenia po akceptacji tylko w „Zlecenia” (nie na liście ogłoszeń ani w „Moich ogłoszeniach” w profilu).
+- [x] Wyszukiwanie tekstowe – backend: `GET api/announcements` nie miał frazy → dodany parametr `phrase`.
+
+Zrobione B (12.11.2026), decyzje:
+- Zakładki: Szukaj (`/announcements`) · Ulubione (`/liked`, nowa trasa) · Dodaj (`/add`) · Zlecenia (`/conversations`)
+  · Konto (`/profile`). „Zlecenia” zostały pod adresem `/conversations` – linki z powiadomień i pusha (backend:
+  `/conversations/{id}`) trafiają do stosu tej zakładki bez zmian w API. Pełna skrzynka wątków (segment Wszystkie /
+  Zlecam / Pomagam) – `/conversations/all`, ikona dymków w nagłówku „Zleceń”. Stare adresy: `/profile/liked` → `/liked`,
+  `/profile/announcements` → `/conversations` (przekierowania). `MyAnnouncementsPage` nie ma już trasy – do usunięcia przez
+  autora (sesja nie kasuje plików).
+- Szukaj: `ion-searchbar` (400 ms; fraza przycinana do 100 znaków w `normalizePhrase`) → filtr `phrase`; kafelki kategorii (przewijany rząd, stuknięcie
+  wybranej = wyłączenie) zamiast listy rozwijanej, podkategoria i promień – jak dotąd. Ikony: `core/categories/category-icons.ts`
+  (Ionicons po angielskiej nazwie z seeda, domyślnie `grid-outline`) – docelowo pole `icon` w `CategoryDto`.
+- Backend: `GetAnnouncements.Phrase` → `GetPhrasePattern()` (trim, `%…%`, `%`/`_`/`[`/`\` dosłownie, > 100 znaków →
+  `InvalidSearchPhraseException` → 400), w handlerze `EF.Functions.Like` na tytule lub opisie (rzutowanie
+  `(string)(object)` przez konwertery VO; domyślna kolacja SQL Servera nie rozróżnia wielkości liter). Bez indeksu pełnotekstowego – przy tej skali wystarczy.
+- Zlecenia: `features/orders` – Zlecam = moje ogłoszenia (wszystkie statusy, `ownerId`), Pomagam = moje wątki jako
+  pomocnik (`api/me/conversations?role=Helper`), po 50 na stronę. Grupy (`order-groups.ts`): Open → „W trakcie
+  negocjacji”, Accepted → „Przyjęte”, InProgress → „W realizacji”, Completed/Cancelled → „Zakończone”; w Pomagam wątek
+  trafia do grupy zlecenia tylko, gdy ostatnia oferta jest `Accepted` (wybrano kogoś innego → „Zakończone”). Wiersz wątku
+  – wspólny `ConversationItemComponent` (skrzynka i Pomagam); wątek bez ofert opisany „Pytania i odpowiedzi – bez oferty”.
+- Dzwonek: `shared/components/notifications-bell` (plakietka 99+, tylko zalogowani) w nagłówkach korzeni zakładek;
+  `/notifications` bez zakładki (strzałka wstecz, wejście też z „Konta”). `TabsPage` dalej uruchamia hub i push.
+- „Zapytaj”: w szczegółach przycisk „Zapytaj” (bez wątku) / „Rozmowa”, oferta osobno. Wątek bez ofert: notka „Pytania
+  i odpowiedzi”, pole „Zadaj pytanie…” (pomocnik) / „Odpowiedz…” (zleceniodawca), „Złóż ofertę” jak dotąd w stopce.
+- Konto: tytuł „Konto”, z listy zniknęły „Moje ogłoszenia” i „Polubione” (mają zakładki), doszły „Powiadomienia”.
+- 12.11.2026 `verify.cmd`: dotnet 489/489 (Core 198, Application 186, integracyjne 105), lint + Vitest 275/275 + build.
+- Do sprawdzenia ręcznie: wygląd czterech pasków nagłówka „Szukaj” na niskim telefonie (ew. połączyć segment Lista/Mapa
+  z filtrami), wyróżnienie zakładki „Zlecenia” po wejściu w wątek ze szczegółów ogłoszenia.
 
 **C. Nieaktualna oferta pomocnika (reguła domeny)**
 - [ ] Dziś: pomocnik złożył ofertę, właściciel edytuje ogłoszenie → oferta `IsOutdated`. Pomocnik widzi „Twoja oferta: x zł”
