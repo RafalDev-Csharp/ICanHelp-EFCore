@@ -1,6 +1,9 @@
 @let current = filters();
 <ion-header [translucent]="true">
   <ion-toolbar>
+    <ion-buttons slot="start">
+      <app-brand></app-brand>
+    </ion-buttons>
     <ion-title>Ogłoszenia</ion-title>
   </ion-toolbar>
   <ion-toolbar>
@@ -79,7 +82,7 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true">
+<ion-content [fullscreen]="true" class="page-column">
   @if (view() === 'list') {
   <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
     <ion-refresher-content></ion-refresher-content>

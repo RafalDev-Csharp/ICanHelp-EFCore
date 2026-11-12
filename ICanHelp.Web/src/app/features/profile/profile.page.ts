@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
   IonButton,
+  IonButtons,
   IonContent,
   IonHeader,
   IonIcon,
@@ -21,6 +22,7 @@ import { documentTextOutline, heartOutline, notificationsOutline } from 'ionicon
 
 import { AuthService } from '../../core/auth/auth.service';
 import { PushService } from '../../core/pwa/push.service';
+import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { parseApiDate } from '../../shared/pipes/time-ago.pipe';
 
@@ -30,11 +32,13 @@ import { AppSettingsComponent } from './app-settings.component';
   selector: 'app-profile',
   templateUrl: './profile.page.html',
   imports: [
+    BrandComponent,
     DatePipe,
     RouterLink,
     IonHeader,
     IonToolbar,
     IonTitle,
+    IonButtons,
     IonContent,
     IonList,
     IonListHeader,

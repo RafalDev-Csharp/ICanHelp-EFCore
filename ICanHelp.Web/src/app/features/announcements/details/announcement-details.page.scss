@@ -6,17 +6,19 @@
   scrollbar-width: none;
 }
 
+/* Całe zdjęcie (bez przycinania i powiększania) na tle – pionowe i panoramiczne też. */
 .gallery-item {
   flex: 0 0 100%;
   aspect-ratio: 4 / 3;
   max-height: 50vh;
   scroll-snap-align: center;
+  background: var(--ion-color-light);
 
   img {
+    display: block;
     width: 100%;
     height: 100%;
-    object-fit: cover;
-    background: var(--ion-color-light);
+    object-fit: contain;
   }
 }
 
@@ -60,10 +62,33 @@ h2 {
   white-space: pre-line;
 }
 
+/* Proporcje zamiast stałej wysokości – na szerszym ekranie mapa nie jest wąskim paskiem. */
 .detail-map {
-  height: 200px;
+  aspect-ratio: 16 / 9;
+  min-height: 200px;
+  max-height: 50vh;
   overflow: hidden;
   border-radius: 12px;
+}
+
+/* Metadane (kategoria, trudność, oferty) jako etykiety – czytelniej niż rozciągnięte wiersze listy. */
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding-top: 12px;
+  list-style: none;
+
+  ion-chip {
+    margin: 0;
+    font-size: 0.9375rem;
+    cursor: default;
+  }
+
+  ion-icon {
+    font-size: 1.125rem;
+  }
 }
 
 .review-rate {

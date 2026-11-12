@@ -206,21 +206,42 @@ Podgląd liczy backend dla zapisanego alertu – odświeża się po „Zapisz zm
 Uwagi z testu na komputerze i telefonie. Część A to błędy (mała zmiana, bez nowego projektu), B – nowa nawigacja (zmienia
 układ zakładek, więc robić ją przed testem z ludźmi, ale osobno od A), C – reguła domeny (backend + front).
 
-**A. Błędy i czytelność**
-- [ ] Szczegóły ogłoszenia na szerokim ekranie (komputer; na Androidzie OK): galeria `flex: 0 0 100%` + `aspect-ratio 4/3`
+**A. Błędy i czytelność** – zrobione 12.11.2026 (opis niżej)
+- [x] Szczegóły ogłoszenia na szerokim ekranie (komputer; na Androidzie OK): galeria `flex: 0 0 100%` + `aspect-ratio 4/3`
       + `max-height: 50vh` + `object-fit: cover` → zdjęcie przycięte do środka i powiększone (rozmyte), mapa 200 px na całą
       szerokość → wąski pasek. Poprawka: treść stron w kolumnie o maks. szerokości (~720 px, wyśrodkowana), zdjęcie `contain`
       na tle, mapa z `aspect-ratio`. Sprawdzić też inne strony (lista, formularze) na szerokim ekranie.
-- [ ] „Trudność” (np. „Trudne”) i inne metadane w szczegółach – większa czcionka, chip/etykieta zamiast rozciągniętego wiersza.
-- [ ] Logo / nazwa „I can help U” w nagłówku → powrót na stronę główną (`/announcements`).
-- [ ] Zakładki pamiętają ostatni ekran (np. wracam na „Ogłoszenia” i widzę szczegóły, a nie listę). Ionic trzyma stos każdej
+- [x] „Trudność” (np. „Trudne”) i inne metadane w szczegółach – większa czcionka, chip/etykieta zamiast rozciągniętego wiersza.
+- [x] Logo / nazwa „I can help U” w nagłówku → powrót na stronę główną (`/announcements`).
+- [x] Zakładki pamiętają ostatni ekran (np. wracam na „Ogłoszenia” i widzę szczegóły, a nie listę). Ionic trzyma stos każdej
       zakładki – zmiana: przejście na inną zakładkę (albo ponowne stuknięcie aktywnej) wraca do jej korzenia.
-- [ ] Wątek negocjacji: wyraźne przejście do ogłoszenia (karta ogłoszenia u góry wątku: zdjęcie, tytuł, status, „Zobacz
+- [x] Wątek negocjacji: wyraźne przejście do ogłoszenia (karta ogłoszenia u góry wątku: zdjęcie, tytuł, status, „Zobacz
       ogłoszenie”) i akcje zlecenia (np. „Rozpocznij”) w wątku, gdy oferta przyjęta.
-- [ ] Do sprawdzenia: ogłoszenie po akceptacji oferty dalej widać na liście „Ogłoszenia” (lista pobiera tylko `Open` – podejrzenie:
+- [x] Do sprawdzenia: ogłoszenie po akceptacji oferty dalej widać na liście „Ogłoszenia” (lista pobiera tylko `Open` – podejrzenie:
       lista nie odświeża się po akcji, bo zakładka trzyma stary stan) → odświeżenie listy po zmianie statusu / przy powrocie.
-- [ ] Brave: „Nie udało się włączyć powiadomień” – Brave domyślnie blokuje push przez Google (FCM). Wykryć Brave
+- [x] Brave: „Nie udało się włączyć powiadomień” – Brave domyślnie blokuje push przez Google (FCM). Wykryć Brave
       (`navigator.brave`) i pokazać podpowiedź: `brave://settings/privacy` → „Use Google services for push messaging”.
+
+Zrobione A (12.11.2026), decyzje:
+- Kolumna: globalna klasa `page-column` (`global.scss`, `--app-column-width: 720px`). Na `ion-content` dokłada boczny
+  odstęp do `::part(scroll)` (zachowuje `ion-padding`), na zwykłych elementach (stopki, karta w nagłówku wątku) –
+  `max-width` + `margin: auto`. Dodana na wszystkich stronach; mapa ogłoszeń (`slot="fixed"`) zostaje na całą szerokość.
+  Galeria: `object-fit: contain` na jasnym tle; mapa w szczegółach `aspect-ratio: 16/9` (min. 200 px, maks. 50vh).
+- Metadane: lista `ion-item` → chipy (kategoria, „Trudność: Trudne” w kolorze trudności – `difficultyColor`, „N ofert”).
+- Logo: `shared/components/brand` (`app-brand`, ikona PWA + „I can help U”, na wąskim ekranie sama ikona) w nagłówku
+  każdej strony (po strzałce wstecz); `NavController.navigateRoot('/announcements')` – czyści stos zakładki Ogłoszenia.
+- Zakładki: `TabsPage.openTabRoot` przechwytuje `ionTabButtonClick` na `ion-tab-bar` (zanim obsłuży go `ion-tabs`)
+  i robi `navigateRoot('/<zakładka>')`. Widok korzenia zakładki jest używany ponownie (filtry listy, szkic „Dodaj”
+  zostają), ekrany głębiej w stosie są zamykane.
+- Lista po akcji: przyczyna potwierdzona – `ngOnInit` wczytywał listę raz, a strona zostaje w stosie. Teraz każde
+  kolejne `ionViewWillEnter` wczytuje pierwszą stronę od nowa (stare karty widać do przyjścia wyników).
+- Wątek: karta ogłoszenia w nagłówku (miniatura z `GET api/announcements/{id}` – dodatek, błąd = ikona; tytuł, status,
+  rola, „Zobacz ogłoszenie”). W wątku z przyjętą ofertą: „Rozpocznij zlecenie” (Accepted, obie strony) / „Zakończ
+  zlecenie” (InProgress, zleceniodawca). `start` / `complete` przeniesione do `OffersService` (wspólne ze szczegółami).
+- Brave: `PushPlatform.isBrave` (`'brave' in navigator`); gdy rejestracja FCM się nie uda – okno z instrukcją
+  (`BRAVE_PUSH_HINT`) zamiast ogólnego błędu. Linku do `brave://` strona otworzyć nie może – adres jest w tekście.
+- Bez zmian backendu. Do sprawdzenia ręcznie: wygląd na komputerze (szeroki ekran) i telefonie, Brave z włączonym
+  ustawieniem.
 
 **B. Nawigacja jak w aplikacjach ogłoszeniowych (do akceptacji autora)**
 - [ ] Dolne zakładki: **Szukaj** (ogłoszenia: lista ↔ mapa, wyszukiwarka tekstowa, kategorie jako kafelki z ikonami –

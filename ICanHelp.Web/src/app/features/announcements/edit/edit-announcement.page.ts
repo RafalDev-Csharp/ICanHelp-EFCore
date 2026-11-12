@@ -27,6 +27,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { CategoriesService } from '../../../core/categories/categories.service';
 import type { GeoPoint } from '../../../core/geo/geo-point';
 import { ToastService } from '../../../core/ui/toast.service';
+import { BrandComponent } from '../../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
 import type { PhotoItem } from '../form/announcement-form';
 import { createAnnouncementForm, formValueOf, hasChanges, photosOf, toUpdateCommand } from '../form/announcement-form';
@@ -55,6 +56,7 @@ type EditState = 'loading' | 'ready' | 'not-owner' | 'locked' | 'not-found' | 'f
     }
   `,
   imports: [
+    BrandComponent,
     RouterLink,
     IonHeader,
     IonToolbar,

@@ -4,9 +4,10 @@ import { provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 
 import type { ConversationDto, ConversationEntryDto, NotificationDto, UserDto } from '../../core/api/api-client';
-import { ConversationsClient, UsersClient } from '../../core/api/api-client';
+import { AnnouncementsClient, ConversationsClient, UsersClient } from '../../core/api/api-client';
 import { AuthService } from '../../core/auth/auth.service';
 import { NotificationsService } from '../../core/notifications/notifications.service';
+import { announcementDetails } from '../announcements/testing/announcement-fixtures';
 import { OffersService } from '../offers/offers.service';
 import { conversationFixture, offerFixture } from '../offers/testing/offer-fixtures';
 
@@ -21,7 +22,10 @@ describe('ConversationPage', () => {
     reject: vi.fn(),
     counter: vi.fn(() => Promise.resolve(true)),
     withdraw: vi.fn(),
+    start: vi.fn(() => Promise.resolve(true)),
+    complete: vi.fn(() => Promise.resolve(true)),
   };
+  const announcements = { getById: vi.fn() };
   const auth = {
     currentUser: signal<UserDto | null>({ id: 'owner-1' } as UserDto),
     loadCurrentUser: vi.fn(() => of()),
@@ -35,6 +39,7 @@ describe('ConversationPage', () => {
   const providers = (): unknown[] => [
     provideRouter([]),
     { provide: ConversationsClient, useValue: conversations },
+    { provide: AnnouncementsClient, useValue: announcements },
     { provide: UsersClient, useValue: users },
     { provide: OffersService, useValue: offers },
     { provide: AuthService, useValue: auth },
@@ -81,6 +86,69 @@ describe('ConversationPage', () => {
     vi.clearAllMocks();
     users.getById.mockReturnValue(of({ id: 'helper-1', fullName: 'Anna Nowak' }));
     conversations.markAsRead.mockReturnValue(of(undefined));
+    announcements.getById.mockReturnValue(
+      of(
+        announcementDetails('a1', {
+          images: [
+            { id: 'i1', announcementId: 'a1', fileName: 'a.jpg', fileExtension: '.jpg', url: '/api/x/i1', addedAt: '' },
+          ],
+        }),
+      ),
+    );
+  });
+
+  it('shows the announcement card with a photo and a link to the announcement', async () => {
+    const { element, render } = create(conversationFixture());
+    await render();
+
+    expect(announcements.getById).toHaveBeenCalledWith('a1');
+    expect(element.querySelector('.subject h2')?.textContent).toContain('Cieknący kran');
+    expect(element.querySelector('.subject-thumb img')?.getAttribute('src')).toContain('/api/x/i1');
+    expect(element.querySelector('.subject-link')?.textContent).toContain('Zobacz ogłoszenie');
+  });
+
+  it('keeps the thread working when the announcement photo cannot be loaded', async () => {
+    announcements.getById.mockReturnValue(throwError(() => ({ status: 500 })));
+    const { element, render } = create(conversationFixture());
+    await render();
+
+    expect(element.querySelector('.subject-thumb img')).toBeNull();
+    expect(element.querySelector('.subject h2')?.textContent).toContain('Cieknący kran');
+  });
+
+  it('offers "start" in the accepted thread to both sides and "complete" only to the client', async () => {
+    const accepted = [offerEntry({ status: 'Accepted' })];
+    const helper = create(conversationFixture({ announcementStatus: 'Accepted', timeline: accepted }));
+    await helper.render();
+
+    expect(helper.page.jobAction()).toBe('start');
+    expect(helper.element.querySelector('.job-action')?.textContent).toContain('Rozpocznij zlecenie');
+    await helper.page.runJobAction();
+    expect(offers.start).toHaveBeenCalledWith('a1');
+    expect(conversations.getById).toHaveBeenCalledTimes(2);
+    TestBed.resetTestingModule();
+
+    const helperInProgress = create(conversationFixture({ announcementStatus: 'InProgress', timeline: accepted }));
+    await helperInProgress.render();
+    expect(helperInProgress.element.querySelector('.job-action')).toBeNull();
+    TestBed.resetTestingModule();
+
+    const client = create(
+      conversationFixture({ myRole: 'Client', announcementStatus: 'InProgress', timeline: accepted }),
+    );
+    await client.render();
+    expect(client.element.querySelector('.job-action')?.textContent).toContain('Zakończ zlecenie');
+    await client.page.runJobAction();
+    expect(offers.complete).toHaveBeenCalledWith('a1');
+  });
+
+  it('has no job actions in a thread whose offer was not accepted', async () => {
+    const { page, render } = create(
+      conversationFixture({ announcementStatus: 'Accepted', timeline: [offerEntry({ status: 'Rejected' })] }),
+    );
+    await render();
+
+    expect(page.jobAction()).toBeNull();
   });
 
   it('shows the thread, the other party and marks it as read', async () => {

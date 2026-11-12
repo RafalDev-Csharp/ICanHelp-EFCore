@@ -2,12 +2,13 @@
   <ion-toolbar>
     <ion-buttons slot="start">
       <ion-back-button [defaultHref]="detailsUrl()"></ion-back-button>
+      <app-brand></app-brand>
     </ion-buttons>
     <ion-title>Edytuj ogłoszenie</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
+<ion-content class="ion-padding page-column">
   @switch (state()) { @case ('loading') {
   <div class="ion-text-center ion-padding" aria-busy="true">
     <ion-spinner name="crescent"></ion-spinner>
@@ -62,7 +63,7 @@
 @if (state() === 'ready') {
 <ion-footer>
   <ion-toolbar>
-    <ion-button expand="block" (click)="save()" [disabled]="saving()">
+    <ion-button class="page-column" expand="block" (click)="save()" [disabled]="saving()">
       @if (saving()) {
       <ion-spinner name="crescent" slot="start"></ion-spinner> Zapisuję… } @else { Zapisz zmiany }
     </ion-button>

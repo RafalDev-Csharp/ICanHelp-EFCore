@@ -1,10 +1,13 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
+    <ion-buttons slot="start">
+      <app-brand></app-brand>
+    </ion-buttons>
     <ion-title>Dodaj ogłoszenie</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true" class="ion-padding">
+<ion-content [fullscreen]="true" class="ion-padding page-column">
   <ion-header collapse="condense">
     <ion-toolbar>
       <ion-title size="large">Dodaj ogłoszenie</ion-title>
@@ -21,7 +24,7 @@
 
 <ion-footer>
   <ion-toolbar>
-    <ion-button class="submit" expand="block" (click)="submit()" [disabled]="saving()">
+    <ion-button class="submit page-column" expand="block" (click)="submit()" [disabled]="saving()">
       @if (saving()) {
       <ion-spinner name="crescent" slot="start"></ion-spinner> Zapisuję… } @else { Opublikuj ogłoszenie }
     </ion-button>

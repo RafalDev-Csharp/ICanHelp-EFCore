@@ -24,9 +24,12 @@ import type { ViewWillEnter, ViewWillLeave } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
   alertCircleOutline,
+  checkmarkDoneOutline,
   cloudOfflineOutline,
   createOutline,
+  imageOutline,
   lockClosedOutline,
+  playOutline,
   pricetagOutline,
   send,
   warningOutline,
@@ -34,10 +37,12 @@ import {
 import { catchError, filter, of } from 'rxjs';
 
 import type { ConversationDto, OfferDto } from '../../core/api/api-client';
-import { ConversationsClient, UsersClient } from '../../core/api/api-client';
+import { AnnouncementsClient, ConversationsClient, UsersClient } from '../../core/api/api-client';
 import { errorStatus } from '../../core/api/api-errors';
+import { apiResourceUrl } from '../../core/api/api.providers';
 import { AuthService } from '../../core/auth/auth.service';
 import { NotificationsService } from '../../core/notifications/notifications.service';
+import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { PricePipe } from '../../shared/pipes/price.pipe';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
@@ -55,12 +60,15 @@ type LoadState = 'loading' | 'ready' | 'not-found' | 'failed';
  * odrzuć / kontroferta / wycofaj – zgodnie z rolą) i zmiany ogłoszenia, od najstarszych. Wejście oznacza wątek jako
  * przeczytany (razem z jego powiadomieniami). Pisać można, dopóki API pozwala (`canWrite`) – potem wątek jest tylko
  * do odczytu. Nowa wiadomość / oferta w tym wątku (powiadomienie z huba SignalR) – wątek przeładowany od razu.
+ * U góry karta ogłoszenia (miniatura, tytuł, status, „Zobacz ogłoszenie”); w wątku przyjętego pomocnika – akcje
+ * zlecenia „Rozpocznij” / „Zakończ”.
  */
 @Component({
   selector: 'app-conversation',
   templateUrl: './conversation.page.html',
   styleUrls: ['./conversation.page.scss'],
   imports: [
+    BrandComponent,
     FormsModule,
     RouterLink,
     IonHeader,
@@ -86,6 +94,7 @@ type LoadState = 'loading' | 'ready' | 'not-found' | 'failed';
 })
 export class ConversationPage implements ViewWillEnter, ViewWillLeave {
   private readonly conversations = inject(ConversationsClient);
+  private readonly announcements = inject(AnnouncementsClient);
   private readonly users = inject(UsersClient);
   private readonly offers = inject(OffersService);
   private readonly auth = inject(AuthService);
@@ -121,6 +130,25 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
     }
     return this.otherName() || partyLabel(conversation.myRole === 'Client' ? 'Helper' : 'Client');
   });
+  /** Miniatura ogłoszenia w karcie u góry (pierwsze zdjęcie); brak zdjęć albo błąd – ikona. */
+  readonly thumbnailUrl = signal<string | undefined>(undefined);
+  /** Wątek z przyjętym pomocnikiem – tu są akcje zlecenia (jak w szczegółach ogłoszenia). */
+  readonly isAcceptedThread = computed(() => {
+    const conversation = this.conversation();
+    return !!conversation && offersOf(conversation).some((offer) => offer.status === 'Accepted');
+  });
+  /** „Rozpocznij” – obie strony przyjętego wątku (Accepted); „Zakończ” – tylko zleceniodawca (InProgress). */
+  readonly jobAction = computed<'start' | 'complete' | null>(() => {
+    const conversation = this.conversation();
+    if (!conversation || !this.isAcceptedThread()) {
+      return null;
+    }
+    if (conversation.announcementStatus === 'Accepted') {
+      return 'start';
+    }
+    return conversation.announcementStatus === 'InProgress' && conversation.myRole === 'Client' ? 'complete' : null;
+  });
+
   /** Pomocnik w otwartym ogłoszeniu bez oczekującej oferty może złożyć nową (np. po odrzuceniu). */
   readonly canMakeOffer = computed(() => {
     const conversation = this.conversation();
@@ -150,9 +178,12 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
   constructor() {
     addIcons({
       alertCircleOutline,
+      checkmarkDoneOutline,
       cloudOfflineOutline,
       createOutline,
+      imageOutline,
       lockClosedOutline,
+      playOutline,
       pricetagOutline,
       send,
       warningOutline,
@@ -190,6 +221,7 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
         this.state.set('ready');
         if (first) {
           this.loadOtherName(conversation);
+          this.loadThumbnail(conversation.announcementId);
         }
         if (conversation.unreadCount > 0) {
           this.conversations.markAsRead(conversation.id).subscribe({ error: () => undefined });
@@ -255,6 +287,20 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
     await this.act(() => this.offers.withdraw(offer));
   }
 
+  /** Akcja zlecenia w przyjętym wątku (potwierdzenie i komunikat – `OffersService`, wspólne ze szczegółami). */
+  async runJobAction(): Promise<void> {
+    const conversation = this.conversation();
+    const action = this.jobAction();
+    if (!conversation || !action) {
+      return;
+    }
+    await this.act(() =>
+      action === 'start'
+        ? this.offers.start(conversation.announcementId)
+        : this.offers.complete(conversation.announcementId),
+    );
+  }
+
   /** Jedna akcja naraz; po zmianie (albo błędzie 409 – stan mógł się zmienić) przeładowanie wątku. */
   private async act(action: () => Promise<boolean>): Promise<void> {
     if (this.busy()) {
@@ -275,6 +321,14 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
       .getById(otherId)
       .pipe(catchError(() => of(null)))
       .subscribe((user) => this.otherName.set(user?.fullName ?? ''));
+  }
+
+  /** Dodatek do karty ogłoszenia – błąd nie psuje wątku (zostaje ikona). */
+  private loadThumbnail(announcementId: string): void {
+    this.announcements
+      .getById(announcementId)
+      .pipe(catchError(() => of(null)))
+      .subscribe((announcement) => this.thumbnailUrl.set(apiResourceUrl(announcement?.images[0]?.url)));
   }
 
   private scrollToBottom(): void {

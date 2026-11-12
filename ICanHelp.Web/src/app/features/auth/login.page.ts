@@ -17,12 +17,14 @@ import {
 
 import { safeReturnUrl } from '../../core/auth/auth.guard';
 import { AuthService } from '../../core/auth/auth.service';
+import { BrandComponent } from '../../shared/components/brand/brand.component';
 
 @Component({
   selector: 'app-login',
   templateUrl: './login.page.html',
   styleUrls: ['./auth.page.scss'],
   imports: [
+    BrandComponent,
     ReactiveFormsModule,
     RouterLink,
     IonHeader,

@@ -39,6 +39,28 @@
 /* Style Leaflet (mapy, F3) – razem z pozostałymi importami, przed regułami. */
 @import 'leaflet/dist/leaflet.css';
 
+/*
+ * Szeroki ekran (F11): treść stron w wyśrodkowanej kolumnie – na komputerze zdjęcia, mapy i listy nie rozciągają się
+ * na całą szerokość okna. `ion-content.page-column` dokłada boczny odstęp do przewijanej części (zachowuje własne
+ * `--padding-*`, np. `ion-padding`); warstwy `slot="fixed"` (mapa ogłoszeń, refresher) zostają na całą szerokość.
+ * Klasa `.page-column` na zwykłym elemencie (stopka, nagłówek) – ta sama szerokość.
+ */
+:root {
+  --app-column-width: 720px;
+}
+
+ion-content.page-column::part(scroll) {
+  padding-inline-start: calc(var(--padding-start, 0px) + max(0px, (100% - var(--app-column-width)) / 2));
+  padding-inline-end: calc(var(--padding-end, 0px) + max(0px, (100% - var(--app-column-width)) / 2));
+}
+
+:not(ion-content).page-column {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--app-column-width);
+  margin-inline: auto;
+}
+
 /* Mapy (Leaflet, F3): kolory warstw rysowanych przez `app-map` (poza widokiem komponentu). */
 .leaflet-container {
   font: inherit;

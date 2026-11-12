@@ -2,12 +2,13 @@
   <ion-toolbar>
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/profile"></ion-back-button>
+      <app-brand></app-brand>
     </ion-buttons>
     <ion-title>Alerty</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="page-column">
   <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>

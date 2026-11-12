@@ -13,7 +13,14 @@ import { InstallPromptService } from './install-prompt.service';
 import type { PushMessaging } from './push-messaging';
 import { PUSH_MESSAGING } from './push-messaging';
 import type { PushPlatform } from './push.service';
-import { PUSH_CLICKED, PUSH_PLATFORM, PUSH_RECEIVED, PUSH_STORAGE_KEY, PushService } from './push.service';
+import {
+  BRAVE_PUSH_HINT,
+  PUSH_CLICKED,
+  PUSH_PLATFORM,
+  PUSH_RECEIVED,
+  PUSH_STORAGE_KEY,
+  PushService,
+} from './push.service';
 
 /** Fałszywy `navigator.serviceWorker`: gotowa rejestracja i wiadomości „z workera”. */
 class FakeContainer extends EventTarget {
@@ -138,6 +145,17 @@ describe('PushService', () => {
 
     expect(toast.error).toHaveBeenCalled();
     expect(service.state()).toBe('default');
+  });
+
+  it('explains the Brave setting when the FCM registration fails in Brave', async () => {
+    messaging.getToken.mockRejectedValue(new Error('Registration failed - push service error'));
+    platform = { ...platform, isBrave: true };
+    const service = create();
+
+    await expect(service.enable()).resolves.toBe(false);
+
+    expect(alerts.create).toHaveBeenCalledWith(expect.objectContaining({ message: BRAVE_PUSH_HINT }));
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it('suggests push once a week and enables it from the alert button', async () => {

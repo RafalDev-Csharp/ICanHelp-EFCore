@@ -2,13 +2,26 @@
   <ion-toolbar>
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/conversations"></ion-back-button>
+      <app-brand></app-brand>
     </ion-buttons>
     <ion-title>{{ title() }}</ion-title>
   </ion-toolbar>
   @if (conversation(); as thread) {
   <ion-toolbar>
-    <ion-item lines="none" [routerLink]="['/announcements', thread.announcementId]" [detail]="true" class="subject">
-      <ion-label>
+    <div class="subject page-column">
+      <a
+        class="subject-thumb"
+        [routerLink]="['/announcements', thread.announcementId]"
+        tabindex="-1"
+        aria-hidden="true"
+      >
+        @if (thumbnailUrl(); as url) {
+        <img [src]="url" alt="" />
+        } @else {
+        <ion-icon name="image-outline"></ion-icon>
+        }
+      </a>
+      <div class="subject-text">
         <h2>{{ thread.announcementTitle }}</h2>
         <p>
           <ion-badge [color]="statusColor(thread.announcementStatus)"
@@ -16,13 +29,20 @@
           >
           · jesteś: {{ partyLabel(thread.myRole).toLowerCase() }}
         </p>
-      </ion-label>
-    </ion-item>
+      </div>
+      <ion-button
+        class="subject-link"
+        size="small"
+        fill="outline"
+        [routerLink]="['/announcements', thread.announcementId]"
+        >Zobacz ogłoszenie</ion-button
+      >
+    </div>
   </ion-toolbar>
   }
 </ion-header>
 
-<ion-content>
+<ion-content class="page-column">
   @switch (state()) { @case ('loading') {
   <div class="ion-text-center ion-padding" aria-busy="true">
     <ion-spinner name="crescent"></ion-spinner>
@@ -111,16 +131,39 @@
 
 @if (conversation(); as thread) {
 <ion-footer>
-  @if (thread.canWrite) { @if (canMakeOffer()) {
+  @if (jobAction(); as action) {
   <ion-toolbar>
-    <ion-button expand="block" fill="outline" class="ion-padding-horizontal" (click)="makeOffer()" [disabled]="busy()">
+    <ion-button
+      expand="block"
+      class="ion-padding-horizontal job-action page-column"
+      [color]="action === 'complete' ? 'success' : 'primary'"
+      (click)="runJobAction()"
+      [disabled]="busy()"
+    >
+      <ion-icon
+        [name]="action === 'start' ? 'play-outline' : 'checkmark-done-outline'"
+        slot="start"
+        aria-hidden="true"
+      ></ion-icon>
+      {{ action === 'start' ? 'Rozpocznij zlecenie' : 'Zakończ zlecenie' }}
+    </ion-button>
+  </ion-toolbar>
+  } @if (thread.canWrite) { @if (canMakeOffer()) {
+  <ion-toolbar>
+    <ion-button
+      expand="block"
+      fill="outline"
+      class="ion-padding-horizontal page-column"
+      (click)="makeOffer()"
+      [disabled]="busy()"
+    >
       <ion-icon name="pricetag-outline" slot="start" aria-hidden="true"></ion-icon>
       Złóż ofertę
     </ion-button>
   </ion-toolbar>
   }
   <ion-toolbar>
-    <div class="composer">
+    <div class="composer page-column">
       <ion-textarea
         [(ngModel)]="draft"
         aria-label="Wiadomość"

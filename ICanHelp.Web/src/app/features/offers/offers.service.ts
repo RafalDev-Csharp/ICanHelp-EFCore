@@ -85,6 +85,29 @@ export class OffersService {
     );
   }
 
+  /** „Rozpocznij” – właściciel albo przyjęty pomocnik (Accepted → InProgress). */
+  async start(announcementId: string): Promise<boolean> {
+    const confirmed = await this.confirm(
+      'Rozpocząć zlecenie?',
+      'Oznaczy zlecenie jako „w realizacji”. Po wszystkim zleceniodawca potwierdzi zakończenie.',
+      'Rozpocznij',
+    );
+    return confirmed && (await this.run(this.client.start(announcementId), 'Zlecenie w realizacji.')) !== null;
+  }
+
+  /** „Zakończ” – tylko właściciel (InProgress → Completed), potem obie strony mogą się ocenić. */
+  async complete(announcementId: string): Promise<boolean> {
+    const confirmed = await this.confirm(
+      'Potwierdzić wykonanie?',
+      'Zlecenie zostanie zakończone, a rozmowa – zamknięta. Potem możecie się wzajemnie ocenić.',
+      'Zakończ',
+    );
+    return (
+      confirmed &&
+      (await this.run(this.client.complete(announcementId), 'Zlecenie zakończone. Oceń współpracę!')) !== null
+    );
+  }
+
   /** Ocena drugiej strony po zakończeniu (raz na ogłoszenie – backend pilnuje, 409 `AlreadyRated`). */
   async rate(announcementId: string, otherParty: string): Promise<boolean> {
     const modal = await this.modals.create({ component: RatingModalComponent, componentProps: { otherParty } });

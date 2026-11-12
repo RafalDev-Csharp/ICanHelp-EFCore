@@ -21,6 +21,7 @@ import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
 import type { AnnouncementDto } from '../../core/api/api-client';
 import { AnnouncementsClient } from '../../core/api/api-client';
 import { CategoriesService } from '../../core/categories/categories.service';
+import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { LikesService } from '../announcements/likes/likes.service';
 import { AnnouncementCardComponent } from '../announcements/list/announcement-card.component';
@@ -36,6 +37,7 @@ export const MAX_LIKED_SHOWN = 50;
   selector: 'app-liked-announcements',
   templateUrl: './liked-announcements.page.html',
   imports: [
+    BrandComponent,
     RouterLink,
     IonHeader,
     IonToolbar,

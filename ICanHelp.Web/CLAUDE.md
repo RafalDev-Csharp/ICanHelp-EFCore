@@ -31,7 +31,7 @@ core/             jedno miejsce na całą aplikację: config/locale.ts (pl-PL, P
                   interceptors/ – `authInterceptor` (Bearer, odświeżenie przed wygaśnięciem i raz po 401), `errorInterceptor`
                   (ProblemDetails → toast, mapa `error-messages.ts`, `SKIP_ERROR_TOAST`); ui/ – `ToastService` (error/success/info);
                   testing/ – helpery do specs
-shared/           components/ (EmptyStateComponent, `app-map` – Leaflet: pinezki, okrąg promienia, trasa z pasem, tryb poglądowy,
+shared/           components/ (EmptyStateComponent, `app-brand` – logo w nagłówku każdej strony → `/announcements`, `app-map` – Leaflet: pinezki, okrąg promienia, trasa z pasem, tryb poglądowy,
                   `app-place-search` – moja pozycja + adres),
                   pipes/ (`price`, `distance` – km z API, `timeAgo` – „2 h temu”), text/ (`pluralPl` – „1 ocena / 2 oceny / 5 ocen”)
 features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poza zakładkami, `?returnUrl=`),
@@ -51,10 +51,12 @@ features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poz
                   alerts (`/profile/alerts` – lista, `/profile/alerts/new?kind=Area|Route`, `/profile/alerts/:alertId` – edycja
                   + „Pasujące teraz”; `alert-form.ts` – stan, walidacja, `WeekDays` ↔ maska; `route-picker` – start/cel → trasa)
 tabs/             TabsPage – dolny pasek zakładek, rejestruje ikony zakładek (`addIcons`), uruchamia `NotificationsService`,
-                  plakietka nieprzeczytanych. Strony używające `NotificationsService` – w specs obiekt z `received$` (Subject)
+                  plakietka nieprzeczytanych; stuknięcie zakładki = jej korzeń (`openTabRoot`, nie ostatni ekran). Strony używające `NotificationsService` – w specs obiekt z `received$` (Subject)
 ```
 Trasy `/add`, `/announcements/:id/edit`, `/conversations` (+ `/:conversationId`), `/notifications`, `/profile/announcements`, `/profile/liked`, `/profile/alerts` (+ `/new`, `/:alertId`) mają `authGuard`; ogłoszenia (lista, szczegóły) i profil są publiczne –
 akcje wymagające konta same prowadzą na `/login?returnUrl=…`.
+Szeroki ekran: nowa strona dostaje `class="page-column"` na `ion-content` (i na treści stopki) – kolumna 720 px (`global.scss`);
+w nagłówku `<app-brand>` w `ion-buttons slot="start"` (po `ion-back-button`).
 Mapy: Leaflet (`import * as L from 'leaflet'`, style w `global.scss`, kolory pinezek – klasy `.map-pin/.map-user/.map-radius`).
 W specs stron z mapą podmieniamy `MapComponent` zaślepką (`TestBed.overrideComponent`) – jsdom nie rysuje map; strony z formularzem
 ogłoszenia – `AnnouncementFormStubComponent` (`features/announcements/testing/announcement-form.stub.ts`).

@@ -1,6 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
+import { NavController } from '@ionic/angular';
 
 import { NotificationsService } from '../core/notifications/notifications.service';
 import { PushService } from '../core/pwa/push.service';
@@ -42,6 +43,28 @@ describe('TabsPage', () => {
 
     notifications.unreadCount.set(150);
     expect(fixture.componentInstance.unreadBadge()).toBe('99+');
+  });
+
+  it('opens the root of the tapped tab instead of its last screen', () => {
+    const fixture = TestBed.createComponent(TabsPage);
+    fixture.detectChanges();
+    const navCtrl = TestBed.inject(NavController);
+    const navigateRoot = vi.spyOn(navCtrl, 'navigateRoot').mockResolvedValue(true);
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'url', 'get').mockReturnValue('/announcements/a1');
+
+    const event = new CustomEvent('ionTabButtonClick', { detail: { tab: 'announcements' }, cancelable: true });
+    const stop = vi.spyOn(event, 'stopPropagation');
+    fixture.componentInstance.openTabRoot(event);
+
+    expect(stop).toHaveBeenCalled();
+    expect(navigateRoot).toHaveBeenCalledWith('/announcements', { animated: true, animationDirection: 'back' });
+
+    // Już na korzeniu – nic nie robimy.
+    navigateRoot.mockClear();
+    vi.spyOn(router, 'url', 'get').mockReturnValue('/profile?x=1');
+    fixture.componentInstance.openTabRoot(new CustomEvent('ionTabButtonClick', { detail: { tab: 'profile' } }));
+    expect(navigateRoot).not.toHaveBeenCalled();
   });
 
   // Teksty etykiet sprawdza e2e (e2e/app.spec.ts) – w jsdom komponenty Ionic czyszczą treść `ion-label`.

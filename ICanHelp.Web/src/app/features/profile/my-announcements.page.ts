@@ -25,6 +25,7 @@ import type { AnnouncementDto } from '../../core/api/api-client';
 import { AnnouncementsClient } from '../../core/api/api-client';
 import { AuthService } from '../../core/auth/auth.service';
 import { CategoriesService } from '../../core/categories/categories.service';
+import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { AnnouncementCardComponent } from '../announcements/list/announcement-card.component';
 import { PAGE_SIZE } from '../announcements/list/announcement-filters';
@@ -41,6 +42,7 @@ interface CompletableTarget {
   selector: 'app-my-announcements',
   templateUrl: './my-announcements.page.html',
   imports: [
+    BrandComponent,
     RouterLink,
     IonHeader,
     IonToolbar,

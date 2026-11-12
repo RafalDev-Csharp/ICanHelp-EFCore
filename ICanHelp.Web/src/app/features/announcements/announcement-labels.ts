@@ -21,8 +21,19 @@ const STATUS_COLORS: Readonly<Record<string, string>> = {
   Cancelled: 'danger',
 };
 
+const DIFFICULTY_COLORS: Readonly<Record<string, string>> = {
+  Easy: 'success',
+  Medium: 'warning',
+  Hard: 'danger',
+};
+
 export function difficultyLabel(difficulty: string): string {
   return DIFFICULTY_LABELS[difficulty] ?? difficulty;
+}
+
+/** Kolor Ionic etykiety trudności (`ion-chip [color]`); nieznana wartość – szary. */
+export function difficultyColor(difficulty: string): string {
+  return DIFFICULTY_COLORS[difficulty] ?? 'medium';
 }
 
 export function statusLabel(status: string): string {

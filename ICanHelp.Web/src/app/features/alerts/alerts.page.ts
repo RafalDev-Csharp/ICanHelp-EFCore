@@ -30,6 +30,7 @@ import type { AlertDto } from '../../core/api/api-client';
 import { AlertsClient } from '../../core/api/api-client';
 import { CategoriesService } from '../../core/categories/categories.service';
 import { ToastService } from '../../core/ui/toast.service';
+import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 
 import { ALERT_RULES, describeSchedule, formatRadius } from './alert-form';
@@ -47,6 +48,7 @@ interface CompletableTarget {
   templateUrl: './alerts.page.html',
   styleUrls: ['./alerts.page.scss'],
   imports: [
+    BrandComponent,
     RouterLink,
     IonHeader,
     IonToolbar,

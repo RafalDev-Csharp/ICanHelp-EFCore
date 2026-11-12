@@ -19,6 +19,8 @@ describe('OffersService', () => {
     accept: vi.fn(),
     reject: vi.fn(),
     withdraw: vi.fn(),
+    start: vi.fn(),
+    complete: vi.fn(),
     postRating: vi.fn(),
   };
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
@@ -112,6 +114,25 @@ describe('OffersService', () => {
     await expect(service.accept(offerFixture('o1'))).resolves.toBe(true);
     expect(client.accept).toHaveBeenCalledWith('a1', 'o1');
     expect(toast.success).toHaveBeenCalledWith('Oferta przyjęta.');
+  });
+
+  it('starts and completes the job only after confirmation', async () => {
+    client.start.mockReturnValue(of(undefined));
+    client.complete.mockReturnValue(of(undefined));
+    const service = create();
+
+    alertRole = 'cancel';
+    await expect(service.start('a1')).resolves.toBe(false);
+    expect(client.start).not.toHaveBeenCalled();
+
+    alertRole = 'confirm';
+    await expect(service.start('a1')).resolves.toBe(true);
+    expect(client.start).toHaveBeenCalledWith('a1');
+    expect(toast.success).toHaveBeenCalledWith('Zlecenie w realizacji.');
+
+    await expect(service.complete('a1')).resolves.toBe(true);
+    expect(client.complete).toHaveBeenCalledWith('a1');
+    expect(toast.success).toHaveBeenCalledWith('Zlecenie zakończone. Oceń współpracę!');
   });
 
   it('reports failure when the API refuses (message shown by the interceptor)', async () => {

@@ -1,5 +1,8 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
+    <ion-buttons slot="start">
+      <app-brand></app-brand>
+    </ion-buttons>
     <ion-title>Rozmowy</ion-title>
   </ion-toolbar>
   <ion-toolbar>
@@ -11,7 +14,7 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="page-column">
   <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>

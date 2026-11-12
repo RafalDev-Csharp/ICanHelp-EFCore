@@ -2,12 +2,13 @@
   <ion-toolbar>
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/login"></ion-back-button>
+      <app-brand></app-brand>
     </ion-buttons>
     <ion-title>Nowe konto</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
+<ion-content class="ion-padding page-column">
   <form class="auth-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
     <p class="auth-lead">
       Jedno konto wystarczy, żeby prosić o pomoc i pomagać innym. Telefon i e-mail zobaczy tylko druga strona

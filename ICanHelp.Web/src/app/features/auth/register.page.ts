@@ -19,6 +19,7 @@ import {
 
 import { safeReturnUrl } from '../../core/auth/auth.guard';
 import { AuthService } from '../../core/auth/auth.service';
+import { BrandComponent } from '../../shared/components/brand/brand.component';
 
 /** Te same reguły co w backendzie (value objects w `ICanHelp.Core/ValueObjects`) – błąd widać przed wysłaniem. */
 export const SIGN_UP_RULES = {
@@ -48,6 +49,7 @@ function optionalDescription(control: AbstractControl<string>): ValidationErrors
   templateUrl: './register.page.html',
   styleUrls: ['./auth.page.scss'],
   imports: [
+    BrandComponent,
     ReactiveFormsModule,
     RouterLink,
     IonHeader,

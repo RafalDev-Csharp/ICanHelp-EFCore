@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import {
   IonBadge,
   IonButton,
+  IonButtons,
   IonContent,
   IonHeader,
   IonIcon,
@@ -33,6 +34,7 @@ import { ConversationsClient } from '../../core/api/api-client';
 import { apiResourceUrl } from '../../core/api/api.providers';
 import { concernsConversation } from '../../core/notifications/notification-texts';
 import { NotificationsService } from '../../core/notifications/notifications.service';
+import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { PricePipe } from '../../shared/pipes/price.pipe';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
@@ -58,10 +60,12 @@ interface CompletableTarget {
   templateUrl: './conversations.page.html',
   styleUrls: ['./conversations.page.scss'],
   imports: [
+    BrandComponent,
     RouterLink,
     IonHeader,
     IonToolbar,
     IonTitle,
+    IonButtons,
     IonContent,
     IonSegment,
     IonSegmentButton,

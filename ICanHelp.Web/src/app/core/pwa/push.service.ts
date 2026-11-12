@@ -34,9 +34,17 @@ const READY_TIMEOUT_MS = 40_000;
 export interface PushPlatform {
   /** `null` – przeglądarka bez service workera albo bez Push API / Notification. */
   readonly serviceWorker: ServiceWorkerContainer | null;
+  /** Brave domyślnie blokuje push przez usługi Google (FCM) – przy błędzie pokazujemy, gdzie to włączyć. */
+  readonly isBrave?: boolean;
   permission(): NotificationPermission;
   requestPermission(): Promise<NotificationPermission>;
 }
+
+/** Podpowiedź dla Brave, gdy rejestracja FCM się nie uda (ustawienie nie ma adresu, który dałoby się otworzyć linkiem). */
+export const BRAVE_PUSH_HINT =
+  'Brave domyślnie blokuje powiadomienia przez usługi Google. Otwórz brave://settings/privacy, włącz ' +
+  '„Use Google services for push messaging” („Używaj usług Google do przesyłania wiadomości push”), uruchom ' +
+  'przeglądarkę ponownie i spróbuj jeszcze raz.';
 
 export const PUSH_PLATFORM = new InjectionToken<PushPlatform>('PUSH_PLATFORM', {
   providedIn: 'root',
@@ -44,6 +52,7 @@ export const PUSH_PLATFORM = new InjectionToken<PushPlatform>('PUSH_PLATFORM', {
     const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     return {
       serviceWorker: supported ? navigator.serviceWorker : null,
+      isBrave: 'brave' in navigator,
       permission: () => (supported ? Notification.permission : 'denied'),
       requestPermission: () => Notification.requestPermission(),
     };
@@ -173,6 +182,13 @@ export class PushService {
       const ok = await this.register();
       if (ok) {
         void this.toast.success('Powiadomienia włączone.');
+      } else if (this.platform.isBrave) {
+        const alert = await this.alerts.create({
+          header: 'Brave blokuje powiadomienia',
+          message: BRAVE_PUSH_HINT,
+          buttons: [{ text: 'OK', role: 'cancel' }],
+        });
+        await alert.present();
       } else {
         void this.toast.error('Nie udało się włączyć powiadomień. Spróbuj ponownie później.');
       }

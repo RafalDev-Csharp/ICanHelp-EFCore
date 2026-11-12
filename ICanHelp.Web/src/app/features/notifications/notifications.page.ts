@@ -39,6 +39,7 @@ import type { NotificationDto } from '../../core/api/api-client';
 import { NotificationsClient } from '../../core/api/api-client';
 import { describeNotification } from '../../core/notifications/notification-texts';
 import { NotificationsService, asRead, isRead } from '../../core/notifications/notifications.service';
+import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
 
@@ -58,6 +59,7 @@ interface CompletableTarget {
   templateUrl: './notifications.page.html',
   styleUrls: ['./notifications.page.scss'],
   imports: [
+    BrandComponent,
     IonHeader,
     IonToolbar,
     IonTitle,

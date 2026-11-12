@@ -36,7 +36,7 @@ describe('AnnouncementDetailsPage', () => {
     postConversation: vi.fn(),
   };
   const conversations = { getMine: vi.fn() };
-  const offers = { make: vi.fn(), rate: vi.fn() };
+  const offers = { make: vi.fn(), rate: vi.fn(), start: vi.fn(), complete: vi.fn() };
   const likes = { load: vi.fn(() => of([])), isLiked: vi.fn(() => false), sync: vi.fn(), toggle: vi.fn() };
   /** Potwierdzenie z okna: `confirm` wybiera przycisk o tej roli. */
   let alertButtons: { role?: string; handler?: () => void }[] = [];
@@ -152,6 +152,9 @@ describe('AnnouncementDetailsPage', () => {
     expect(element.querySelector('h1')?.textContent).toContain('Powieszenie obrazu');
     expect(element.querySelector('.budget')?.textContent?.replace(/\s/g, ' ')).toContain('80 zł');
     expect(element.querySelectorAll('.gallery img')).toHaveLength(1);
+    expect(element.querySelector('.fact-difficulty')?.textContent).toContain('Trudność');
+    expect(element.querySelector('.fact-offers')?.textContent).toContain('2 oferty');
+    expect(element.querySelector('app-brand')).not.toBeNull();
     expect(element.textContent).toContain('Jan Kowalski');
     expect(element.textContent).toContain('4,5');
     expect(element.textContent).toContain('2 oceny');
@@ -234,8 +237,7 @@ describe('AnnouncementDetailsPage', () => {
         },
       }),
     );
-    alertRole = 'confirm';
-    announcements.start.mockReturnValue(of(undefined));
+    offers.start.mockResolvedValue(true);
     const { page, element, render } = create();
     await render();
 
@@ -246,8 +248,8 @@ describe('AnnouncementDetailsPage', () => {
 
     await page.start();
 
-    expect(announcements.start).toHaveBeenCalledWith('a1');
-    expect(toast.success).toHaveBeenCalledWith('Zlecenie w realizacji.');
+    expect(offers.start).toHaveBeenCalledWith('a1');
+    expect(announcements.getById).toHaveBeenCalledTimes(2);
   });
 
   it('lets the owner complete the job in progress and then rate', async () => {
@@ -262,14 +264,13 @@ describe('AnnouncementDetailsPage', () => {
         }),
       ),
     );
-    alertRole = 'confirm';
-    announcements.complete.mockReturnValue(of(undefined));
+    offers.complete.mockResolvedValue(true);
     const { page, element, render } = create();
     await render();
 
     expect(element.querySelector('ion-footer')?.textContent).toContain('Zakończ');
     await page.complete();
-    expect(announcements.complete).toHaveBeenCalledWith('a1');
+    expect(offers.complete).toHaveBeenCalledWith('a1');
 
     announcements.getById.mockReturnValue(
       of(

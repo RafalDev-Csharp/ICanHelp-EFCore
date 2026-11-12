@@ -3,6 +3,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   IonButton,
+  IonButtons,
   IonContent,
   IonHeader,
   IonIcon,
@@ -28,6 +29,7 @@ import { close, cloudOfflineOutline, locateOutline, searchOutline } from 'ionico
 import { CategoriesService } from '../../core/categories/categories.service';
 import { GeolocationError, GeolocationService } from '../../core/geo/geolocation.service';
 import { ToastService } from '../../core/ui/toast.service';
+import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import type { MapCircle, MapMarker } from '../../shared/components/map/map.component';
 import { MapComponent } from '../../shared/components/map/map.component';
@@ -56,9 +58,11 @@ interface CompletableTarget {
   styleUrls: ['./announcements.page.scss'],
   providers: [AnnouncementListStore],
   imports: [
+    BrandComponent,
     IonHeader,
     IonToolbar,
     IonTitle,
+    IonButtons,
     IonContent,
     IonSegment,
     IonSegmentButton,
@@ -93,6 +97,8 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
   protected readonly locating = signal(false);
   /** Pinezka wybrana na mapie – jej ogłoszenie pokazujemy w karcie na dole mapy. */
   protected readonly selectedId = signal<string | null>(null);
+  /** Pierwsze wejście wczytuje `ngOnInit` – odświeżamy dopiero przy kolejnych. */
+  private entered = false;
 
   protected readonly filters = this.store.filters;
   protected readonly hasFilters = computed(() => activeFilterCount(this.filters()) > 0);
@@ -125,9 +131,17 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
     void this.store.reload();
   }
 
-  /** Przy każdym wejściu na zakładkę (np. po zalogowaniu): serduszka na kartach – wczytane raz na sesję. */
+  /**
+   * Przy każdym wejściu na zakładkę (np. po zalogowaniu): serduszka na kartach – wczytane raz na sesję. Przy powrocie
+   * (ze szczegółów, z innej zakładki) – pierwsza strona od nowa: ogłoszenie mogło w międzyczasie przestać czekać na
+   * oferty (akceptacja, anulowanie) albo dojść nowe. Dotychczasowe karty zostają do przyjścia wyników.
+   */
   ionViewWillEnter(): void {
     this.likes.load().subscribe({ error: () => undefined });
+    if (this.entered && !this.store.loading()) {
+      void this.store.reload();
+    }
+    this.entered = true;
   }
 
   setView(value: unknown): void {

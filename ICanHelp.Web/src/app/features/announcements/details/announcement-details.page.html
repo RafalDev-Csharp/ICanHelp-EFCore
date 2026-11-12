@@ -2,6 +2,7 @@
   <ion-toolbar>
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/announcements"></ion-back-button>
+      <app-brand></app-brand>
     </ion-buttons>
     <ion-title>Ogłoszenie</ion-title>
     @if (state() === 'ready' && !isOwner()) {
@@ -23,7 +24,7 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="page-column">
   @switch (state()) { @case ('loading') {
   <div class="ion-padding" aria-busy="true" aria-label="Wczytywanie ogłoszenia">
     <ion-skeleton-text [animated]="true" class="skeleton-gallery"></ion-skeleton-text>
@@ -72,24 +73,28 @@
     </p>
   </section>
 
-  <ion-list inset="true">
+  <ul class="facts ion-padding-horizontal" role="list" aria-label="Informacje o zleceniu">
     @if (category()) {
-    <ion-item>
-      <ion-icon name="pricetag-outline" slot="start" aria-hidden="true"></ion-icon>
-      <ion-label>{{ category() }}</ion-label>
-    </ion-item>
+    <li>
+      <ion-chip class="fact-category" color="primary" [outline]="true">
+        <ion-icon name="pricetag-outline" aria-hidden="true"></ion-icon>
+        <ion-label>{{ category() }}</ion-label>
+      </ion-chip>
+    </li>
     }
-    <ion-item>
-      <ion-icon name="construct-outline" slot="start" aria-hidden="true"></ion-icon>
-      <ion-label>Trudność</ion-label>
-      <ion-note slot="end">{{ difficultyLabel(item.difficulty) }}</ion-note>
-    </ion-item>
-    <ion-item lines="none">
-      <ion-icon name="people-outline" slot="start" aria-hidden="true"></ion-icon>
-      <ion-label>Oferty od pomocników</ion-label>
-      <ion-note slot="end">{{ item.helperCount }}</ion-note>
-    </ion-item>
-  </ion-list>
+    <li>
+      <ion-chip class="fact-difficulty" [color]="difficultyColor(item.difficulty)">
+        <ion-icon name="construct-outline" aria-hidden="true"></ion-icon>
+        <ion-label>Trudność: {{ difficultyLabel(item.difficulty) }}</ion-label>
+      </ion-chip>
+    </li>
+    <li>
+      <ion-chip class="fact-offers" color="medium" [outline]="true">
+        <ion-icon name="people-outline" aria-hidden="true"></ion-icon>
+        <ion-label>{{ offersLabel() }}</ion-label>
+      </ion-chip>
+    </li>
+  </ul>
 
   <section class="ion-padding-horizontal">
     <h2>Opis</h2>
@@ -245,14 +250,14 @@
       Zlecenie zakończone · dziękujemy za ocenę.
     </p>
     } @else {
-    <div class="actions">
+    <div class="actions page-column">
       <ion-button class="primary-action" (click)="rate()" [disabled]="busy()">
         <ion-icon name="star-outline" slot="start" aria-hidden="true"></ion-icon>
         {{ isOwner() ? 'Oceń pomocnika' : 'Oceń zleceniodawcę' }}
       </ion-button>
     </div>
     } } @else if (isParticipant() && (status() === 'Accepted' || status() === 'InProgress')) {
-    <div class="actions">
+    <div class="actions page-column">
       @if (isOwner() && status() === 'Accepted') {
       <ion-button fill="outline" color="danger" (click)="cancel()" [disabled]="cancelling() || busy()">
         <ion-icon name="close-circle-outline" slot="start" aria-hidden="true"></ion-icon>
@@ -278,7 +283,7 @@
       }
     </div>
     } @else if (isOwner()) { @if (isOpen()) {
-    <div class="actions">
+    <div class="actions page-column">
       <ion-button fill="outline" color="danger" (click)="cancel()" [disabled]="cancelling()">
         <ion-icon name="close-circle-outline" slot="start" aria-hidden="true"></ion-icon>
         Anuluj
@@ -291,7 +296,7 @@
     } @else {
     <p class="footer-note">{{ statusLabel(status()) }} · to Twoje ogłoszenie.</p>
     } } @else if (isOpen()) {
-    <div class="actions">
+    <div class="actions page-column">
       <ion-button fill="outline" (click)="writeMessage()" [disabled]="busy()">
         <ion-icon name="chatbubble-outline" slot="start" aria-hidden="true"></ion-icon>
         {{ myConversationId() ? 'Rozmowa' : 'Napisz' }}
@@ -301,7 +306,7 @@
       </ion-button>
     </div>
     } @else {
-    <div class="actions">
+    <div class="actions page-column">
       <p class="footer-note primary-action">To ogłoszenie nie przyjmuje już ofert.</p>
       @if (myConversationId()) {
       <ion-button fill="clear" (click)="writeMessage()">Rozmowa</ion-button>

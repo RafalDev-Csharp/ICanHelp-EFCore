@@ -1,7 +1,16 @@
 import { Component, inject, signal } from '@angular/core';
 import { NonNullableFormBuilder } from '@angular/forms';
 import { Router } from '@angular/router';
-import { IonButton, IonContent, IonFooter, IonHeader, IonSpinner, IonTitle, IonToolbar } from '@ionic/angular';
+import {
+  IonButton,
+  IonButtons,
+  IonContent,
+  IonFooter,
+  IonHeader,
+  IonSpinner,
+  IonTitle,
+  IonToolbar,
+} from '@ionic/angular';
 import type { ViewWillEnter } from '@ionic/angular';
 import { map, switchMap } from 'rxjs';
 
@@ -10,6 +19,7 @@ import { CategoriesService } from '../../core/categories/categories.service';
 import type { GeoPoint } from '../../core/geo/geo-point';
 import { PushService } from '../../core/pwa/push.service';
 import { ToastService } from '../../core/ui/toast.service';
+import { BrandComponent } from '../../shared/components/brand/brand.component';
 
 import type { PhotoItem } from './form/announcement-form';
 import { createAnnouncementForm, toCreateCommand } from './form/announcement-form';
@@ -24,7 +34,18 @@ import { syncPhotos } from './form/photo-upload';
 @Component({
   selector: 'app-add-announcement',
   templateUrl: './add-announcement.page.html',
-  imports: [IonHeader, IonToolbar, IonTitle, IonContent, IonFooter, IonButton, IonSpinner, AnnouncementFormComponent],
+  imports: [
+    BrandComponent,
+    IonHeader,
+    IonToolbar,
+    IonButtons,
+    IonTitle,
+    IonContent,
+    IonFooter,
+    IonButton,
+    IonSpinner,
+    AnnouncementFormComponent,
+  ],
 })
 export class AddAnnouncementPage implements ViewWillEnter {
   private readonly client = inject(AnnouncementsClient);

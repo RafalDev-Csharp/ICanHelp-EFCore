@@ -32,6 +32,7 @@ import { errorStatus } from '../../core/api/api-errors';
 import { CategoriesService } from '../../core/categories/categories.service';
 import type { GeoPoint } from '../../core/geo/geo-point';
 import { ToastService } from '../../core/ui/toast.service';
+import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { LocationPickerComponent } from '../announcements/form/location-picker.component';
 import { AnnouncementCardComponent } from '../announcements/list/announcement-card.component';
@@ -64,6 +65,7 @@ export const PREVIEW_LIMIT = 20;
   templateUrl: './alert-edit.page.html',
   styleUrls: ['./alert-edit.page.scss'],
   imports: [
+    BrandComponent,
     IonHeader,
     IonToolbar,
     IonButtons,

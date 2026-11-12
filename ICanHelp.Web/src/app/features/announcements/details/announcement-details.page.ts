@@ -7,6 +7,7 @@ import {
   IonBadge,
   IonButton,
   IonButtons,
+  IonChip,
   IonContent,
   IonFooter,
   IonHeader,
@@ -47,7 +48,6 @@ import {
   starOutline,
   warningOutline,
 } from 'ionicons/icons';
-import type { Observable } from 'rxjs';
 import { catchError, firstValueFrom, forkJoin, of } from 'rxjs';
 
 import type {
@@ -65,6 +65,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { CategoriesService } from '../../../core/categories/categories.service';
 import { openStreetMapUrl } from '../../../core/config/map';
 import { ToastService } from '../../../core/ui/toast.service';
+import { BrandComponent } from '../../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
 import type { MapMarker } from '../../../shared/components/map/map.component';
 import { MapComponent } from '../../../shared/components/map/map.component';
@@ -73,7 +74,7 @@ import { TimeAgoPipe, parseApiDate } from '../../../shared/pipes/time-ago.pipe';
 import { pluralPl } from '../../../shared/text/plural';
 import { formatOfferTerm, offerStatusColor, offerStatusLabel, pendingOffer } from '../../offers/offer-labels';
 import { OffersService } from '../../offers/offers.service';
-import { difficultyLabel, statusColor, statusLabel } from '../announcement-labels';
+import { difficultyColor, difficultyLabel, statusColor, statusLabel } from '../announcement-labels';
 import { LikesService } from '../likes/likes.service';
 
 import { negotiationsOf, ownerHistory } from './announcement-negotiations';
@@ -102,6 +103,7 @@ const AFTER_ACCEPTANCE = ['Accepted', 'InProgress', 'Completed'];
   templateUrl: './announcement-details.page.html',
   styleUrls: ['./announcement-details.page.scss'],
   imports: [
+    BrandComponent,
     DatePipe,
     RouterLink,
     IonHeader,
@@ -114,6 +116,7 @@ const AFTER_ACCEPTANCE = ['Accepted', 'InProgress', 'Completed'];
     IonRefresherContent,
     IonSkeletonText,
     IonBadge,
+    IonChip,
     IonText,
     IonList,
     IonListHeader,
@@ -159,6 +162,7 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
 
   protected readonly parseApiDate = parseApiDate;
   protected readonly difficultyLabel = difficultyLabel;
+  protected readonly difficultyColor = difficultyColor;
   protected readonly statusLabel = statusLabel;
   protected readonly statusColor = statusColor;
   protected readonly offerStatusLabel = offerStatusLabel;
@@ -175,6 +179,11 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
           .filter(Boolean)
           .join(' · ')
       : '';
+  });
+  /** „Brak ofert” / „1 oferta” / „3 oferty” – etykieta pod tytułem. */
+  protected readonly offersLabel = computed(() => {
+    const count = this.announcement()?.helperCount ?? 0;
+    return count === 0 ? 'Brak ofert' : `${count} ${pluralPl(count, 'oferta', 'oferty', 'ofert')}`;
   });
   protected readonly marker = computed<MapMarker[]>(() => {
     const announcement = this.announcement();
@@ -372,24 +381,12 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
 
   /** „Rozpocznij” – właściciel albo przyjęty pomocnik (Accepted → InProgress). */
   async start(): Promise<void> {
-    await this.lifecycle(
-      'Rozpocząć zlecenie?',
-      'Oznaczy zlecenie jako „w realizacji”. Po wszystkim zleceniodawca potwierdzi zakończenie.',
-      'Rozpocznij',
-      (id) => this.announcements.start(id),
-      'Zlecenie w realizacji.',
-    );
+    await this.lifecycle((id) => this.offers.start(id));
   }
 
   /** „Zakończ” – tylko właściciel (InProgress → Completed), potem obie strony mogą się ocenić. */
   async complete(): Promise<void> {
-    await this.lifecycle(
-      'Potwierdzić wykonanie?',
-      'Zlecenie zostanie zakończone, a rozmowa – zamknięta. Potem możecie się wzajemnie ocenić.',
-      'Zakończ',
-      (id) => this.announcements.complete(id),
-      'Zlecenie zakończone. Oceń współpracę!',
-    );
+    await this.lifecycle((id) => this.offers.complete(id));
   }
 
   /** Ocena drugiej strony po zakończeniu. */
@@ -467,36 +464,15 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     });
   }
 
-  private async lifecycle(
-    header: string,
-    message: string,
-    action: string,
-    request: (announcementId: string) => Observable<void>,
-    success: string,
-  ): Promise<void> {
+  /** Potwierdzenie, API i komunikat – w `OffersService` (wspólne z wątkiem); potem stan z serwera (także po 409). */
+  private async lifecycle(action: (announcementId: string) => Promise<boolean>): Promise<void> {
     const announcement = this.announcement();
     if (!announcement || this.busy()) {
       return;
     }
-    const alert = await this.alerts.create({
-      header,
-      message,
-      buttons: [
-        { text: 'Nie', role: 'cancel' },
-        { text: action, role: 'confirm' },
-      ],
-    });
-    await alert.present();
-    const { role } = await alert.onDidDismiss();
-    if (role !== 'confirm') {
-      return;
-    }
     this.busy.set(true);
     try {
-      await firstValueFrom(request(announcement.id), { defaultValue: undefined });
-      void this.toast.success(success);
-    } catch {
-      // Komunikat (np. 409 – druga strona zmieniła status) pokazał interceptor.
+      await action(announcement.id);
     } finally {
       this.busy.set(false);
       this.load();

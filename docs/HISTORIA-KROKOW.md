@@ -246,5 +246,23 @@
   (szybki tunel bez konta, `winget install Cloudflare.cloudflared`) – OK. iPhone – do zrobienia. Uwagi UX z testu → Krok F11.
   12.11.2026 lokalnie (`verify.cmd`, Docker): build + dotnet 479/479 (Core 198, Application 179, integracyjne 102),
   `npm run api` (klient bez zmian), lint + Vitest 250/250 + build zielone.
+- [ ] Krok F11 (w toku) – poprawki po teście autora. Część A (12.11.2026, sam frontend): błędy i czytelność.
+  Szeroki ekran: globalna klasa `page-column` (`global.scss`, `--app-column-width: 720px`) – na `ion-content` boczny
+  odstęp w `::part(scroll)` (z zachowaniem `--padding-*`), na stopkach / karcie wątku `max-width` + `margin: auto`;
+  dodana na wszystkich 14 stronach (warstwa mapy `slot="fixed"` zostaje na całą szerokość). Szczegóły: galeria
+  `object-fit: contain` na tle, mapa `aspect-ratio: 16/9` (200 px – 50vh), metadane jako `ion-chip` (kategoria,
+  „Trudność: …” w kolorze z `difficultyColor`, „N ofert”). Logo: `shared/components/brand` (`app-brand`, ikona PWA +
+  „I can help U”, < 576 px sama ikona) w nagłówku każdej strony → `navigateRoot('/announcements')`. Zakładki:
+  `TabsPage.openTabRoot` (`ionTabButtonClick` na `ion-tab-bar`, `stopPropagation`, `navigateRoot('/<zakładka>')`) – zawsze
+  korzeń zakładki, widok korzenia używany ponownie. Lista ogłoszeń: każde kolejne `ionViewWillEnter` = pierwsza strona od
+  nowa (przyczyna: strona w stosie, wczytanie tylko w `ngOnInit`). Wątek: karta ogłoszenia w nagłówku (miniatura
+  z `GET api/announcements/{id}`, tytuł, status, rola, „Zobacz ogłoszenie”), w wątku z przyjętą ofertą „Rozpocznij
+  zlecenie” / „Zakończ zlecenie”; `start` / `complete` (potwierdzenie + API + toast) przeniesione do `OffersService`.
+  Brave: `PushPlatform.isBrave`, przy nieudanej rejestracji FCM okno z instrukcją `BRAVE_PUSH_HINT`. Testy: nowe
+  `brand.component.spec`, dopisane w `tabs`, `announcements`, `announcement-details`, `conversation`, `offers.service`,
+  `push.service`. Części B (nawigacja) i C (aktualizacja oferty) – osobno.
+  12.11.2026 lokalnie (`verify.cmd`, Docker): dotnet 479/479 (Core 198, Application 179, integracyjne 102), `npm run api`
+  (klient bez zmian), lint + Vitest 259/259 + build zielone. Podgląd `ng serve` (bez backendu): kolumna 720 px i logo
+  na 1400 px, na telefonie sama ikona – OK; szczegóły z danymi i Brave – do sprawdzenia ręcznie.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

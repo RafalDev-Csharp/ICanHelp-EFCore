@@ -67,6 +67,21 @@ describe('AnnouncementsPage', () => {
     );
   });
 
+  it('reloads the list when the user comes back (e.g. an announcement was accepted meanwhile)', async () => {
+    client.getAll.mockReturnValue(of([announcement('a1', { title: 'Kran' }), announcement('a2', { title: 'Płot' })]));
+    const { page, element, render } = create();
+    page.ionViewWillEnter();
+    await render();
+    expect(client.getAll).toHaveBeenCalledTimes(1);
+
+    client.getAll.mockReturnValue(of([announcement('a2', { title: 'Płot' })]));
+    page.ionViewWillEnter();
+    await render();
+
+    expect(client.getAll).toHaveBeenCalledTimes(2);
+    expect(titles(element)).toEqual(['Płot']);
+  });
+
   it('shows the number of offers and the heart of a liked announcement', async () => {
     client.getAll.mockReturnValue(
       of([announcement('liked-1', { helperCount: 3 }), announcement('a2', { helperCount: 0 })]),
