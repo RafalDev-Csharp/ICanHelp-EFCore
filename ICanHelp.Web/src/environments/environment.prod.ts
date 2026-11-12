@@ -14,5 +14,6 @@ export const environment: { production: boolean; apiUrl: string; openRouteServic
   },
   vapidKey: 'BPbsgep13c7V_MQ37dOvxOq0J63Mfzu1-0lqxCU2LuOF1jDyWaTmAOh1d9RnBKiHp8feUO1H2ztPLmVm1V6m2eY',
   // Klucz OpenRouteService – opis w environment.ts.
-  openRouteServiceKey: '',
+  openRouteServiceKey:
+    'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjlmM2YwMTUyMTRkMTRjMjFiZDExZjJkYWFjMmRlNmY0IiwiaCI6Im11cm11cjY0In0=',
 };

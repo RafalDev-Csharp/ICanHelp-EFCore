@@ -22,5 +22,6 @@ export const environment: { production: boolean; apiUrl: string; openRouteServic
    * Klucz OpenRouteService (trasy alertów „po drodze”, F8): darmowe konto na openrouteservice.org → Dashboard → Tokens.
    * Klucz jest publiczny (trafia do przeglądarki) – ogranicz go w panelu ORS. Pusty = trasa jako linia prosta start → cel.
    */
-  openRouteServiceKey: '',
+  openRouteServiceKey:
+    'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjlmM2YwMTUyMTRkMTRjMjFiZDExZjJkYWFjMmRlNmY0IiwiaCI6Im11cm11cjY0In0=',
 };
