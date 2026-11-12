@@ -228,4 +228,63 @@ describe('NotificationsService', () => {
       vi.useRealTimers();
     }
   });
+  describe('push in the open app (F7)', () => {
+    const push = { notificationId: 'n7', title: 'Nowa oferta', body: 'Jan: 90 zł', url: '/conversations/c7' };
+
+    it('shows a toast for a push the hub has not delivered, and refreshes the counter', () => {
+      const service = create();
+      client.getUnreadCount.mockReturnValue(of({ count: 3 }));
+
+      service.showPush(push);
+
+      expect(service.unreadCount()).toBe(3);
+      expect(toast.action).toHaveBeenCalledWith('Nowa oferta – Jan: 90 zł', 'Pokaż', expect.any(Function));
+    });
+
+    it('shows one toast when the hub and the push bring the same notification', () => {
+      const service = create();
+      connections[0].push(notification({ id: 'n7', conversationId: 'c7' }));
+      expect(service.unreadCount()).toBe(3);
+
+      service.showPush(push);
+      service.showPush(push);
+
+      expect(toast.action).toHaveBeenCalledTimes(1);
+      expect(service.unreadCount()).toBe(3);
+    });
+
+    it('does not add one more to the counter when the hub comes after the push', () => {
+      const service = create();
+      client.getUnreadCount.mockReturnValue(of({ count: 4 }));
+      service.showPush(push);
+
+      connections[0].push(notification({ id: 'n7', conversationId: 'c7' }));
+
+      expect(service.unreadCount()).toBe(4);
+      expect(toast.action).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays quiet for the open thread and when signed out', () => {
+      const service = create();
+      service.openConversation('c7');
+      service.showPush({ ...push, conversationId: 'c7' });
+      expect(toast.action).not.toHaveBeenCalled();
+
+      authenticated.set(false);
+      service.showPush({ ...push, notificationId: 'n8' });
+      expect(toast.action).not.toHaveBeenCalled();
+    });
+
+    it('opens the push link as read; a foreign link falls back to the list', async () => {
+      const service = create();
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+      await service.openPush('/conversations/c7', 'n7');
+      expect(client.markAsRead).toHaveBeenCalledWith('n7');
+      expect(navigate).toHaveBeenLastCalledWith('/conversations/c7');
+
+      await service.openPush('https://example.com/x');
+      expect(navigate).toHaveBeenLastCalledWith('/notifications');
+    });
+  });
 });

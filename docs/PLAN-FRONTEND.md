@@ -145,15 +145,28 @@ przeczytana. Backend: `read-all?conversationId=` – wejście do wątku gasi jeg
 
 ## Krok F7 – PWA i push (po backendowym Kroku 15)
 
-- [ ] `ng add @angular/pwa`: manifest (nazwa, ikony, kolory, `display: standalone`), service worker, praca offline dla „skorupy” aplikacji.
-- [ ] Zachęta do instalacji: na Androidzie `beforeinstallprompt` („Zainstaluj aplikację”), na iPhonie krótka instrukcja
+- [x] `ng add @angular/pwa`: manifest (nazwa, ikony, kolory, `display: standalone`), service worker, praca offline dla „skorupy” aplikacji.
+- [x] Zachęta do instalacji: na Androidzie `beforeinstallprompt` („Zainstaluj aplikację”), na iPhonie krótka instrukcja
       („Udostępnij → Do ekranu początkowego”) – bez tego iPhone nie dostanie pusha.
-- [ ] Firebase Messaging (JS SDK): zgoda na powiadomienia **po kliknięciu** (np. po złożeniu pierwszej oferty: „Powiadomić Cię
+- [x] Firebase Messaging (JS SDK): zgoda na powiadomienia **po kliknięciu** (np. po złożeniu pierwszej oferty: „Powiadomić Cię
       o odpowiedzi?”), `getToken` → `POST api/me/devices`, przy wylogowaniu `DELETE`.
       Uwaga: Angular ma swój service worker (`ngsw`), Firebase chce swojego – użyć jednego (własny SW importujący `ngsw-worker.js`
       i obsługę FCM, rejestracja przekazana do `getToken({ serviceWorkerRegistration })`). Sprawdzić przy implementacji.
-- [ ] Kliknięcie w push → otwarcie aplikacji na `data.url`. W otwartej aplikacji – toast zamiast systemowego dymka.
+- [x] Kliknięcie w push → otwarcie aplikacji na `data.url`. W otwartej aplikacji – toast zamiast systemowego dymka.
 - [ ] Test ręczny: Android (Chrome) i iPhone (PWA z ekranu głównego) przez tunel HTTPS. Lighthouse (kategoria PWA).
+      Wymaga uzupełnienia `firebase` + `vapidKey` w `src/environments/environment*.ts` (autor).
+
+Zrobione 10.11.2026 (szczegóły: `docs/HISTORIA-KROKOW.md`). Decyzje: jeden service worker `public/app-sw.js` – sam obsługuje
+`push` i `notificationclick` (bez SDK Firebase w workerze), rejestruje słuchacze **przed** `importScripts('./ngsw-worker.js')`
+i zatrzymuje ngsw (`stopImmediatePropagation`), bo ngsw pokazałby dymek także przy otwartej aplikacji. Aplikacja widoczna →
+worker przekazuje push do strony (`postMessage`) → toast z `NotificationsService`; to samo powiadomienie z huba i z pusha
+(id) pokazujemy raz. Kliknięcie: otwarta karta → `focus` + router (bez przeładowania), inaczej `openWindow`; link spoza
+aplikacji → start. Zgoda: okno „Powiadomić Cię…?” po złożeniu oferty i dodaniu ogłoszenia (najwyżej raz na tydzień) albo
+„Włącz” w profilu (sekcja „Aplikacja”); przy zgodzie już udzielonej token zapisujemy przy każdym starcie (backend robi upsert).
+Wylogowanie: `DELETE api/me/devices/{id}` przed końcem sesji + unieważnienie tokenu; sesja utracona bez wylogowania – samo
+unieważnienie (FCM odrzuci token, backend usunie urządzenie). Firebase SDK ładowany leniwie (osobny chunk). W `ng serve` service
+worker jest wyłączony – push testujemy na `npm run build` (np. tunel HTTPS do serwera statycznego `www/`). Ikony: własne
+(białe serce na `#0054e9`), maskable osobno; `navigationUrls` pomija `/api`, `/hubs`, `/swagger`, `/health` (F10: jedna domena).
 
 ## Krok F8 – alerty („w okolicy” i „po drodze”)
 

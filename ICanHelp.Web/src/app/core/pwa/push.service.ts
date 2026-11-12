@@ -73,7 +73,7 @@ export class PushService {
   private readonly installPrompt = inject(InstallPromptService);
   private readonly messaging = inject(PUSH_MESSAGING);
   private readonly platform = inject(PUSH_PLATFORM);
-  private readonly serviceWorkerEnabled = inject(SwUpdate).isEnabled;
+  private readonly serviceWorkerEnabled = inject(SwUpdate, { optional: true })?.isEnabled ?? false;
 
   private readonly started = signal(false);
   private readonly permission = signal<NotificationPermission>(this.platform.permission());

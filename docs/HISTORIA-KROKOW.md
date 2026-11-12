@@ -179,5 +179,30 @@
   Frontend: `describeNotification` bierze `title`/`body` z API (ikona z `type`), klient przegenerowany (`DevicesClient`).
   10.11.2026 lokalnie (`verify.cmd`, Docker): build + dotnet 468/468 (Core 198, Application 179, integracyjne 91), `npm run api`,
   lint + Vitest 182/182 + build zielone. Ręczny test FCM (konsola Firebase, VAPID, telefony) – w F7.
+- [x] Krok F7 (frontend, 10.11.2026) – PWA + push (FCM).
+  PWA: `ng add @angular/pwa` (`@angular/service-worker`), `ngsw-config.json` (skorupa prefetch, zasoby lazy, `navigationUrls`
+  bez `/api`, `/hubs`, `/swagger`, `/health`), `public/manifest.webmanifest` (pl, `ICanHelp`, standalone, start `/announcements`,
+  `#0054e9`), własne ikony 72–512 + maskable + `apple-touch-icon` (+ favicon), `index.html` (theme-color, meta iOS);
+  `angular.json` – katalog `public/` w assets.
+  Service worker: `public/app-sw.js` (rejestrowany przez `provideServiceWorker('app-sw.js')`) – `push` i `notificationclick`
+  przed `importScripts('./ngsw-worker.js')` (ngsw zatrzymany); widoczna aplikacja → `postMessage` zamiast dymka, ukryta → dymek
+  (`tag` = notificationId); kliknięcie → focus + `postMessage` z adresem albo `openWindow`, tylko adresy tej aplikacji.
+  `core/pwa/`: `push-messaging.ts` (`PUSH_MESSAGING` – Firebase JS SDK 13, leniwy import, `getToken({ vapidKey,
+  serviceWorkerRegistration })`, `deleteToken` / wypisanie z Push API), `push.service.ts` (`PushService`: stan `unavailable |
+  needs-install | unsupported | default | denied | enabled`, `suggest()` – okno po akcji, raz na tydzień, `enable()` – zgoda +
+  `POST api/me/devices`, ponowny zapis przy starcie, `unregister()` przed wylogowaniem, wiadomości z workera → `NotificationsService`;
+  `PUSH_PLATFORM` – API przeglądarki), `install-prompt.service.ts` (`beforeinstallprompt`, `appinstalled`, iOS / standalone;
+  tworzony w `provideAppInitializer`). `environments/push-environment.ts` + pola `firebase`, `vapidKey` (puste = push wyłączony).
+  `NotificationsService.showPush` / `openPush` (odsiewanie duplikatów hub + push po id, licznik bez podwójnego +1).
+  Ekrany: profil – sekcja „Aplikacja” (`AppSettingsComponent`: instalacja / instrukcja iPhone, stan push + „Włącz”), wylogowanie
+  najpierw wyrejestrowuje urządzenie; `OffersService.make` i dodanie ogłoszenia → `suggest()`; `TabsPage` uruchamia `PushService`.
+  `errorInterceptor`: `api/me/devices` bez toastu (zapis w tle).
+  Testy Vitest: `PushService` (10, zaślepki Firebase i workera), `InstallPromptService` (5), `createFirebaseMessaging` (2),
+  `NotificationsService` push (+5), `AppSettingsComponent` (5), poprawki specs ofert, dodawania i zakładek. `app-sw.js` sprawdzony
+  symulacją środowiska workera w Node (bez dymka przy widocznej aplikacji, ngsw nie dubluje, obcy link → start); panel przeglądarki
+  w Claude nie rejestruje service workerów, więc test na żywo – ręcznie.
+  Do zrobienia ręcznie: konfiguracja Firebase w `environment*.ts`, test na Androidzie i iPhonie przez HTTPS, Lighthouse.
+  10.11.2026 lokalnie (`verify.cmd`, Docker): build + dotnet 468/468 (Core 198, Application 179, integracyjne 91), `npm run api`
+  (klient bez zmian), lint + Vitest 209/209 + build zielone.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

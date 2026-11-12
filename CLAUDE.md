@@ -98,9 +98,9 @@ cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /ap
   Ostatnia weryfikacja 10.11.2026 (`verify.cmd`): dotnet 468/468 (Core 198, Application 179, integracyjne 91).
 - [x] Frontend, F1–F6: szkielet, logowanie, przeglądanie (lista ↔ mapa), dodawanie/edycja, oferty i rozmowy, powiadomienia
   w aplikacji. Ostatnia weryfikacja 10.11.2026: lint + Vitest 182/182 + build zielone.
-- [ ] **Następny: F7 – PWA + push** (`docs/PLAN-FRONTEND.md`; manifest + service worker, Firebase `getToken` → `api/me/devices`,
-  kliknięcie → `data.url`; ręcznie: projekt Firebase, VAPID, test na Androidzie i iPhonie przez HTTPS)
-- [ ] F8 – alerty (ekran `api/me/alerts`, trasa z OpenRouteService) → F10 wdrożenie = MVP (Augustów / Suwałki)
+- [x] F7 – PWA + push (10.11.2026, `verify.cmd`: Vitest 209/209): manifest, ikony, jeden SW `app-sw.js` (FCM + ngsw), instalacja,
+  `PushService` → `api/me/devices`. Zostało ręcznie: `firebase` + `vapidKey` w `environment*.ts`, test Android / iPhone przez HTTPS.
+- [ ] **Następny: F8 – alerty** (ekran `api/me/alerts`, trasa z OpenRouteService) → F10 wdrożenie = MVP (Augustów / Suwałki)
 - [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)

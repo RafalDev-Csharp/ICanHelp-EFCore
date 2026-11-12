@@ -24,6 +24,9 @@ core/             jedno miejsce na całą aplikację: config/locale.ts (pl-PL, P
                   notifications/ – `NotificationsService` (hub SignalR `/hubs/notifications`, dopóki zalogowany; `unreadCount`,
                   `received$`, toast „Pokaż”, `openConversation` = wątek na ekranie), `notification-texts` (tekst i link
                   z `type` + `parameters`), `NOTIFICATION_HUB_FACTORY` (w specs – fałszywe połączenie);
+                  pwa/ – `PushService` (FCM: zgoda po akcji – `suggest()` / `enable()`, `api/me/devices`, `unregister()` przed
+                  wylogowaniem, push z workera → `NotificationsService.showPush`), `PUSH_MESSAGING` (Firebase SDK, leniwie;
+                  w specs zaślepka), `InstallPromptService` (`beforeinstallprompt`, instrukcja iPhone);
                   interceptors/ – `authInterceptor` (Bearer, odświeżenie przed wygaśnięciem i raz po 401), `errorInterceptor`
                   (ProblemDetails → toast, mapa `error-messages.ts`, `SKIP_ERROR_TOAST`); ui/ – `ToastService` (error/success/info);
                   testing/ – helpery do specs
@@ -53,7 +56,10 @@ W specs stron z mapą podmieniamy `MapComponent` zaślepką (`TestBed.overrideCo
 ogłoszenia – `AnnouncementFormStubComponent` (`features/announcements/testing/announcement-form.stub.ts`).
 Okna (Ionic modal) dostają dane przez `componentProps` → w komponentach okien zwykłe `@Input()`, nie `input()`; w specs
 `ModalController` / `AlertController` zastępujemy obiektem z `create()` (wynik `onWillDismiss` / `onDidDismiss` ustawia test).
-`src/environments/environment*.ts`: `apiUrl` – pusty = ta sama domena (dev przez proxy, produkcja: API serwuje frontend, F10).
+`src/environments/environment*.ts`: `apiUrl` – pusty = ta sama domena (dev przez proxy, produkcja: API serwuje frontend, F10);
+`firebase` + `vapidKey` – publiczna konfiguracja FCM (puste = push wyłączony).
+PWA: jeden service worker `public/app-sw.js` (push + `importScripts('./ngsw-worker.js')`), `ngsw-config.json`, manifest i ikony
+w `public/`. W `ng serve` service worker jest wyłączony – PWA i push sprawdzamy na `npm run build` (`www/`) przez HTTPS.
 
 ## Zasady (z `docs/PLAN-FRONTEND.md` „Dlaczego tak”)
 1. Mobile first – najpierw telefon (Ionic), komputer ma działać.

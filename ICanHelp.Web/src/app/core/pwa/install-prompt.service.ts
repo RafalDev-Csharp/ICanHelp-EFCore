@@ -67,5 +67,5 @@ export function isStandalone(): boolean {
 /** iPhone / iPod / iPad (iPadOS udaje komputer Mac, ale ma ekran dotykowy). */
 export function isIos(): boolean {
   const userAgent = navigator.userAgent;
-  return /iPad|iPhone|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && navigator.maxTouchPoints > 1);
+  return /iPad|iPhone|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && (navigator.maxTouchPoints ?? 0) > 1);
 }

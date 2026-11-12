@@ -17,7 +17,9 @@ describe('TabsPage', () => {
     push.start.mockClear();
     await TestBed.configureTestingModule({
       imports: [TabsPage],
-      providers: [provideRouter([]), { provide: NotificationsService, useValue: notifications },
+      providers: [
+        provideRouter([]),
+        { provide: NotificationsService, useValue: notifications },
         { provide: PushService, useValue: push },
       ],
     }).compileComponents();
