@@ -241,6 +241,9 @@
   bez usuwania – to po stronie Chrome/GCM); backend usuwa wtedy urządzenie, a aplikacja zapisze token ponownie przy następnym
   starcie. Panel przeglądarki w aplikacji Claude nie rejestruje service workerów (także na http://localhost) – testy w Chrome.
   Kliknięcia w systemowy dymek nie da się zautomatyzować – do sprawdzenia ręcznie (razem z telefonem przez tunel).
+  Test autora: komputer (Chrome) OK; Brave – push wymaga włączenia „Use Google services for push messaging”; Chrome
+  incognito – powiadomienia zawsze zablokowane. Android (Chrome) przez `cloudflared tunnel --url http://localhost:5080`
+  (szybki tunel bez konta, `winget install Cloudflare.cloudflared`) – OK. iPhone – do zrobienia. Uwagi UX z testu → Krok F11.
   12.11.2026 lokalnie (`verify.cmd`, Docker): build + dotnet 479/479 (Core 198, Application 179, integracyjne 102),
   `npm run api` (klient bez zmian), lint + Vitest 250/250 + build zielone.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie

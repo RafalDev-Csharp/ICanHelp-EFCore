@@ -10,7 +10,7 @@
 ```
 F1 szkielet → F2 logowanie → F3 przeglądanie → F4 dodawanie → F5 oferty i rozmowy → F6 powiadomienia w aplikacji
 → Krok 15 (backend: push) → F7 PWA + push → F8 alerty
-→ F10 wdrożenie  ══►  MVP: test w jednym mieście (Augustów / Suwałki)
+→ F10 wdrożenie (+ F11 poprawki po teście autora)  ══►  MVP: test w jednym mieście (Augustów / Suwałki)
 → Krok 16 (backend: „jestem w okolicy”) → F9 „jestem w okolicy” → Krok 17 (Capacitor, sklepy)
 ```
 F10 (wdrożenie) można zrobić wcześniej, jeśli chcesz pokazać aplikację znajomym już po F5.
@@ -155,8 +155,9 @@ przeczytana. Backend: `read-all?conversationId=` – wejście do wątku gasi jeg
 - [x] Kliknięcie w push → otwarcie aplikacji na `data.url`. W otwartej aplikacji – toast zamiast systemowego dymka.
 - [x] Test lokalny przez HTTPS (12.11.2026, F10): `serve-local.cmd` → https://localhost:7080 – SW, offline, instalowalność,
       push przy otwartej i zamkniętej aplikacji w Chrome (szczegóły: `docs/HISTORIA-KROKOW.md`, Krok F10).
-- [ ] Test ręczny: Android (Chrome) i iPhone (PWA z ekranu głównego) przez tunel HTTPS na port 5080
-      (`devtunnel host -p 5080 --allow-anonymous` / `ngrok http 5080`), kliknięcie w dymek → właściwy wątek.
+- [x] Test ręczny Android (Chrome, 12.11.2026, autor): `serve-local.cmd` + `cloudflared tunnel --url http://localhost:5080`
+      – instalacja, push, kliknięcie w dymek OK.
+- [ ] Test ręczny iPhone (PWA z ekranu głównego) przez tunel HTTPS na port 5080.
 
 Zrobione 10.11.2026 (szczegóły: `docs/HISTORIA-KROKOW.md`). Decyzje: jeden service worker `public/app-sw.js` – sam obsługuje
 `push` i `notificationclick` (bez SDK Firebase w workerze), rejestruje słuchacze **przed** `importScripts('./ngsw-worker.js')`
@@ -199,6 +200,45 @@ Podgląd liczy backend dla zapisanego alertu – odświeża się po „Zapisz zm
 - [ ] Przy alertach tras: „Wracam teraz” (`activate-now`).
 - [ ] Odświeżanie pozycji tylko przy otwartej aplikacji (`watchPosition`, wysyłka co ≥ 1 min i przy ruchu > 200 m).
 - [ ] Dla zleceniodawcy na jego ogłoszeniu: „W okolicy jest teraz N pomocników” (jeśli backend to zrobi).
+
+## Krok F11 – poprawki po teście autora (12.11.2026) – przed testem z ludźmi
+
+Uwagi z testu na komputerze i telefonie. Część A to błędy (mała zmiana, bez nowego projektu), B – nowa nawigacja (zmienia
+układ zakładek, więc robić ją przed testem z ludźmi, ale osobno od A), C – reguła domeny (backend + front).
+
+**A. Błędy i czytelność**
+- [ ] Szczegóły ogłoszenia na szerokim ekranie (komputer; na Androidzie OK): galeria `flex: 0 0 100%` + `aspect-ratio 4/3`
+      + `max-height: 50vh` + `object-fit: cover` → zdjęcie przycięte do środka i powiększone (rozmyte), mapa 200 px na całą
+      szerokość → wąski pasek. Poprawka: treść stron w kolumnie o maks. szerokości (~720 px, wyśrodkowana), zdjęcie `contain`
+      na tle, mapa z `aspect-ratio`. Sprawdzić też inne strony (lista, formularze) na szerokim ekranie.
+- [ ] „Trudność” (np. „Trudne”) i inne metadane w szczegółach – większa czcionka, chip/etykieta zamiast rozciągniętego wiersza.
+- [ ] Logo / nazwa „I can help U” w nagłówku → powrót na stronę główną (`/announcements`).
+- [ ] Zakładki pamiętają ostatni ekran (np. wracam na „Ogłoszenia” i widzę szczegóły, a nie listę). Ionic trzyma stos każdej
+      zakładki – zmiana: przejście na inną zakładkę (albo ponowne stuknięcie aktywnej) wraca do jej korzenia.
+- [ ] Wątek negocjacji: wyraźne przejście do ogłoszenia (karta ogłoszenia u góry wątku: zdjęcie, tytuł, status, „Zobacz
+      ogłoszenie”) i akcje zlecenia (np. „Rozpocznij”) w wątku, gdy oferta przyjęta.
+- [ ] Do sprawdzenia: ogłoszenie po akceptacji oferty dalej widać na liście „Ogłoszenia” (lista pobiera tylko `Open` – podejrzenie:
+      lista nie odświeża się po akcji, bo zakładka trzyma stary stan) → odświeżenie listy po zmianie statusu / przy powrocie.
+- [ ] Brave: „Nie udało się włączyć powiadomień” – Brave domyślnie blokuje push przez Google (FCM). Wykryć Brave
+      (`navigator.brave`) i pokazać podpowiedź: `brave://settings/privacy` → „Use Google services for push messaging”.
+
+**B. Nawigacja jak w aplikacjach ogłoszeniowych (do akceptacji autora)**
+- [ ] Dolne zakładki: **Szukaj** (ogłoszenia: lista ↔ mapa, wyszukiwarka tekstowa, kategorie jako kafelki z ikonami –
+      placeholdery z Material Symbols / Ionicons, docelowe kategorie później) · **Ulubione** (serce) · **Dodaj** (+) ·
+      **Zlecenia** (segment **Zlecam / Pomagam**: moje ogłoszenia i moje oferty z rozmowami, pogrupowane po statusie –
+      w trakcie negocjacji, przyjęte, w realizacji, zakończone) · **Konto** (profil, alerty, ustawienia).
+- [ ] Powiadomienia: dzwonek z plakietką w nagłówku (zamiast zakładki).
+- [ ] Rozmowa przed ofertą = pytania i odpowiedzi (wątek już istnieje przed ofertą – pokazać go jako „Zapytaj”, oferta osobno).
+- [ ] Zlecenia po akceptacji tylko w „Zlecenia” (nie na liście ogłoszeń ani w „Moich ogłoszeniach” w profilu).
+- [ ] Wyszukiwanie tekstowe – backend: sprawdzić, czy `GET api/announcements` ma parametr frazy (jeśli nie – zadanie backendowe).
+
+**C. Nieaktualna oferta pomocnika (reguła domeny)**
+- [ ] Dziś: pomocnik złożył ofertę, właściciel edytuje ogłoszenie → oferta `IsOutdated`. Pomocnik widzi „Twoja oferta: x zł”
+      (cena jego starej oferty), po kliknięciu „nieaktualna” i nie może nic zrobić: kontrować może tylko druga strona,
+      a nowej oferty nie złoży, bo ma już oczekującą (`AddOffer` → 409). Jedyna droga – wycofać i złożyć od nowa (nieoczywiste).
+      Propozycja: autor może **zaktualizować** własną nieaktualną ofertę (`Announcement.ReviseOffer` – stara `Countered`/
+      `Withdrawn`, nowa na bieżącej rewizji), a w UI przy nieaktualnej ofercie przycisk „Zaktualizuj ofertę” + informacja,
+      co się zmieniło (`changedSinceOffer`). Testy Core + Api, przykład w `.http`.
 
 ## Krok F10 – wdrożenie i wymagania przed testem z ludźmi
 

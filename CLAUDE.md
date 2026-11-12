@@ -104,7 +104,8 @@ cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /ap
 - [x] F8 – alerty (12.11.2026, `verify.cmd`: dotnet 468/468, Vitest 250/250): `/profile/alerts` (lista, włącz/wyłącz, usuń),
   obszar / trasa (OpenRouteService), podgląd `/preview`. Zostało ręcznie: `openRouteServiceKey` w `environment*.ts`.
 - [ ] **W toku: F10 wdrożenie** = MVP (Augustów / Suwałki). 12.11.2026: API serwuje frontend (`wwwroot`, `serve-local.cmd`),
-  PWA + push sprawdzone lokalnie przez HTTPS w Chrome (`verify.cmd`: dotnet 479/479, Vitest 250/250). Dalej: telefon, hosting.
+  PWA + push sprawdzone lokalnie przez HTTPS w Chrome (`verify.cmd`: dotnet 479/479, Vitest 250/250). Android OK (tunel cloudflared). Dalej: iPhone, hosting.
+- [ ] F11 – poprawki po teście autora (`docs/PLAN-FRONTEND.md`: A błędy, B nawigacja, C aktualizacja oferty) – przed testem z ludźmi
 - [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)
