@@ -1,6 +1,6 @@
 import type { PushEnvironment } from './push-environment';
 
-export const environment: { production: boolean; apiUrl: string } & PushEnvironment = {
+export const environment: { production: boolean; apiUrl: string; openRouteServiceKey: string } & PushEnvironment = {
   production: true,
   apiUrl: '',
   // Publiczne dane projektu Firebase (nie są sekretem) – te same co w environment.ts.
@@ -13,4 +13,6 @@ export const environment: { production: boolean; apiUrl: string } & PushEnvironm
     appId: '',
   },
   vapidKey: '',
+  // Klucz OpenRouteService – opis w environment.ts.
+  openRouteServiceKey: '',
 };

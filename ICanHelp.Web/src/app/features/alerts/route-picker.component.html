@@ -1,0 +1,44 @@
+<ion-segment [value]="active()" (ionChange)="setActive($event.detail.value)" aria-label="Który punkt wybierasz">
+  <ion-segment-button value="start" data-testid="route-start">
+    <ion-label>Start{{ start() ? ' ✓' : '' }}</ion-label>
+  </ion-segment-button>
+  <ion-segment-button value="end" data-testid="route-end">
+    <ion-label>Cel{{ end() ? ' ✓' : '' }}</ion-label>
+  </ion-segment-button>
+</ion-segment>
+
+<app-place-search
+  class="place"
+  [label]="active() === 'start' ? 'Skąd (adres)' : 'Dokąd (adres)'"
+  [placeholder]="active() === 'start' ? 'np. Noniewicza 1, Suwałki' : 'np. Rynek 1, Augustów'"
+  (picked)="choose($event)"
+></app-place-search>
+
+<app-map class="route-map" [markers]="markers()" [route]="route()" (mapClick)="choose($event)"></app-map>
+
+<div class="status">
+  @if (planning()) {
+    <ion-note><ion-spinner name="dots"></ion-spinner> Wyznaczam trasę…</ion-note>
+  } @else if (route()) {
+    <ion-note data-testid="route-ready">
+      @if (straightLine()) {
+        Linia prosta start → cel (brak klucza OpenRouteService – tylko do testów).
+      } @else {
+        Trasa gotowa – szukamy ogłoszeń w pasie po obu stronach drogi.
+      }
+    </ion-note>
+  } @else if (start() && end()) {
+    <ion-button size="small" fill="outline" (click)="plan()" data-testid="route-plan">
+      <ion-icon name="navigate-outline" slot="start" aria-hidden="true"></ion-icon>
+      Wyznacz trasę
+    </ion-button>
+  } @else {
+    <ion-note>
+      {{ active() === 'start' ? 'Wybierz start' : 'Wybierz cel' }} – wyszukaj adres, użyj swojej pozycji albo dotknij
+      mapy.
+      @if (!roadsAvailable) {
+        (Bez klucza OpenRouteService trasa będzie linią prostą.)
+      }
+    </ion-note>
+  }
+</div>

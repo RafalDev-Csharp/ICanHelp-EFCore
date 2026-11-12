@@ -32,3 +32,15 @@ export const GEOCODING = {
   limit: 5,
   minIntervalMs: 1_100,
 } as const;
+
+/**
+ * Trasy dla alertów „po drodze” (F8): OpenRouteService, darmowy klucz (`environment.openRouteServiceKey`, limit
+ * ~2000 tras dziennie – wystarczy, bo trasę liczymy raz, przy zapisie alertu). Przy wzroście – Wariant 2 (backend, Krok 14).
+ */
+export const ROUTING = {
+  url: 'https://api.openrouteservice.org/v2/directions/driving-car/geojson',
+  /** Uproszczenie polilinii: przy pasie ≥ 0,5 km 25 m odchyłki nie zmienia wyniku (baza i tak robi `Reduce(25)`). */
+  toleranceMeters: 25,
+  /** Backend przyjmuje 2–1000 punktów; zostawiamy zapas. */
+  maxPoints: 500,
+} as const;

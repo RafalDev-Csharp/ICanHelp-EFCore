@@ -2,25 +2,6 @@
   display: block;
 }
 
-.sources {
-  margin-bottom: 8px;
-}
-
-.search {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-
-  ion-input {
-    flex: 1;
-  }
-}
-
-.results {
-  margin-top: 4px;
-  border-radius: 8px;
-}
-
 .picker-map {
   height: 240px;
   margin-top: 12px;

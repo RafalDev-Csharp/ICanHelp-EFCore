@@ -1,0 +1,90 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/profile"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Alerty</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  @switch (state()) { @case ('loading') {
+  <div class="ion-text-center ion-padding" aria-busy="true">
+    <ion-spinner name="crescent"></ion-spinner>
+  </div>
+  } @case ('failed') {
+  <app-empty-state
+    icon="cloud-offline-outline"
+    heading="Nie udało się wczytać alertów"
+    message="Sprawdź połączenie z internetem i spróbuj ponownie."
+  >
+    <ion-button (click)="reload()">Spróbuj ponownie</ion-button>
+  </app-empty-state>
+  } @case ('ready') { @if (items().length === 0) {
+  <app-empty-state
+    icon="notifications-outline"
+    heading="Nie masz jeszcze alertów"
+    message="Powiemy Ci o nowych ogłoszeniach w Twojej okolicy albo na trasie, którą jeździsz – np. z pracy do domu."
+  ></app-empty-state>
+  } @else {
+  <ion-list>
+    @for (alert of items(); track alert.id) {
+    <ion-item-sliding #sliding>
+      <ion-item [routerLink]="['/profile/alerts', alert.id]" [detail]="false" data-testid="alert-item">
+        <ion-icon
+          [name]="alert.kind === 'Area' ? 'location-outline' : 'navigate-outline'"
+          slot="start"
+          [color]="alert.isEnabled ? 'primary' : 'medium'"
+          aria-hidden="true"
+        ></ion-icon>
+        <ion-label class="ion-text-wrap" [class.disabled]="!alert.isEnabled">
+          <h2>{{ alert.name }}</h2>
+          <p>{{ alert.kind === 'Area' ? 'W okolicy' : 'Po drodze' }} · {{ summary(alert) }}</p>
+        </ion-label>
+        <ion-toggle
+          slot="end"
+          [checked]="alert.isEnabled"
+          [disabled]="busy().has(alert.id)"
+          (click)="$event.stopPropagation()"
+          (ionChange)="setEnabled(alert, $event.detail.checked)"
+          [attr.aria-label]="(alert.isEnabled ? 'Wyłącz alert ' : 'Włącz alert ') + alert.name"
+          data-testid="alert-toggle"
+        ></ion-toggle>
+      </ion-item>
+      <ion-item-options side="end">
+        <ion-item-option color="danger" (click)="remove(alert, sliding)">Usuń</ion-item-option>
+      </ion-item-options>
+    </ion-item-sliding>
+    }
+  </ion-list>
+  <ion-note class="ion-padding-horizontal hint">
+    Przesuń alert w lewo, żeby go usunąć. {{ items().length }} z {{ maxPerUser }}.
+  </ion-note>
+  }
+
+  <div class="ion-padding actions">
+    @if (limitReached()) {
+    <ion-note data-testid="alert-limit">Masz już {{ maxPerUser }} alertów – usuń któryś, żeby dodać nowy.</ion-note>
+    } @else {
+    <ion-button expand="block" routerLink="/profile/alerts/new" [queryParams]="{ kind: 'Area' }" data-testid="add-area">
+      <ion-icon name="location-outline" slot="start" aria-hidden="true"></ion-icon>
+      Nowy alert w okolicy
+    </ion-button>
+    <ion-button
+      expand="block"
+      fill="outline"
+      routerLink="/profile/alerts/new"
+      [queryParams]="{ kind: 'Route' }"
+      data-testid="add-route"
+    >
+      <ion-icon name="navigate-outline" slot="start" aria-hidden="true"></ion-icon>
+      Nowy alert po drodze
+    </ion-button>
+    }
+  </div>
+  } }
+</ion-content>

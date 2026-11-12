@@ -18,7 +18,8 @@ core/             jedno miejsce na całą aplikację: config/locale.ts (pl-PL, P
                   api/ – `api-client.ts` (NSwag, generowany), `provideApi()` (API_BASE_URL), `isApiUrl`, `apiResourceUrl`
                   (adresy zdjęć), `errorStatus`; categories/ – `CategoriesService` (raz na sesję, `name(id)`);
                   geo/ – `GeoPoint`, `GeolocationService` (tylko po kliknięciu, ~100 m), `GeocodingService` (Nominatim, ≥ 1,1 s
-                  między zapytaniami, `approximatePoint`);
+                  między zapytaniami, `approximatePoint`), `RoutingService` (OpenRouteService, `prepareRoute`; bez klucza –
+                  linia prosta);
                   auth/ – `AuthService` (sygnały `currentUser`, `isAuthenticated`; tokeny w localStorage `icanhelp.auth`, synchronizacja kart,
                   jedno odświeżenie naraz), `authGuard` (+ `loginUrlTree`, `safeReturnUrl`);
                   notifications/ – `NotificationsService` (hub SignalR `/hubs/notifications`, dopóki zalogowany; `unreadCount`,
@@ -30,7 +31,8 @@ core/             jedno miejsce na całą aplikację: config/locale.ts (pl-PL, P
                   interceptors/ – `authInterceptor` (Bearer, odświeżenie przed wygaśnięciem i raz po 401), `errorInterceptor`
                   (ProblemDetails → toast, mapa `error-messages.ts`, `SKIP_ERROR_TOAST`); ui/ – `ToastService` (error/success/info);
                   testing/ – helpery do specs
-shared/           components/ (EmptyStateComponent, `app-map` – Leaflet: pinezki, okrąg promienia, tryb poglądowy),
+shared/           components/ (EmptyStateComponent, `app-map` – Leaflet: pinezki, okrąg promienia, trasa z pasem, tryb poglądowy,
+                  `app-place-search` – moja pozycja + adres),
                   pipes/ (`price`, `distance` – km z API, `timeAgo` – „2 h temu”), text/ (`pluralPl` – „1 ocena / 2 oceny / 5 ocen”)
 features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poza zakładkami, `?returnUrl=`),
                   announcements (lista ↔ mapa: `list/` – store, filtry, karta; `details/` – `/announcements/:announcementId`;
@@ -45,11 +47,13 @@ features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poz
                   oferty z akcjami, zmiany ogłoszenia; `conversation-timeline.ts`),
                   notifications (`/notifications` – lista, „Oznacz wszystkie”, nowe z huba na górze),
                   profile (bez logowania: „Zaloguj się”; `/profile/announcements` – moje,
-                  `/profile/liked` – polubione); alerts dojdą w F8
+                  `/profile/liked` – polubione),
+                  alerts (`/profile/alerts` – lista, `/profile/alerts/new?kind=Area|Route`, `/profile/alerts/:alertId` – edycja
+                  + „Pasujące teraz”; `alert-form.ts` – stan, walidacja, `WeekDays` ↔ maska; `route-picker` – start/cel → trasa)
 tabs/             TabsPage – dolny pasek zakładek, rejestruje ikony zakładek (`addIcons`), uruchamia `NotificationsService`,
                   plakietka nieprzeczytanych. Strony używające `NotificationsService` – w specs obiekt z `received$` (Subject)
 ```
-Trasy `/add`, `/announcements/:id/edit`, `/conversations` (+ `/:conversationId`), `/notifications`, `/profile/announcements`, `/profile/liked` mają `authGuard`; ogłoszenia (lista, szczegóły) i profil są publiczne –
+Trasy `/add`, `/announcements/:id/edit`, `/conversations` (+ `/:conversationId`), `/notifications`, `/profile/announcements`, `/profile/liked`, `/profile/alerts` (+ `/new`, `/:alertId`) mają `authGuard`; ogłoszenia (lista, szczegóły) i profil są publiczne –
 akcje wymagające konta same prowadzą na `/login?returnUrl=…`.
 Mapy: Leaflet (`import * as L from 'leaflet'`, style w `global.scss`, kolory pinezek – klasy `.map-pin/.map-user/.map-radius`).
 W specs stron z mapą podmieniamy `MapComponent` zaślepką (`TestBed.overrideComponent`) – jsdom nie rysuje map; strony z formularzem
@@ -57,7 +61,8 @@ ogłoszenia – `AnnouncementFormStubComponent` (`features/announcements/testing
 Okna (Ionic modal) dostają dane przez `componentProps` → w komponentach okien zwykłe `@Input()`, nie `input()`; w specs
 `ModalController` / `AlertController` zastępujemy obiektem z `create()` (wynik `onWillDismiss` / `onDidDismiss` ustawia test).
 `src/environments/environment*.ts`: `apiUrl` – pusty = ta sama domena (dev przez proxy, produkcja: API serwuje frontend, F10);
-`firebase` + `vapidKey` – publiczna konfiguracja FCM (puste = push wyłączony).
+`firebase` + `vapidKey` – publiczna konfiguracja FCM (puste = push wyłączony); `openRouteServiceKey` – trasy alertów (pusty =
+linia prosta).
 PWA: jeden service worker `public/app-sw.js` (push + `importScripts('./ngsw-worker.js')`), `ngsw-config.json`, manifest i ikony
 w `public/`. W `ng serve` service worker jest wyłączony – PWA i push sprawdzamy na `npm run build` (`www/`) przez HTTPS.
 

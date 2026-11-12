@@ -54,6 +54,19 @@
   stroke: #fff;
 }
 
+/* Alert trasy (F8): pas wokół drogi (grubość = 2 × promień, liczy `app-map`) i sama droga. */
+.leaflet-container path.map-corridor {
+  stroke: var(--ion-color-primary);
+  stroke-opacity: 0.12;
+  fill: none;
+}
+
+.leaflet-container path.map-route {
+  stroke: var(--ion-color-primary);
+  stroke-opacity: 0.9;
+  fill: none;
+}
+
 .leaflet-container path.map-radius {
   fill: var(--ion-color-primary);
   fill-opacity: 0.08;

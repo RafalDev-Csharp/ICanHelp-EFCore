@@ -170,12 +170,25 @@ worker jest wyłączony – push testujemy na `npm run build` (np. tunel HTTPS d
 
 ## Krok F8 – alerty („w okolicy” i „po drodze”)
 
-- [ ] Lista alertów (`api/me/alerts`), włącz/wyłącz, usuń.
-- [ ] Alert obszaru: punkt na mapie / moja pozycja / adres, suwak promienia (0,5–50 km, okrąg na mapie), kategoria + podkategorie,
+- [x] Lista alertów (`api/me/alerts`), włącz/wyłącz, usuń.
+- [x] Alert obszaru: punkt na mapie / moja pozycja / adres, suwak promienia (0,5–50 km, okrąg na mapie), kategoria + podkategorie,
       dni i godziny.
-- [ ] Alert trasy: start i cel (adres / mapa) → trasa z OpenRouteService → polilinia (pas o szerokości promienia na mapie) → zapis.
+- [x] Alert trasy: start i cel (adres / mapa) → trasa z OpenRouteService → polilinia (pas o szerokości promienia na mapie) → zapis.
       Klucz ORS w konfiguracji frontendu (darmowy limit wystarczy; przy wzroście – Wariant 2 z backendem, Krok 14).
-- [ ] Podgląd: „pasujące teraz” (`/preview`).
+- [x] Podgląd: „pasujące teraz” (`/preview`).
+- [ ] Ręcznie: klucz ORS w `environment*.ts` (`openRouteServiceKey`, autor) i sprawdzenie trasy na żywo.
+
+Zrobione 12.11.2026 (szczegóły: `docs/HISTORIA-KROKOW.md`). Decyzje: alerty w profilu (`/profile/alerts`, nowy:
+`/profile/alerts/new?kind=Area|Route`, edycja + podgląd: `/profile/alerts/:alertId`) – to ustawienie, nie osobna zakładka.
+Przełącznik na liście działa od razu (`enable`/`disable`, przy błędzie wraca), usuwanie – przesunięcie albo przycisk w edycji,
+zawsze z potwierdzeniem; przy 10 alertach przyciski „Nowy” znikają (backend i tak da 409). Formularz na sygnałach (bez
+Reactive Forms – dni jako flagi, mapa, trasa). Dni: skróty „Codziennie / Dni robocze / Weekend” + Pn–Nd (flagi `WeekDays`
+jak w backendzie, np. „Monday, Friday”), godziny opcjonalne (`type="time"`, przez noc OK). Trasa: segment Start / Cel, adres /
+moja pozycja / dotknięcie mapy, droga liczy się sama, gdy są oba punkty (`POST` ORS `driving-car/geojson`, klucz w nagłówku, poza
+interceptorami); polilinia zaokrąglona do ~1 m, bez powtórzeń i uproszczona (Douglas–Peucker 25 m, max 500 punktów). Bez klucza
+– linia prosta z ostrzeżeniem (do pracy lokalnej). Pas na mapie: linia o grubości 2 × promień przeliczanej przy zoomie (okrągłe
+końce ≈ bufor z bazy). Wspólne wyszukiwanie miejsca: `shared/components/place-search` (używa go też formularz ogłoszenia).
+Podgląd liczy backend dla zapisanego alertu – odświeża się po „Zapisz zmiany”.
 
 ## Krok F9 – „Jestem w okolicy” (po backendowym Kroku 16)
 

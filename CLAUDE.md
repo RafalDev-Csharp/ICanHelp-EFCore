@@ -100,7 +100,9 @@ cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /ap
   w aplikacji. Ostatnia weryfikacja 10.11.2026: lint + Vitest 182/182 + build zielone.
 - [x] F7 – PWA + push (10.11.2026, `verify.cmd`: Vitest 209/209): manifest, ikony, jeden SW `app-sw.js` (FCM + ngsw), instalacja,
   `PushService` → `api/me/devices`. Zostało ręcznie: `firebase` + `vapidKey` w `environment*.ts`, test Android / iPhone przez HTTPS.
-- [ ] **Następny: F8 – alerty** (ekran `api/me/alerts`, trasa z OpenRouteService) → F10 wdrożenie = MVP (Augustów / Suwałki)
+- [x] F8 – alerty (12.11.2026, `verify.cmd`: dotnet 468/468, Vitest 250/250): `/profile/alerts` (lista, włącz/wyłącz, usuń),
+  obszar / trasa (OpenRouteService), podgląd `/preview`. Zostało ręcznie: `openRouteServiceKey` w `environment*.ts`.
+- [ ] **Następny: F10 wdrożenie** = MVP (Augustów / Suwałki)
 - [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)

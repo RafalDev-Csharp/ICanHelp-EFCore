@@ -1,0 +1,228 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/profile/alerts"></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ title() }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  @switch (state()) { @case ('loading') {
+  <div class="ion-text-center ion-padding" aria-busy="true">
+    <ion-spinner name="crescent"></ion-spinner>
+  </div>
+  } @case ('missing') {
+  <app-empty-state
+    icon="notifications-off-outline"
+    heading="Nie ma takiego alertu"
+    message="Mógł zostać usunięty – wróć do listy alertów."
+  ></app-empty-state>
+  } @case ('failed') {
+  <app-empty-state
+    icon="cloud-offline-outline"
+    heading="Nie udało się wczytać alertu"
+    message="Sprawdź połączenie z internetem i spróbuj ponownie."
+  >
+    <ion-button (click)="retry()">Spróbuj ponownie</ion-button>
+  </app-empty-state>
+  } @case ('ready') { @let value = form(); @let error = visibleErrors();
+  <div class="fields">
+    <section>
+      <p class="intro">
+        @if (value.kind === 'Area') { Damy znać, gdy w pobliżu tego miejsca pojawi się nowe ogłoszenie z wybranej
+        kategorii. } @else { Damy znać, gdy przy Twojej trasie (np. z pracy do domu) pojawi się nowe ogłoszenie z
+        wybranej kategorii. }
+      </p>
+      <ion-input
+        fill="outline"
+        label="Nazwa"
+        labelPlacement="floating"
+        [placeholder]="value.kind === 'Area' ? 'np. Dom' : 'np. Droga z pracy'"
+        [value]="value.name"
+        [maxlength]="rules.name.max"
+        (ionInput)="setName($event.detail.value)"
+        [class.ion-invalid]="!!error.name"
+        [class.ion-touched]="!!error.name"
+        [errorText]="error.name"
+        data-testid="alert-name"
+      ></ion-input>
+    </section>
+
+    <section>
+      <h2>Czego szukasz?</h2>
+      <ion-select
+        label="Kategoria"
+        labelPlacement="floating"
+        fill="outline"
+        interface="action-sheet"
+        cancelText="Anuluj"
+        [value]="value.categoryId"
+        (ionChange)="setCategory($event.detail.value)"
+        [class.ion-invalid]="!!error.categoryId"
+        [class.ion-touched]="!!error.categoryId"
+        [errorText]="error.categoryId"
+      >
+        @for (category of categories.categories(); track category.id) {
+        <ion-select-option [value]="category.id">{{ category.name }}</ion-select-option>
+        }
+      </ion-select>
+      @if (value.categoryId) {
+      <ion-select
+        label="Podkategorie"
+        labelPlacement="floating"
+        fill="outline"
+        [multiple]="true"
+        interface="alert"
+        cancelText="Anuluj"
+        okText="Gotowe"
+        placeholder="Wszystkie"
+        [value]="value.subcategoryIds"
+        (ionChange)="setSubcategories($event.detail.value)"
+        helperText="Nic nie zaznaczone = cała kategoria."
+        [class.ion-invalid]="!!error.subcategoryIds"
+        [class.ion-touched]="!!error.subcategoryIds"
+        [errorText]="error.subcategoryIds"
+      >
+        @for (subcategory of subcategories(); track subcategory.id) {
+        <ion-select-option [value]="subcategory.id">{{ subcategory.name }}</ion-select-option>
+        }
+      </ion-select>
+      }
+    </section>
+
+    <section>
+      <h2>{{ value.kind === 'Area' ? 'Gdzie?' : 'Twoja trasa' }}</h2>
+      @if (value.kind === 'Area') {
+      <app-location-picker
+        [point]="value.center"
+        (pointChange)="setCenter($event)"
+        markerTitle="Środek alertu"
+        [radiusKm]="value.radiusKm"
+        hint="Szukamy ogłoszeń w zaznaczonym okręgu."
+      ></app-location-picker>
+      } @else {
+      <app-route-picker
+        [start]="value.routeStart"
+        (startChange)="setRouteStart($event)"
+        [end]="value.routeEnd"
+        (endChange)="setRouteEnd($event)"
+        [points]="value.routePoints"
+        (pointsChange)="setRoutePoints($event)"
+        [radiusKm]="value.radiusKm"
+      ></app-route-picker>
+      } @if (error.place) {
+      <ion-text color="danger"><p class="error" data-testid="place-error">{{ error.place }}</p></ion-text>
+      }
+
+      <div class="radius">
+        <ion-label>
+          {{ value.kind === 'Area' ? 'Promień' : 'Odległość od drogi' }}:
+          <strong>{{ formatRadius(value.radiusKm) }}</strong>
+        </ion-label>
+        <ion-range
+          [min]="rules.radiusKm.min"
+          [max]="rules.radiusKm.max"
+          [step]="rules.radiusKm.step"
+          [value]="value.radiusKm"
+          (ionInput)="setRadius($event.detail.value)"
+          aria-label="Promień w kilometrach"
+          data-testid="alert-radius"
+        >
+          <span slot="start">{{ rules.radiusKm.min }}</span>
+          <span slot="end">{{ rules.radiusKm.max }}</span>
+        </ion-range>
+      </div>
+    </section>
+
+    <section>
+      <h2>Kiedy?</h2>
+      <div class="chips">
+        @for (preset of presets; track preset.mask) {
+        <ion-chip [outline]="value.days !== preset.mask" (click)="setDays(preset.mask)">
+          <ion-label>{{ preset.label }}</ion-label>
+        </ion-chip>
+        }
+      </div>
+      <div class="chips days" role="group" aria-label="Dni tygodnia">
+        @for (day of weekDays; track day.bit) {
+        <ion-chip
+          [outline]="!hasDay(day.bit)"
+          [color]="hasDay(day.bit) ? 'primary' : 'medium'"
+          (click)="toggleDay(day.bit)"
+          [attr.aria-pressed]="hasDay(day.bit)"
+          [attr.data-testid]="'day-' + day.name"
+        >
+          <ion-label>{{ day.short }}</ion-label>
+        </ion-chip>
+        }
+      </div>
+      @if (error.days) {
+      <ion-text color="danger"><p class="error">{{ error.days }}</p></ion-text>
+      }
+
+      <ion-toggle
+        [checked]="value.limitHours"
+        (ionChange)="setLimitHours($event.detail.checked)"
+        justify="space-between"
+        data-testid="alert-hours"
+      >
+        Tylko w wybranych godzinach
+      </ion-toggle>
+      @if (value.limitHours) {
+      <div class="hours">
+        <ion-input
+          type="time"
+          fill="outline"
+          label="Od"
+          labelPlacement="floating"
+          [value]="value.from"
+          (ionInput)="setFrom($event.detail.value)"
+        ></ion-input>
+        <ion-input
+          type="time"
+          fill="outline"
+          label="Do"
+          labelPlacement="floating"
+          [value]="value.to"
+          (ionInput)="setTo($event.detail.value)"
+        ></ion-input>
+      </div>
+      <ion-note class="hint">Np. 22:00–06:00 = przez noc. Poza tymi godzinami nie wysyłamy powiadomień.</ion-note>
+      @if (error.hours) {
+      <ion-text color="danger"><p class="error">{{ error.hours }}</p></ion-text>
+      } }
+    </section>
+
+    <ion-button expand="block" (click)="save()" [disabled]="saving()" data-testid="alert-save">
+      @if (saving()) {
+      <ion-spinner name="crescent"></ion-spinner>
+      } @else { {{ alertId() ? 'Zapisz zmiany' : 'Zapisz alert' }} }
+    </ion-button>
+
+    @if (alertId()) {
+    <section class="preview" data-testid="alert-preview">
+      <h2>Pasujące teraz</h2>
+      <ion-note class="hint">Otwarte ogłoszenia w strefie zapisanego alertu (bez godzin i dni).</ion-note>
+      @if (previewFailed()) {
+      <ion-button fill="clear" (click)="retryPreview()">Spróbuj ponownie</ion-button>
+      } @else { @let items = preview(); @if (items === null) {
+      <div class="ion-text-center ion-padding"><ion-spinner name="crescent"></ion-spinner></div>
+      } @else if (items.length === 0) {
+      <p class="empty">Na razie nic tu nie ma – damy znać, gdy coś się pojawi.</p>
+      } @else {
+      <ion-list>
+        @for (item of items; track item.id) {
+        <app-announcement-card [announcement]="item"></app-announcement-card>
+        }
+      </ion-list>
+      } }
+    </section>
+
+    <ion-button expand="block" fill="outline" color="danger" (click)="remove()" data-testid="alert-delete">
+      Usuń alert
+    </ion-button>
+    }
+  </div>
+  } }
+</ion-content>

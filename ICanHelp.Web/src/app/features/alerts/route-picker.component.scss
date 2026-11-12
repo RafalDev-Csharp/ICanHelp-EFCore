@@ -1,0 +1,29 @@
+:host {
+  display: block;
+}
+
+.place {
+  margin-top: 12px;
+}
+
+.route-map {
+  height: 260px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.status {
+  margin-top: 6px;
+  font-size: 0.8125rem;
+
+  ion-note {
+    display: block;
+  }
+
+  ion-spinner {
+    width: 18px;
+    height: 12px;
+    vertical-align: middle;
+  }
+}

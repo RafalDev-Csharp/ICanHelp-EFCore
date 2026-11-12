@@ -66,6 +66,22 @@ export const routes: Routes = [
           import('../features/profile/liked-announcements.page').then((m) => m.LikedAnnouncementsPage),
       },
       {
+        path: 'profile/alerts',
+        canActivate: [authGuard],
+        loadComponent: () => import('../features/alerts/alerts.page').then((m) => m.AlertsPage),
+      },
+      {
+        // Nowy alert: `?kind=Area|Route`. Przed `:alertId`, żeby „new” nie było traktowane jak id.
+        path: 'profile/alerts/new',
+        canActivate: [authGuard],
+        loadComponent: () => import('../features/alerts/alert-edit.page').then((m) => m.AlertEditPage),
+      },
+      {
+        path: 'profile/alerts/:alertId',
+        canActivate: [authGuard],
+        loadComponent: () => import('../features/alerts/alert-edit.page').then((m) => m.AlertEditPage),
+      },
+      {
         path: '',
         redirectTo: '/announcements',
         pathMatch: 'full',

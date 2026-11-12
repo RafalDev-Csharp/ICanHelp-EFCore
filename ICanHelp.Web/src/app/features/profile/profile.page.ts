@@ -17,7 +17,7 @@ import {
 } from '@ionic/angular';
 import type { ViewWillEnter } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { documentTextOutline, heartOutline } from 'ionicons/icons';
+import { documentTextOutline, heartOutline, notificationsOutline } from 'ionicons/icons';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { PushService } from '../../core/pwa/push.service';
@@ -56,7 +56,7 @@ export class ProfilePage implements ViewWillEnter {
   protected readonly parseApiDate = parseApiDate;
 
   constructor() {
-    addIcons({ documentTextOutline, heartOutline });
+    addIcons({ documentTextOutline, heartOutline, notificationsOutline });
   }
 
   /** Zakładki Ionic zostają w pamięci – dane odświeżamy przy każdym wejściu na zakładkę. */

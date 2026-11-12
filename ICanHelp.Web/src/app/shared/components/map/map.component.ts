@@ -17,6 +17,17 @@ export interface MapCircle extends GeoPoint {
   radiusKm: number;
 }
 
+/** Trasa (alert „po drodze”): linia i pas `radiusKm` po obu stronach – tam szukamy ogłoszeń. */
+export interface MapRoute {
+  points: GeoPoint[];
+  radiusKm: number;
+}
+
+/** Metrów na piksel przy danym zoomie (kafelki 256 px, Web Mercator) – do grubości pasu trasy w metrach. */
+export function metersPerPixel(latitude: number, zoom: number): number {
+  return (156_543.033_92 * Math.cos((latitude * Math.PI) / 180)) / 2 ** zoom;
+}
+
 /**
  * Mapa Leaflet + kafelki OpenStreetMap. Widok: `center` + `zoom`, a bez nich – dopasowanie do okręgu albo pinezek
  * (bez niczego – domyślny środek). Wysokość nadaje rodzic (`app-map { height: … }`).
@@ -33,6 +44,7 @@ export class MapComponent implements OnDestroy {
   readonly center = input<GeoPoint>();
   readonly zoom = input(DEFAULT_MAP_ZOOM);
   readonly circle = input<MapCircle>();
+  readonly route = input<MapRoute>();
   /** Pozycja użytkownika – tylko dla niego samego (nigdy nie pokazujemy jej innym). */
   readonly userPosition = input<GeoPoint>();
   /** `false` – mapa poglądowa (np. w szczegółach): bez przesuwania i zoomu, nie przechwytuje przewijania strony. */
@@ -44,13 +56,15 @@ export class MapComponent implements OnDestroy {
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
   private map: L.Map | null = null;
   private layers: L.LayerGroup | null = null;
+  /** Pas trasy – Leaflet podaje grubość linii w pikselach, więc przeliczamy ją przy każdej zmianie zoomu. */
+  private corridor: { line: L.Polyline; radiusKm: number; latitude: number } | null = null;
   private resizeObserver: ResizeObserver | null = null;
   /** Widok dopasowano, gdy mapa miała już rozmiar (strony Ionic na starcie bywają ukryte – wtedy dopasowujemy jeszcze raz). */
   private fittedWithSize = false;
 
   constructor() {
     afterNextRender(() => this.createMap());
-    effect(() => this.render(this.markers(), this.circle(), this.userPosition()));
+    effect(() => this.render(this.markers(), this.circle(), this.userPosition(), this.route()));
   }
 
   ngOnDestroy(): void {
@@ -78,7 +92,8 @@ export class MapComponent implements OnDestroy {
         this.mapClick.emit({ latitude: event.latlng.lat, longitude: event.latlng.lng }),
       );
     }
-    this.render(this.markers(), this.circle(), this.userPosition());
+    this.map.on('zoomend', () => this.resizeCorridor());
+    this.render(this.markers(), this.circle(), this.userPosition(), this.route());
 
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObserver = new ResizeObserver(() => {
@@ -91,12 +106,32 @@ export class MapComponent implements OnDestroy {
     }
   }
 
-  private render(markers: MapMarker[], circle: MapCircle | undefined, user: GeoPoint | undefined): void {
+  private render(
+    markers: MapMarker[],
+    circle: MapCircle | undefined,
+    user: GeoPoint | undefined,
+    route: MapRoute | undefined,
+  ): void {
     const layers = this.layers;
     if (!layers) {
       return;
     }
     layers.clearLayers();
+    this.corridor = null;
+
+    if (route && route.points.length > 1) {
+      const latLngs = route.points.map((point) => L.latLng(point.latitude, point.longitude));
+      const line = L.polyline(latLngs, {
+        className: 'map-corridor',
+        lineCap: 'round',
+        lineJoin: 'round',
+        interactive: false,
+      }).addTo(layers);
+      L.polyline(latLngs, { className: 'map-route', weight: 3, interactive: false }).addTo(layers);
+      const latitude = latLngs.reduce((sum, point) => sum + point.lat, 0) / latLngs.length;
+      this.corridor = { line, radiusKm: route.radiusKm, latitude };
+      this.resizeCorridor();
+    }
 
     if (circle) {
       L.circle([circle.latitude, circle.longitude], {
@@ -134,6 +169,16 @@ export class MapComponent implements OnDestroy {
     this.fitView();
   }
 
+  /** Pas o szerokości 2 × promień (w metrach) → piksele przy obecnym zoomie (zaokrąglone końce ≈ bufor trasy). */
+  private resizeCorridor(): void {
+    const corridor = this.corridor;
+    if (!corridor || !this.map) {
+      return;
+    }
+    const pixels = (corridor.radiusKm * 2000) / metersPerPixel(corridor.latitude, this.map.getZoom());
+    corridor.line.setStyle({ weight: Math.max(4, pixels) });
+  }
+
   private fitView(): void {
     const map = this.map;
     if (!map) {
@@ -145,12 +190,22 @@ export class MapComponent implements OnDestroy {
     const center = this.center();
     const circle = this.circle();
     const markers = this.markers();
+    const route = this.route();
     if (center) {
       map.setView([center.latitude, center.longitude], this.zoom());
     } else if (circle) {
       map.fitBounds(L.latLng(circle.latitude, circle.longitude).toBounds(circle.radiusKm * 2000), {
         padding: [16, 16],
       });
+    } else if (route && route.points.length > 1) {
+      // Cała trasa razem z pasem (granice poszerzone o promień w każdą stronę).
+      const bounds = L.latLngBounds(route.points.map((point) => L.latLng(point.latitude, point.longitude)));
+      const size = route.radiusKm * 2000;
+      const padded = L.latLngBounds(
+        bounds.getSouthWest().toBounds(size).getSouthWest(),
+        bounds.getNorthEast().toBounds(size).getNorthEast(),
+      );
+      map.fitBounds(padded, { padding: [16, 16] });
     } else if (markers.length > 0) {
       const bounds = L.latLngBounds(markers.map((marker) => L.latLng(marker.latitude, marker.longitude)));
       map.fitBounds(bounds, { padding: [32, 32], maxZoom: 15 });

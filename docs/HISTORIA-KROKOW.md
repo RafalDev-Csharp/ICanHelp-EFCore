@@ -204,5 +204,26 @@
   Do zrobienia ręcznie: konfiguracja Firebase w `environment*.ts`, test na Androidzie i iPhonie przez HTTPS, Lighthouse.
   10.11.2026 lokalnie (`verify.cmd`, Docker): build + dotnet 468/468 (Core 198, Application 179, integracyjne 91), `npm run api`
   (klient bez zmian), lint + Vitest 209/209 + build zielone.
+- [x] Krok F8 (frontend, 12.11.2026) – alerty „w okolicy” i „po drodze”.
+  `features/alerts/`: `alerts.page` (`/profile/alerts` – lista z rodzajem, kategorią (+ liczbą podkategorii), promieniem
+  i harmonogramem, `ion-toggle` → `enable`/`disable` od razu z cofnięciem przy błędzie, przesunięcie → usuń z potwierdzeniem,
+  limit 10 – bez przycisków „Nowy”), `alert-edit.page` (`/profile/alerts/new?kind=Area|Route` i `/profile/alerts/:alertId`:
+  nazwa, kategoria + podkategorie (`ion-select` multiple, puste = cała), miejsce / trasa, suwak promienia 0,5–50 km co 0,5,
+  dni (skróty + Pn–Nd), godziny opcjonalne; zapis `POST` → lista, `PATCH` bez `kind` → toast + nowy podgląd; „Pasujące teraz”
+  z `/preview?limit=20` kartami ogłoszeń; 404 → „Nie ma takiego alertu”; usuń z potwierdzeniem), `alert-form.ts` (stan
+  formularza, walidacja jak w domenie, `WeekDays` ↔ maska bitów, `TimeOnly` ↔ „HH:mm”, opisy po polsku, `toCreateAlert` /
+  `toUpdateAlert` – obszar wysyła tylko `center`, trasa tylko `routePoints`), `route-picker.component` (Start / Cel, adres,
+  moja pozycja, dotknięcie mapy, trasa sama po wybraniu obu punktów, zmiana punktu unieważnia trasę, ten sam punkt – błąd).
+  `core/geo/routing.service.ts` (`RoutingService.plan` – OpenRouteService `driving-car/geojson`, klucz `OPEN_ROUTE_SERVICE_KEY`
+  z `environment.openRouteServiceKey`, pusty = linia prosta; `prepareRoute` – zaokrąglenie, bez powtórzeń, Douglas–Peucker),
+  `ROUTING` w `core/config/map.ts`. `app-map`: wejście `route` (linia + pas o grubości 2 × promień przeliczanej przy zoomie,
+  dopasowanie widoku do trasy z pasem), style `.map-route` / `.map-corridor` w `global.scss`. Nowy `shared/components/place-search`
+  (moja pozycja + Nominatim) – `LocationPicker` z niego korzysta i dostał `radiusKm` (okrąg), `markerTitle`, `hint`.
+  Profil: pozycja „Alerty”. Backend bez zmian.
+  Testy Vitest: `alert-form` (11), `RoutingService` + `prepareRoute` (5), `AlertsPage` (7), `AlertEditPage` (8),
+  `RoutePickerComponent` (5), `PlaceSearchComponent` (3).
+  Do zrobienia ręcznie: klucz ORS w `environment*.ts`, sprawdzenie trasy i pasa na telefonie.
+  12.11.2026 lokalnie (`verify.cmd`, Docker): build + dotnet 468/468 (Core 198, Application 179, integracyjne 91), `npm run api`
+  (klient bez zmian), lint + Vitest 250/250 + build zielone.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny
