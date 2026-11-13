@@ -111,7 +111,9 @@ cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /ap
   **B nawigacja zrobiona 12.11.2026** (zakładki Szukaj · Ulubione · Dodaj · Zlecenia · Konto, dzwonek, „Zapytaj”, fraza
   `phrase` w `GET api/announcements`; `verify.cmd`: dotnet 489/489, Vitest 275/275). **C zrobione 13.11.2026**: autor
   aktualizuje nieaktualną ofertę (`ReviseOffer`, status `Revised`, powiadomienie `OfferRevised`, „Zaktualizuj ofertę”;
-  `verify.cmd`: dotnet 507/507, Vitest 281/281). Zostało: test ręczny przed testem z ludźmi.
+  `verify.cmd`: dotnet 507/507, Vitest 281/281; test ręczny Chrome ↔ Brave OK). Zostało: **D** (odświeżanie wątku, zmiana
+  oczekującej oferty, „Rozpocznij” / „Zgłoś wykonanie” u pomocnika, potwierdzenie u zleceniodawcy, powiadomienia,
+  „Zakończone” osobno), potem **E** (rezygnacja / przerwanie zlecenia).
 - [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)
