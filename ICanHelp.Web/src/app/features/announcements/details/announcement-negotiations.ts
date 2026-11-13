@@ -1,7 +1,7 @@
 import type { AnnouncementDetailsDto, MyConversationDto, OfferDto } from '../../../core/api/api-client';
 import { formatPrice } from '../../../shared/pipes/price.pipe';
 import { parseApiDate } from '../../../shared/pipes/time-ago.pipe';
-import { changedFieldsLabel, offerStatusLabel } from '../../offers/offer-labels';
+import { changedFieldsLabel, offerKindLabel, offerStatusLabel } from '../../offers/offer-labels';
 
 /** Negocjacja z jednym pomocnikiem w szczegółach ogłoszenia: ostatnia oferta + wątek (jeśli jest). */
 export interface Negotiation {
@@ -76,7 +76,7 @@ export interface HistoryEntry {
 export function ownerHistory(announcement: AnnouncementDetailsDto, names: ReadonlyMap<string, string>): HistoryEntry[] {
   const offers: HistoryEntry[] = announcement.offers.map((offer) => {
     const who = offer.proposedBy === 'Client' ? 'Ty' : names.get(offer.helperId) || 'pomocnik';
-    const kind = offer.parentOfferId ? 'Kontroferta' : 'Oferta';
+    const kind = offerKindLabel(offer, announcement.offers);
     return {
       key: `o-${offer.id}`,
       at: offer.createdAt,

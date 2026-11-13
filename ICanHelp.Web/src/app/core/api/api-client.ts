@@ -1850,6 +1850,81 @@ export class AnnouncementsClient {
     }
 
     /**
+     * Aktualizacja własnej nieaktualnej oferty (ogłoszenie zmieniło się po jej złożeniu): nowe warunki na bieżącej
+    wersji, stara oferta → `Revised`. Tylko autor; aktualnej oferty nie można aktualizować (409). Zwraca id nowej oferty.
+     * @param body (optional) 
+     * @return Created
+     */
+    postReviseOffer(announcementId: string, offerId: string, body?: ReviseOffer | undefined): Observable<CreatedDto> {
+        let url_ = this.baseUrl + "/api/announcements/{announcementId}/offers/{offerId}/revise";
+        if (announcementId === undefined || announcementId === null)
+            throw new globalThis.Error("The parameter 'announcementId' must be defined.");
+        url_ = url_.replace("{announcementId}", encodeURIComponent("" + announcementId));
+        if (offerId === undefined || offerId === null)
+            throw new globalThis.Error("The parameter 'offerId' must be defined.");
+        url_ = url_.replace("{offerId}", encodeURIComponent("" + offerId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(body);
+
+        let options_ : any = {
+            body: content_,
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("post", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processPostReviseOffer(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processPostReviseOffer(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<CreatedDto>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<CreatedDto>;
+        }));
+    }
+
+    protected processPostReviseOffer(response: HttpResponseBase): Observable<CreatedDto> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 201) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result201: any = null;
+            result201 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as CreatedDto;
+            return _observableOf(result201);
+            }));
+        } else if (status === 404) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Not Found", status, _responseText, _headers, result404);
+            }));
+        } else if (status === 409) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result409: any = null;
+            result409 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Conflict", status, _responseText, _headers, result409);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    /**
      * Akceptacja oferty (druga strona niż autor). Pozostałe oczekujące oferty zostają odrzucone.
      * @return No Content
      */
@@ -3956,6 +4031,13 @@ export interface RefreshSession {
 export interface RegisterDevice {
     token: string;
     platform: DevicePlatform;
+}
+
+export interface ReviseOffer {
+    price: PriceDto;
+    proposedStart: string;
+    proposedEnd: string;
+    message: string | undefined;
 }
 
 export interface SendMessage {

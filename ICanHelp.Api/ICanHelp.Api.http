@@ -270,6 +270,21 @@ Content-Type: application/json
 }
 
 ###
+# Autor aktualizuje własną NIEAKTUALNĄ ofertę (ogłoszenie edytowano po jej złożeniu) -> 201 { id nowej oferty },
+# stara oferta -> "Revised", druga strona dostaje powiadomienie OfferRevised. Aktualna oferta / cudza oferta -> 409.
+# Przykład: po PATCH ogłoszenia właściciel aktualizuje swoją kontrofertę.
+POST {{baseUrl}}/api/announcements/{{announcementId}}/offers/{{counterOffer.response.body.$.id}}/revise
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "price": { "amount": 110, "currency": "PLN" },
+  "proposedStart": "2026-12-02T16:00:00Z",
+  "proposedEnd": "2026-12-02T18:00:00Z",
+  "message": "Po zmianie opisu – nowa propozycja."
+}
+
+###
 # Pomocnik akceptuje kontrofertę -> 204
 POST {{baseUrl}}/api/announcements/{{announcementId}}/offers/{{counterOffer.response.body.$.id}}/accept
 Authorization: Bearer {{signInHelper.response.body.$.accessToken}}

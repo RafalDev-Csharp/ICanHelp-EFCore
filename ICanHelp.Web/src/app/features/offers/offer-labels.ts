@@ -22,6 +22,7 @@ const OFFER_STATUS_LABELS: Readonly<Record<string, string>> = {
   Rejected: 'Odrzucona',
   Withdrawn: 'Wycofana',
   Countered: 'Kontroferta',
+  Revised: 'Zaktualizowana',
 };
 
 const OFFER_STATUS_COLORS: Readonly<Record<string, string>> = {
@@ -30,6 +31,7 @@ const OFFER_STATUS_COLORS: Readonly<Record<string, string>> = {
   Rejected: 'danger',
   Withdrawn: 'medium',
   Countered: 'medium',
+  Revised: 'medium',
 };
 
 const PARTY_LABELS: Readonly<Record<string, string>> = {
@@ -66,6 +68,21 @@ export function changedFieldsLabel(fields: readonly AnnouncementFieldChangeDto[]
   return [...new Set(fields.map((change) => FIELD_LABELS[change.field] ?? change.field))].join(', ');
 }
 
+/**
+ * „Oferta” (pierwsza), „Kontroferta” (odpowiedź drugiej strony) albo „Zaktualizowana oferta” (autor zastąpił swoją
+ * nieaktualną ofertę – poprzednia ma status `Revised`). `offers` – oferty tej samej negocjacji (do znalezienia poprzedniej).
+ */
+export function offerKindLabel(
+  offer: Pick<OfferDto, 'parentOfferId'>,
+  offers: readonly Pick<OfferDto, 'id' | 'status'>[],
+): string {
+  if (!offer.parentOfferId) {
+    return 'Oferta';
+  }
+  const parent = offers.find((other) => other.id === offer.parentOfferId);
+  return parent?.status === 'Revised' ? 'Zaktualizowana oferta' : 'Kontroferta';
+}
+
 /** Co zalogowany może zrobić z ofertą – te same reguły co w domenie (`Announcement.AcceptOffer` itd.). */
 export interface OfferActions {
   /** Akceptacja: druga strona, oferta aktualna (złożona na ostatniej rewizji ogłoszenia). */
@@ -75,9 +92,11 @@ export interface OfferActions {
   counter: boolean;
   /** Wycofanie: tylko autor. */
   withdraw: boolean;
+  /** Aktualizacja: autor nieaktualnej oferty (`Announcement.ReviseOffer`) – nowe warunki do bieżącej wersji ogłoszenia. */
+  revise: boolean;
 }
 
-const NO_ACTIONS: OfferActions = { accept: false, reject: false, counter: false, withdraw: false };
+const NO_ACTIONS: OfferActions = { accept: false, reject: false, counter: false, withdraw: false, revise: false };
 
 /**
  * @param myParty rola zalogowanego w tej negocjacji (`Client` = właściciel, `Helper` = pomocnik z oferty)
@@ -92,9 +111,9 @@ export function offerActions(
     return NO_ACTIONS;
   }
   if (offer.proposedBy === myParty) {
-    return { ...NO_ACTIONS, withdraw: true };
+    return { ...NO_ACTIONS, withdraw: true, revise: offer.isOutdated };
   }
-  return { accept: !offer.isOutdated, reject: true, counter: true, withdraw: false };
+  return { ...NO_ACTIONS, accept: !offer.isOutdated, reject: true, counter: true };
 }
 
 /** Oferta oczekująca w łańcuchu negocjacji jednego pomocnika (najwyżej jedna), albo `undefined`. */

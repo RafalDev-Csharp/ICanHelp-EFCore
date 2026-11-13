@@ -79,4 +79,6 @@ public class Offer
     internal void Withdraw() => Status = OfferStatus.Withdrawn;
 
     internal void MarkAsCountered() => Status = OfferStatus.Countered;
+
+    internal void MarkAsRevised() => Status = OfferStatus.Revised;
 }

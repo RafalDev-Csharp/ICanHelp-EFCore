@@ -50,7 +50,9 @@ describe('toTimelineItems', () => {
       reject: true,
       counter: true,
       withdraw: false,
+      revise: false,
     });
+    expect(offer.kind === 'offer' && offer.kindLabel).toBe('Oferta');
 
     expect(items[2]).toMatchObject({ kind: 'change', fields: 'budżet', revision: 1 });
   });

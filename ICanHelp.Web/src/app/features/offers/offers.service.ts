@@ -60,6 +60,27 @@ export class OffersService {
     return created !== null;
   }
 
+  /**
+   * Autor aktualizuje własną nieaktualną ofertę (ogłoszenie zmieniło się po jej złożeniu): okno z poprzednimi
+   * warunkami i informacją, co się zmieniło → `POST …/revise` (stara oferta → „Zaktualizowana”).
+   */
+  async revise(offer: OfferDto): Promise<boolean> {
+    const changed = changedFieldsLabel(offer.changesSinceOffer);
+    const command = await this.openForm({
+      heading: 'Zaktualizuj ofertę',
+      basis: offer,
+      note: `Ogłoszenie zmieniło się od Twojej oferty${changed ? ` (${changed})` : ''}. Sprawdź warunki i wyślij je do aktualnej wersji – dopiero wtedy druga strona może ją przyjąć.`,
+    });
+    if (!command) {
+      return false;
+    }
+    const created = await this.run(
+      this.client.postReviseOffer(offer.announcementId, offer.id, command),
+      'Oferta zaktualizowana.',
+    );
+    return created !== null;
+  }
+
   async accept(offer: OfferDto): Promise<boolean> {
     const confirmed = await this.confirm(
       'Przyjąć ofertę?',

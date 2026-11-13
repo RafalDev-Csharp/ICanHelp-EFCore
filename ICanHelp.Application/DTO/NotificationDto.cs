@@ -20,7 +20,7 @@ public sealed record NotificationDto
     /// <summary>
     /// OfferReceived, OfferCountered, OfferAccepted, OfferRejected, OfferWithdrawn, MessageReceived, AnnouncementEdited,
     /// NewAnnouncementNearby (alert: announcementTitle, categoryName, alertName, alertKind, distanceKm),
-    /// NewAnnouncementsDigest (over the daily limit: count).
+    /// NewAnnouncementsDigest (over the daily limit: count), OfferRevised (price, proposedBy).
     /// </summary>
     public string Type { get; init; } = string.Empty;
 

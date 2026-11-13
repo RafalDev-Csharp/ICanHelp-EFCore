@@ -1,6 +1,6 @@
 import type { ConversationDto, MessageDto, OfferDto } from '../../core/api/api-client';
 import type { OfferActions } from '../offers/offer-labels';
-import { changedFieldsLabel, offerActions } from '../offers/offer-labels';
+import { changedFieldsLabel, offerActions, offerKindLabel } from '../offers/offer-labels';
 
 /** Wpis osi czasu wątku gotowy do wyświetlenia (typy wpisów jak `ConversationEntryDto.type` w API). */
 export type TimelineItem =
@@ -11,8 +11,8 @@ export type TimelineItem =
       at: string;
       offer: OfferDto;
       mine: boolean;
-      /** Kontroferta (odpowiedź na wcześniejszą ofertę). */
-      isCounter: boolean;
+      /** „Oferta” / „Kontroferta” / „Zaktualizowana oferta” (`offerKindLabel`). */
+      kindLabel: string;
       actions: OfferActions;
       /** „budżet, opis” – co zmieniło się w ogłoszeniu od złożenia oferty (tylko dla nieaktualnych). */
       changedSince: string;
@@ -25,6 +25,7 @@ export type TimelineItem =
  */
 export function toTimelineItems(conversation: ConversationDto, myId: string | undefined): TimelineItem[] {
   const items: TimelineItem[] = [];
+  const offers = offersOf(conversation);
   for (const entry of conversation.timeline) {
     if (entry.type === 'Message' && entry.message) {
       items.push({
@@ -42,7 +43,7 @@ export function toTimelineItems(conversation: ConversationDto, myId: string | un
         at: entry.at,
         offer,
         mine: offer.proposedBy === conversation.myRole,
-        isCounter: !!offer.parentOfferId,
+        kindLabel: offerKindLabel(offer, offers),
         actions: offerActions(offer, conversation.myRole, conversation.announcementStatus),
         changedSince: offer.isOutdated ? changedFieldsLabel(offer.changesSinceOffer) : '',
       });

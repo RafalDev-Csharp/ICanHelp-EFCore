@@ -281,5 +281,21 @@
   `announcements.page`, `conversation.page`, `tabs`, e2e `app.spec`. Część C – osobno.
   12.11.2026 lokalnie (`verify.cmd`, Docker): dotnet 489/489 (Core 198, Application 186, integracyjne 105), `npm run api`
   (klient bez zmian względem ręcznej edycji), lint + Vitest 275/275 + build zielone. Wygląd na telefonie – do sprawdzenia ręcznie.
+  Część C (13.11.2026): aktualizacja nieaktualnej oferty. Problem: po edycji ogłoszenia oferta pomocnika była
+  `IsOutdated`, nikt nie mógł jej przyjąć, kontrować mogła tylko druga strona, a nowej oferty nie dało się złożyć (409 –
+  jest oczekująca). Core: `Announcement.ReviseOffer` (Open, oczekująca, tylko autor, tylko nieaktualna; nowa oferta tej
+  samej strony na bieżącej rewizji z `ParentOfferId`), nowy `OfferStatus.Revised` (`Offer.MarkAsRevised`), zdarzenie
+  `OfferRevised`. Application: `ReviseOffer` + `ReviseOfferHandler`, `TransactionNotificationHandler` → druga strona,
+  `NotificationType.OfferRevised`, tekst „Oferta zaktualizowana: X zł” w `NotificationTextFormatter`. Api:
+  `POST api/announcements/{id}/offers/{offerId}/revise` → 201, przykład w `.http`. Bez migracji (enumy jako tekst).
+  Front: `postReviseOffer` w `api-client.ts`, `offerActions().revise`, `offerKindLabel` (Oferta / Kontroferta /
+  Zaktualizowana oferta), `OffersService.revise` (okno z notką, co się zmieniło), „Zaktualizuj ofertę” w wątku i w stopce
+  szczegółów, status „Zaktualizowana”, powiadomienie `OfferRevised` (ikona `refresh-outline`). Testy: nowe
+  `AnnouncementReviseOfferTests` (Core, 12), dopisane w `AnnouncementHandlersTests`, `TransactionNotificationHandlerTests`,
+  `NotificationTextFormatterTests`, Api `AnnouncementEditTests` (pełny przepływ: 409 dla aktualnej i cudzej oferty, revise,
+  powiadomienie, akceptacja); Vitest – `offer-labels`, `offers.service`, `conversation-timeline`, `conversation.page`,
+  `announcement-details.page`, `notification-texts`.
+  13.11.2026 lokalnie (`verify.cmd`, Docker): dotnet 507/507 (Core 210, Application 191, integracyjne 106), `npm run api`
+  (klient zgodny z ręczną edycją), lint + Vitest 281/281 + build zielone. Przepływ w przeglądarce – do sprawdzenia ręcznie.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

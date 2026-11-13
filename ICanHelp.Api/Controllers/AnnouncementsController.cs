@@ -396,6 +396,39 @@ public sealed class AnnouncementsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { announcementId }, new CreatedDto(newOfferId));
     }
 
+    /// <summary>
+    /// Aktualizacja własnej nieaktualnej oferty (ogłoszenie zmieniło się po jej złożeniu): nowe warunki na bieżącej
+    /// wersji, stara oferta → <c>Revised</c>. Tylko autor; aktualnej oferty nie można aktualizować (409). Zwraca id nowej oferty.
+    /// </summary>
+    [HttpPost("{announcementId:guid}/offers/{offerId:guid}/revise")]
+    [Authorize]
+    [ProducesResponseType<CreatedDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<CreatedDto>> PostReviseOffer(
+        Guid announcementId,
+        Guid offerId,
+        [FromBody] ReviseOffer command,
+        [FromServices] ICommandHandler<ReviseOffer> handler,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var userId))
+        {
+            return Unauthorized();
+        }
+
+        var newOfferId = Guid.NewGuid();
+        await handler.HandleAsync(command with
+        {
+            AnnouncementId = announcementId,
+            OfferId = offerId,
+            NewOfferId = newOfferId,
+            ActorId = userId
+        }, cancellationToken);
+
+        return CreatedAtAction(nameof(GetById), new { announcementId }, new CreatedDto(newOfferId));
+    }
+
     /// <summary>Akceptacja oferty (druga strona niż autor). Pozostałe oczekujące oferty zostają odrzucone.</summary>
     [HttpPost("{announcementId:guid}/offers/{offerId:guid}/accept")]
     [Authorize]

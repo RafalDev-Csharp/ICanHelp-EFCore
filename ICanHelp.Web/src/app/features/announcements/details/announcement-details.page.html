@@ -306,7 +306,10 @@
         {{ myConversationId() ? 'Rozmowa' : 'Zapytaj' }}
       </ion-button>
       <ion-button class="primary-action" (click)="makeOffer()" [disabled]="busy()">
-        @if (myPendingOffer(); as offer) { Twoja oferta: {{ offer.price.amount | price }} } @else { Złóż ofertę }
+        @if (myOutdatedOffer()) {
+        <ion-icon name="warning-outline" slot="start" aria-hidden="true"></ion-icon>
+        Zaktualizuj ofertę } @else if (myPendingOffer(); as offer) { Twoja oferta: {{ offer.price.amount | price }} }
+        @else { Złóż ofertę }
       </ion-button>
     </div>
     } @else {

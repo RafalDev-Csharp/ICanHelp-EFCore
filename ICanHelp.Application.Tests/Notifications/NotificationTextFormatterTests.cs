@@ -25,6 +25,12 @@ public class NotificationTextFormatterTests
             .ShouldBe(new NotificationText($"Kontroferta: 99,50{Nbsp}zł", Title));
 
     [Fact]
+    public void OfferRevised_TitleWithPrice()
+        => Format(NotificationType.OfferRevised, (NotificationPayload.AnnouncementTitle, Title),
+                (NotificationPayload.Price, "180.00 PLN"))
+            .ShouldBe(new NotificationText($"Oferta zaktualizowana: 180{Nbsp}zł", Title));
+
+    [Fact]
     public void Offer_WithoutPrice_TitleOnly()
         => Format(NotificationType.OfferReceived, (NotificationPayload.AnnouncementTitle, Title))
             .Title.ShouldBe("Nowa oferta");

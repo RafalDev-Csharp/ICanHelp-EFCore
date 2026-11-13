@@ -82,8 +82,7 @@
       <header>
         <ion-icon name="pricetag-outline" aria-hidden="true"></ion-icon>
         <span class="offer-title"
-          >{{ item.isCounter ? 'Kontroferta' : 'Oferta' }} · {{ item.mine ? 'Ty' : partyLabel(item.offer.proposedBy)
-          }}</span
+          >{{ item.kindLabel }} · {{ item.mine ? 'Ty' : partyLabel(item.offer.proposedBy) }}</span
         >
         <ion-badge [color]="offerStatusColor(item.offer.status)">{{ offerStatusLabel(item.offer.status) }}</ion-badge>
       </header>
@@ -95,14 +94,18 @@
       <p class="offer-outdated">
         <ion-icon name="warning-outline" color="warning" aria-hidden="true"></ion-icon>
         Nieaktualna – ogłoszenie zmieniło się po jej złożeniu{{ item.changedSince ? ' (' + item.changedSince + ')' : ''
-        }}. Przyjąć można tylko ofertę do aktualnej wersji.
+        }}. {{ item.actions.revise ? 'Zaktualizuj ją, żeby druga strona mogła ją przyjąć.' : 'Przyjąć można tylko ofertę
+        do aktualnej wersji.' }}
       </p>
-      } @if (item.actions.accept || item.actions.reject || item.actions.counter || item.actions.withdraw) {
+      } @if (item.actions.accept || item.actions.reject || item.actions.counter || item.actions.withdraw ||
+      item.actions.revise) {
       <div class="offer-actions">
         @if (item.actions.withdraw) {
         <ion-button size="small" fill="outline" color="medium" (click)="withdraw(item.offer)" [disabled]="busy()"
           >Wycofaj</ion-button
         >
+        } @if (item.actions.revise) {
+        <ion-button size="small" (click)="revise(item.offer)" [disabled]="busy()">Zaktualizuj ofertę</ion-button>
         } @if (item.actions.reject) {
         <ion-button size="small" fill="outline" color="danger" (click)="reject(item.offer)" [disabled]="busy()"
           >Odrzuć</ion-button

@@ -1,4 +1,11 @@
-import { changedFieldsLabel, formatOfferTerm, offerActions, offerStatusLabel, pendingOffer } from './offer-labels';
+import {
+  changedFieldsLabel,
+  formatOfferTerm,
+  offerActions,
+  offerKindLabel,
+  offerStatusLabel,
+  pendingOffer,
+} from './offer-labels';
 import { offerFixture } from './testing/offer-fixtures';
 
 describe('offerActions', () => {
@@ -8,6 +15,7 @@ describe('offerActions', () => {
       reject: true,
       counter: true,
       withdraw: false,
+      revise: false,
     });
   });
 
@@ -17,7 +25,21 @@ describe('offerActions', () => {
       reject: false,
       counter: false,
       withdraw: true,
+      revise: false,
     });
+  });
+
+  it('lets the author revise (and still withdraw) an outdated offer – the other side cannot', () => {
+    const outdated = offerFixture('o1', { isOutdated: true });
+    expect(offerActions(outdated, 'Helper', 'Open')).toEqual({
+      accept: false,
+      reject: false,
+      counter: false,
+      withdraw: true,
+      revise: true,
+    });
+    expect(offerActions(outdated, 'Client', 'Open').revise).toBe(false);
+    expect(offerActions({ ...outdated, status: 'Revised' }, 'Helper', 'Open').revise).toBe(false);
   });
 
   it('replaces accept with a counter-offer when the offer is outdated', () => {
@@ -27,7 +49,7 @@ describe('offerActions', () => {
   });
 
   it('allows nothing on answered offers or closed announcements', () => {
-    const none = { accept: false, reject: false, counter: false, withdraw: false };
+    const none = { accept: false, reject: false, counter: false, withdraw: false, revise: false };
     expect(offerActions(offerFixture('o1', { status: 'Rejected' }), 'Client', 'Open')).toEqual(none);
     expect(offerActions(offerFixture('o1'), 'Client', 'Accepted')).toEqual(none);
   });
@@ -36,6 +58,7 @@ describe('offerActions', () => {
 describe('offer texts', () => {
   it('translates statuses and changed fields', () => {
     expect(offerStatusLabel('Countered')).toBe('Kontroferta');
+    expect(offerStatusLabel('Revised')).toBe('Zaktualizowana');
     expect(offerStatusLabel('Something')).toBe('Something');
     expect(
       changedFieldsLabel([
@@ -54,6 +77,17 @@ describe('offer texts', () => {
 
     expect(formatOfferTerm(start, sameDay)).toMatch(/10 lis.*17:00–19:30$/);
     expect(formatOfferTerm(start, nextDay)).toMatch(/10 lis.*17:00 – .*11 lis.*09:00$/);
+  });
+
+  it('names an offer by its place in the negotiation', () => {
+    const first = offerFixture('o1', { status: 'Countered' });
+    const counter = offerFixture('o2', { parentOfferId: 'o1', proposedBy: 'Client', status: 'Revised' });
+    const revised = offerFixture('o3', { parentOfferId: 'o2', proposedBy: 'Client' });
+    const offers = [first, counter, revised];
+
+    expect(offerKindLabel(first, offers)).toBe('Oferta');
+    expect(offerKindLabel(counter, offers)).toBe('Kontroferta');
+    expect(offerKindLabel(revised, offers)).toBe('Zaktualizowana oferta');
   });
 
   it('finds the pending offer', () => {

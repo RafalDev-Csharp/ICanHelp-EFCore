@@ -73,6 +73,34 @@ internal sealed class CounterOfferHandler : ICommandHandler<CounterOffer>
     }
 }
 
+internal sealed class ReviseOfferHandler : ICommandHandler<ReviseOffer>
+{
+    private readonly IAnnouncementRepository _announcements;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IClock _clock;
+
+    public ReviseOfferHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
+    {
+        _announcements = announcements;
+        _unitOfWork = unitOfWork;
+        _clock = clock;
+    }
+
+    public async Task HandleAsync(ReviseOffer command, CancellationToken cancellationToken = default)
+    {
+        var price = new Price(command.Price.Amount, command.Price.Currency);
+        var message = OfferMessage.From(command.Message);
+
+        await _unitOfWork.ExecuteAsync(async () =>
+        {
+            var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
+
+            announcement.ReviseOffer(new Id(command.OfferId), new Id(command.NewOfferId), new UserId(command.ActorId),
+                price, command.ProposedStart.AsUtc(), command.ProposedEnd.AsUtc(), message, _clock.UtcNow);
+        }, cancellationToken);
+    }
+}
+
 internal sealed class AcceptOfferHandler : ICommandHandler<AcceptOffer>
 {
     private readonly IAnnouncementRepository _announcements;

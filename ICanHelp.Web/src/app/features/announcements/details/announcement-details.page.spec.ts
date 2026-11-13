@@ -36,7 +36,7 @@ describe('AnnouncementDetailsPage', () => {
     postConversation: vi.fn(),
   };
   const conversations = { getMine: vi.fn() };
-  const offers = { make: vi.fn(), rate: vi.fn(), start: vi.fn(), complete: vi.fn() };
+  const offers = { make: vi.fn(), revise: vi.fn(), rate: vi.fn(), start: vi.fn(), complete: vi.fn() };
   const likes = { load: vi.fn(() => of([])), isLiked: vi.fn(() => false), sync: vi.fn(), toggle: vi.fn() };
   /** Potwierdzenie z okna: `confirm` wybiera przycisk o tej roli. */
   let alertButtons: { role?: string; handler?: () => void }[] = [];
@@ -209,6 +209,25 @@ describe('AnnouncementDetailsPage', () => {
 
     expect(offers.make).not.toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith(['/conversations', 'c1']);
+  });
+
+  it('lets a helper update his outdated offer from the footer', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'helper-1' } as UserDto);
+    const outdated = offerFixture('o1', { isOutdated: true });
+    announcements.getById.mockReturnValue(of(announcementDetails('a1', { offers: [outdated] })));
+    conversations.getMine.mockReturnValue(of([myConversationFixture('c1', { myRole: 'Helper' })]));
+    offers.revise.mockResolvedValue(true);
+    const { page, element, render } = create();
+    await render();
+
+    expect(element.querySelector('ion-footer')?.textContent).toContain('Zaktualizuj ofertę');
+
+    await page.makeOffer();
+
+    expect(offers.revise).toHaveBeenCalledWith(outdated);
+    expect(offers.make).not.toHaveBeenCalled();
+    expect(announcements.getById).toHaveBeenCalledTimes(2);
   });
 
   it('gives the accepted helper the contact and the start action', async () => {

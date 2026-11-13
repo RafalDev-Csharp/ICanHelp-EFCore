@@ -43,6 +43,12 @@ function describeFromParameters(notification: NotificationDto): NotificationText
       return { title: price ? `Nowa oferta: ${price}` : 'Nowa oferta', body: title, icon: 'pricetag-outline' };
     case 'OfferCountered':
       return { title: price ? `Kontroferta: ${price}` : 'Kontroferta', body: title, icon: 'swap-horizontal-outline' };
+    case 'OfferRevised':
+      return {
+        title: price ? `Oferta zaktualizowana: ${price}` : 'Oferta zaktualizowana',
+        body: title,
+        icon: 'refresh-outline',
+      };
     case 'OfferAccepted':
       return { title: 'Twoja oferta została przyjęta', body: title, icon: 'checkmark-circle-outline' };
     case 'OfferRejected':

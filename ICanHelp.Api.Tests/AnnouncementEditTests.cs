@@ -1,5 +1,6 @@
 using ICanHelp.Api.Tests.Infrastructure;
 using ICanHelp.Application.DTO;
+using ICanHelp.Application.Notifications;
 
 namespace ICanHelp.Api.Tests;
 
@@ -68,6 +69,53 @@ public sealed class AnnouncementEditTests
         acceptedOffer.AnnouncementRevision.ShouldBe(1);
         acceptedOffer.IsOutdated.ShouldBeFalse();
         acceptedOffer.ChangesSinceOffer.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Edit_HelperRevisesOutdatedOffer_OwnerIsNotifiedAndCanAcceptIt()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var helper = await _factory.CreateUserAsync();
+        var announcementId = await owner.CreateAnnouncementAsync();
+        var url = $"/api/announcements/{announcementId}";
+        var offerId = await helper.MakeOfferAsync(announcementId, 120m);
+
+        // Aktualnej oferty nie można „aktualizować” – czeka na odpowiedź.
+        await (await helper.Client.PostAsJsonAsync($"{url}/offers/{offerId}/revise", TestApi.OfferBody(150m)))
+            .ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
+
+        (await owner.Client.PatchAsJsonAsync(url, new { description = "Kran i syfon pod zlewem do wymiany." }))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        await _factory.ProcessOutboxAsync();
+        var before = (await owner.GetNotificationsAsync()).Count;
+
+        // Właściciel nie zaktualizuje cudzej oferty (może ją tylko kontrować).
+        await (await owner.Client.PostAsJsonAsync($"{url}/offers/{offerId}/revise", TestApi.OfferBody(150m)))
+            .ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
+
+        var revise = await helper.Client.PostAsJsonAsync($"{url}/offers/{offerId}/revise", TestApi.OfferBody(170m));
+        revise.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var revisedId = (await revise.ReadAsync<CreatedDto>()).Id;
+
+        var details = await helper.Client.GetFromJsonAsync<AnnouncementDetailsDto>(url);
+        details!.Offers.Single(o => o.Id == offerId).Status.ShouldBe("Revised");
+        var revised = details.Offers.Single(o => o.Id == revisedId);
+        revised.Status.ShouldBe("Pending");
+        revised.ProposedBy.ShouldBe("Helper");
+        revised.ParentOfferId.ShouldBe(offerId);
+        revised.Price.Amount.ShouldBe(170m);
+        revised.AnnouncementRevision.ShouldBe(1);
+        revised.IsOutdated.ShouldBeFalse();
+
+        await _factory.ProcessOutboxAsync();
+        var notifications = await owner.GetNotificationsAsync();
+        notifications.Count.ShouldBe(before + 1);
+        var notification = notifications.Single(n => n.Type == "OfferRevised");
+        notification.Parameters[NotificationPayload.Price].ShouldBe("170.00 PLN");
+        notification.Title.ShouldBe("Oferta zaktualizowana: 170 zł");
+
+        (await owner.Client.PostEmptyAsync($"{url}/offers/{revisedId}/accept")).StatusCode
+            .ShouldBe(HttpStatusCode.NoContent);
     }
 
     [Fact]

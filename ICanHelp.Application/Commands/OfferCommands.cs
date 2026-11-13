@@ -32,6 +32,23 @@ public sealed record CounterOffer : ICommand
     public string? Message { get; init; }
 }
 
+/// <summary>
+/// Autor aktualizuje własną nieaktualną ofertę <see cref="OfferId"/> (ogłoszenie zmieniło się po jej złożeniu) –
+/// nowe warunki na bieżącej wersji ogłoszenia, stara oferta → <c>Revised</c>.
+/// </summary>
+public sealed record ReviseOffer : ICommand
+{
+    [JsonIgnore] public Guid AnnouncementId { get; init; }
+    [JsonIgnore] public Guid OfferId { get; init; }
+    [JsonIgnore] public Guid NewOfferId { get; init; }
+    [JsonIgnore] public Guid ActorId { get; init; }
+
+    public PriceDto Price { get; init; } = new();
+    public DateTime ProposedStart { get; init; }
+    public DateTime ProposedEnd { get; init; }
+    public string? Message { get; init; }
+}
+
 /// <summary>Akceptacja oferty przez drugą stronę niż jej autor.</summary>
 public sealed record AcceptOffer(Guid AnnouncementId, Guid OfferId, Guid ActorId) : ICommand;
 

@@ -34,6 +34,10 @@ describe('notification texts', () => {
     );
     expect(describeNotification(notification('OfferAccepted', title)).title).toBe('Twoja oferta została przyjęta');
     expect(describeNotification(notification('OfferWithdrawn', title)).title).toBe('Oferta wycofana');
+
+    const revised = describeNotification(notification('OfferRevised', { ...title, price: '180.00 PLN' }));
+    expect(plain(revised.title)).toBe('Oferta zaktualizowana: 180 zł');
+    expect(revised.icon).toBe('refresh-outline');
   });
 
   it('prefers the ready text from the API and keeps the icon from the type', () => {

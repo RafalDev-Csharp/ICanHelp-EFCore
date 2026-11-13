@@ -22,6 +22,7 @@ describe('ConversationPage', () => {
     reject: vi.fn(),
     counter: vi.fn(() => Promise.resolve(true)),
     withdraw: vi.fn(),
+    revise: vi.fn(() => Promise.resolve(true)),
     start: vi.fn(() => Promise.resolve(true)),
     complete: vi.fn(() => Promise.resolve(true)),
   };
@@ -193,6 +194,21 @@ describe('ConversationPage', () => {
     const buttons = [...element.querySelectorAll('.offer-actions ion-button')].map((b) => b.textContent?.trim());
     expect(buttons).toEqual(['Odrzuć', 'Zaproponuj kontrofertę']);
     expect(conversations.markAsRead).not.toHaveBeenCalled();
+  });
+
+  it('lets the author update an outdated offer and reloads the thread', async () => {
+    const outdated = offerEntry({ isOutdated: true });
+    const { page, element, render } = create(conversationFixture({ myRole: 'Helper', timeline: [outdated] }));
+    await render();
+
+    expect(element.querySelector('.offer-outdated')?.textContent).toContain('Zaktualizuj ją');
+    const buttons = [...element.querySelectorAll('.offer-actions ion-button')].map((b) => b.textContent?.trim());
+    expect(buttons).toEqual(['Wycofaj', 'Zaktualizuj ofertę']);
+
+    await page.revise(outdated.offer);
+
+    expect(offers.revise).toHaveBeenCalledWith(outdated.offer);
+    expect(conversations.getById).toHaveBeenCalledTimes(2);
   });
 
   it('accepts through OffersService and reloads the thread', async () => {

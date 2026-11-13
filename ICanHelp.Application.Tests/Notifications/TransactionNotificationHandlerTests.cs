@@ -79,6 +79,19 @@ public class TransactionNotificationHandlerTests
     }
 
     [Theory]
+    [InlineData(OfferParty.Client, false)] // właściciel aktualizuje swoją kontrofertę → pomocnik
+    [InlineData(OfferParty.Helper, true)]  // pomocnik aktualizuje swoją ofertę → właściciel
+    public async Task OfferRevised_NotifiesOtherSideThanAuthor(OfferParty proposedBy, bool ownerIsRecipient)
+    {
+        await _handler.HandleAsync(Guid.NewGuid(), new OfferRevised(_announcement.Id, Guid.NewGuid(), Guid.NewGuid(),
+            _owner, _helper, proposedBy, 180m, "PLN", Now));
+
+        var notification = _notifications.Notifications.ShouldHaveSingleItem();
+        notification.UserId.ShouldBe(ownerIsRecipient ? _owner : _helper);
+        notification.Type.ShouldBe(NotificationType.OfferRevised);
+    }
+
+    [Theory]
     [InlineData(OfferParty.Helper, false)] // właściciel przyjął ofertę pomocnika → pomocnik
     [InlineData(OfferParty.Client, true)]  // pomocnik przyjął kontrofertę właściciela → właściciel
     public async Task OfferAccepted_NotifiesAuthorOfOffer(OfferParty proposedBy, bool ownerIsRecipient)

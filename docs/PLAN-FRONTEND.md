@@ -280,13 +280,34 @@ Zrobione B (12.11.2026), decyzje:
 - Do sprawdzenia ręcznie: wygląd czterech pasków nagłówka „Szukaj” na niskim telefonie (ew. połączyć segment Lista/Mapa
   z filtrami), wyróżnienie zakładki „Zlecenia” po wejściu w wątek ze szczegółów ogłoszenia.
 
-**C. Nieaktualna oferta pomocnika (reguła domeny)**
-- [ ] Dziś: pomocnik złożył ofertę, właściciel edytuje ogłoszenie → oferta `IsOutdated`. Pomocnik widzi „Twoja oferta: x zł”
+**C. Nieaktualna oferta pomocnika (reguła domeny)** – zrobione 13.11.2026 (opis niżej)
+- [x] Dziś: pomocnik złożył ofertę, właściciel edytuje ogłoszenie → oferta `IsOutdated`. Pomocnik widzi „Twoja oferta: x zł”
       (cena jego starej oferty), po kliknięciu „nieaktualna” i nie może nic zrobić: kontrować może tylko druga strona,
       a nowej oferty nie złoży, bo ma już oczekującą (`AddOffer` → 409). Jedyna droga – wycofać i złożyć od nowa (nieoczywiste).
       Propozycja: autor może **zaktualizować** własną nieaktualną ofertę (`Announcement.ReviseOffer` – stara `Countered`/
       `Withdrawn`, nowa na bieżącej rewizji), a w UI przy nieaktualnej ofercie przycisk „Zaktualizuj ofertę” + informacja,
       co się zmieniło (`changedSinceOffer`). Testy Core + Api, przykład w `.http`.
+
+Zrobione C (13.11.2026), decyzje:
+- Domena: `Announcement.ReviseOffer(offerId, newOfferId, actor, price, start, end, message, at)` – tylko w `Open`, tylko
+  oczekująca oferta, tylko jej **autor** (pomocnik albo właściciel – nieaktualna kontroferta właściciela też), tylko
+  **nieaktualna** (aktualna czeka na odpowiedź → 409; inaczej byłby to obejście „jedna oczekująca oferta”). Nowa oferta:
+  ta sama strona, `ParentOfferId` = stara, bieżąca rewizja. Stara dostaje **nowy status `Revised`** (nie `Countered` /
+  `Withdrawn` z propozycji – historia ma pokazać „zaktualizowana”, a nie „kontroferta” czy „wycofana”). Kolumna statusu
+  to tekst (20 znaków) – bez migracji.
+- Zdarzenie `OfferRevised` → nowy typ powiadomienia `OfferRevised` dla drugiej strony („Oferta zaktualizowana: 180 zł”,
+  ikona `refresh-outline`, link do wątku) – osobny typ zamiast `OfferCountered`, bo „Kontroferta” byłaby myląca.
+- API: `POST api/announcements/{id}/offers/{offerId}/revise` (body jak kontroferta) → 201 `{ id }`; przykład w `.http`.
+- Front: `offerActions().revise` (autor + nieaktualna); `OffersService.revise` – okno z poprzednimi warunkami i notką,
+  co się zmieniło (`changesSinceOffer`). Wątek: przy nieaktualnej własnej ofercie „Zaktualizuj ofertę” + „Wycofaj”,
+  notka „Zaktualizuj ją, żeby druga strona mogła ją przyjąć”. Szczegóły ogłoszenia: stopka pomocnika „Zaktualizuj ofertę”
+  zamiast „Twoja oferta: x zł” (otwiera okno od razu). Nazwa wpisu: `offerKindLabel` – Oferta / Kontroferta /
+  Zaktualizowana oferta (wątek i „Historia ogłoszenia”); status `Revised` = „Zaktualizowana”.
+- 13.11.2026 `verify.cmd`: dotnet 507/507 (Core 210, Application 191, integracyjne 106), `npm run api` (klient zgodny
+  z ręczną edycją), lint + Vitest 281/281 + build. Pierwszy przebieg: 3 testy Vitest przekroczyły 5 s pod obciążeniem
+  (alert-edit, orders, szczegóły) – pojedynczo i w drugim pełnym przebiegu zielone.
+- Do sprawdzenia ręcznie: pomocnik składa ofertę → właściciel edytuje → pomocnik „Zaktualizuj ofertę” → właściciel
+  dostaje powiadomienie i przyjmuje.
 
 ## Krok F10 – wdrożenie i wymagania przed testem z ludźmi
 

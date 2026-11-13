@@ -219,6 +219,11 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
   protected readonly myPendingOffer = computed(() =>
     this.isOwner() ? undefined : pendingOffer(this.announcement()?.offers ?? []),
   );
+  /** Pomocnik: jego własna oczekująca oferta, która jest nieaktualna (ogłoszenie edytowano) – do aktualizacji. */
+  protected readonly myOutdatedOffer = computed(() => {
+    const offer = this.myPendingOffer();
+    return offer?.isOutdated && offer.proposedBy === 'Helper' ? offer : undefined;
+  });
   /** Pomocnik: jego wątek w tym ogłoszeniu. */
   protected readonly myConversationId = computed(() =>
     this.isOwner() ? undefined : this.conversations()[0]?.conversationId,
@@ -326,12 +331,25 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
   }
 
   /**
-   * „Złóż ofertę”: niezalogowany → logowanie i powrót; pomocnik z oczekującą ofertą → jego wątek (tam kontroferty);
+   * „Złóż ofertę”: niezalogowany → logowanie i powrót; pomocnik z własną nieaktualną ofertą → okno aktualizacji
+   * (`POST …/revise`); z inną oczekującą ofertą → jego wątek (tam kontroferty);
    * inaczej okno oferty → `POST …/offers` → wątek (oferta zakłada go sama).
    */
   async makeOffer(): Promise<void> {
     const announcement = this.announcement();
     if (!announcement || this.busy() || !this.requireSignIn()) {
+      return;
+    }
+    const outdated = this.myOutdatedOffer();
+    if (outdated) {
+      this.busy.set(true);
+      try {
+        if (await this.offers.revise(outdated)) {
+          this.load();
+        }
+      } finally {
+        this.busy.set(false);
+      }
       return;
     }
     if (this.myPendingOffer()) {

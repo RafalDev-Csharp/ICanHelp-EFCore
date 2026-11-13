@@ -294,6 +294,11 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
     await this.act(() => this.offers.withdraw(offer));
   }
 
+  /** Autor nieaktualnej oferty: nowe warunki do aktualnej wersji ogłoszenia. */
+  async revise(offer: OfferDto): Promise<void> {
+    await this.act(() => this.offers.revise(offer));
+  }
+
   /** Akcja zlecenia w przyjętym wątku (potwierdzenie i komunikat – `OffersService`, wspólne ze szczegółami). */
   async runJobAction(): Promise<void> {
     const conversation = this.conversation();

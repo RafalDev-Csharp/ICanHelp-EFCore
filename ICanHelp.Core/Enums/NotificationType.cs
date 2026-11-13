@@ -28,5 +28,8 @@ public enum NotificationType
     NewAnnouncementNearby,
 
     /// <summary>Krok 14: over the daily limit of alerts – one digest a day ("and N more new announcements").</summary>
-    NewAnnouncementsDigest
+    NewAnnouncementsDigest,
+
+    /// <summary>F11 C: the other side updated its outdated offer to the current version of the announcement.</summary>
+    OfferRevised
 }

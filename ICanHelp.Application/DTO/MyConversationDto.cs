@@ -75,7 +75,7 @@ public sealed record LastOfferDto
     public Guid Id { get; init; }
     public PriceDto Price { get; init; } = new();
 
-    /// <summary>Pending, Accepted, Rejected, Withdrawn or Countered.</summary>
+    /// <summary>Pending, Accepted, Rejected, Withdrawn, Countered or Revised.</summary>
     public string Status { get; init; } = string.Empty;
 
     /// <summary>Client (counter-offer of the owner) or Helper.</summary>

@@ -39,6 +39,8 @@ public static class NotificationTextFormatter
                 return new(price.Length > 0 ? $"Nowa oferta: {price}" : "Nowa oferta", title);
             case NotificationType.OfferCountered:
                 return new(price.Length > 0 ? $"Kontroferta: {price}" : "Kontroferta", title);
+            case NotificationType.OfferRevised:
+                return new(price.Length > 0 ? $"Oferta zaktualizowana: {price}" : "Oferta zaktualizowana", title);
             case NotificationType.OfferAccepted:
                 return new("Twoja oferta została przyjęta", title);
             case NotificationType.OfferRejected:

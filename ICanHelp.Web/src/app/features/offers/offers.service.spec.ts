@@ -16,6 +16,7 @@ describe('OffersService', () => {
   const client = {
     postOffer: vi.fn(),
     postCounterOffer: vi.fn(),
+    postReviseOffer: vi.fn(),
     accept: vi.fn(),
     reject: vi.fn(),
     withdraw: vi.fn(),
@@ -100,6 +101,33 @@ describe('OffersService', () => {
 
     expect(modals.create.mock.calls[0][0].componentProps?.['note']).toContain('budżet');
     expect(client.postCounterOffer).toHaveBeenCalledWith('a1', 'o1', command);
+  });
+
+  it('revises own outdated offer from its terms, with a note about the change', async () => {
+    modalResult = { data: command, role: 'confirm' };
+    client.postReviseOffer.mockReturnValue(of({ id: 'o2' }));
+    const offer = offerFixture('o1', {
+      isOutdated: true,
+      changesSinceOffer: [{ field: 'Description', oldValue: 'a', newValue: 'b' }],
+    });
+    const service = create();
+
+    await expect(service.revise(offer)).resolves.toBe(true);
+
+    const props = modals.create.mock.calls[0][0].componentProps;
+    expect(props?.['heading']).toBe('Zaktualizuj ofertę');
+    expect(props?.['basis']).toBe(offer);
+    expect(props?.['note']).toContain('opis');
+    expect(client.postReviseOffer).toHaveBeenCalledWith('a1', 'o1', command);
+    expect(toast.success).toHaveBeenCalledWith('Oferta zaktualizowana.');
+  });
+
+  it('does not revise when the form is closed', async () => {
+    modalResult = { role: 'cancel' };
+    const service = create();
+
+    await expect(service.revise(offerFixture('o1', { isOutdated: true }))).resolves.toBe(false);
+    expect(client.postReviseOffer).not.toHaveBeenCalled();
   });
 
   it('accepts only after confirmation', async () => {

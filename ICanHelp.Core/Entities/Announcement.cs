@@ -263,6 +263,42 @@ public class Announcement : AggregateRoot
     }
 
     /// <summary>
+    /// The author updates his own offer that became outdated (the announcement was edited after it was made):
+    /// new terms on the current revision, the old offer becomes <see cref="OfferStatus.Revised"/>.
+    /// Without it the author could only withdraw and start again – the other side cannot accept an outdated offer.
+    /// An up-to-date offer cannot be revised: it waits for the other side's answer (or is withdrawn).
+    /// </summary>
+    public Offer ReviseOffer(Id offerId, Id newOfferId, UserId actorId, Price price, DateTime proposedStart,
+        DateTime proposedEnd, Description? message, DateTime createdAtUtc)
+    {
+        EnsureStatus(AnnouncementStatus.Open, "have an offer revised");
+
+        var original = GetPendingOffer(offerId);
+        var party = ResolveParty(original, actorId);
+
+        if (party != original.ProposedBy)
+        {
+            throw new DomainRuleException("Only the author of an offer can revise it. Make a counter-offer instead.");
+        }
+
+        if (original.AnnouncementRevision == Revision)
+        {
+            throw new DomainRuleException(
+                "The offer is up to date – wait for the answer or withdraw it. Only an outdated offer can be revised.");
+        }
+
+        // As in CounterOffer: the new offer first, so invalid data leaves the original untouched.
+        var revised = new Offer(newOfferId, Id, original.HelperId, party, price, proposedStart, proposedEnd,
+            message, createdAtUtc, original.Id, Revision);
+
+        original.MarkAsRevised();
+        _offers.Add(revised);
+        AddDomainEvent(new OfferRevised(Id, revised.Id, original.Id, OwnerId, original.HelperId, party,
+            price.Amount, price.Currency, createdAtUtc));
+        return revised;
+    }
+
+    /// <summary>
     /// The side that did not propose the offer accepts it; all other pending offers are rejected.
     /// An offer made before the last edit of the announcement cannot be accepted – the terms were agreed for
     /// a different description. Either side can make a counter-offer instead (it is made on the current revision).

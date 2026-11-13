@@ -173,6 +173,55 @@ public class AnnouncementHandlersTests
     }
 
     [Fact]
+    public async Task ReviseOffer_OutdatedOfferByHelper_ReplacesItWithOfferOnCurrentRevision()
+    {
+        var announcement = await CreateAnnouncementAsync();
+        var offerId = await MakeOfferAsync(announcement);
+        announcement.Update(_owner.Id, announcement.CategoryId, announcement.SubcategoryId, announcement.Difficulty,
+            announcement.Title, "Kran i syfon w kuchni.", announcement.Budget, announcement.Location, _clock.UtcNow);
+        var command = new ReviseOffer
+        {
+            AnnouncementId = announcement.Id,
+            OfferId = offerId,
+            NewOfferId = Guid.NewGuid(),
+            ActorId = _helper.Id,
+            Price = new PriceDto { Amount = 180, Currency = "PLN" },
+            ProposedStart = _clock.UtcNow.AddDays(2),
+            ProposedEnd = _clock.UtcNow.AddDays(2).AddHours(2),
+            Message = "Z syfonem drożej."
+        };
+
+        await new ReviseOfferHandler(_announcements, _unitOfWork, _clock).HandleAsync(command);
+
+        announcement.Offers.Single(o => o.Id == new Id(offerId)).Status.ShouldBe(OfferStatus.Revised);
+        var revised = announcement.Offers.Single(o => o.Id == new Id(command.NewOfferId));
+        revised.Status.ShouldBe(OfferStatus.Pending);
+        revised.ProposedBy.ShouldBe(OfferParty.Helper);
+        revised.AnnouncementRevision.ShouldBe(announcement.Revision);
+        revised.Price.ShouldBe(Price.Pln(180));
+        revised.ParentOfferId!.Value.ShouldBe(offerId);
+    }
+
+    [Fact]
+    public async Task ReviseOffer_UpToDateOffer_Throws()
+    {
+        var announcement = await CreateAnnouncementAsync();
+        var offerId = await MakeOfferAsync(announcement);
+
+        await Should.ThrowAsync<DomainRuleException>(() => new ReviseOfferHandler(_announcements, _unitOfWork, _clock)
+            .HandleAsync(new ReviseOffer
+            {
+                AnnouncementId = announcement.Id,
+                OfferId = offerId,
+                NewOfferId = Guid.NewGuid(),
+                ActorId = _helper.Id,
+                Price = new PriceDto { Amount = 180, Currency = "PLN" },
+                ProposedStart = _clock.UtcNow.AddDays(2),
+                ProposedEnd = _clock.UtcNow.AddDays(2).AddHours(2)
+            }));
+    }
+
+    [Fact]
     public async Task AcceptOffer_ByOwner_AcceptsAnnouncement()
     {
         var announcement = await CreateAnnouncementAsync();

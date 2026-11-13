@@ -33,6 +33,7 @@ import {
   locationOutline,
   notificationsOutline,
   pricetagOutline,
+  refreshOutline,
   swapHorizontalOutline,
 } from 'ionicons/icons';
 
@@ -108,6 +109,7 @@ export class NotificationsPage implements ViewWillEnter {
       locationOutline,
       notificationsOutline,
       pricetagOutline,
+      refreshOutline,
       swapHorizontalOutline,
     });
 

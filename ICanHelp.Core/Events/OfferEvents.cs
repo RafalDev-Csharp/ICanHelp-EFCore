@@ -27,6 +27,21 @@ public sealed record OfferCountered(
     string Currency,
     DateTime OccurredAt) : IDomainEvent;
 
+/// <summary>
+/// The author (<paramref name="ProposedBy"/>) replaced his outdated offer (<paramref name="ParentOfferId"/>) with new terms
+/// for the current version of the announcement (<paramref name="OfferId"/>).
+/// </summary>
+public sealed record OfferRevised(
+    Guid AnnouncementId,
+    Guid OfferId,
+    Guid ParentOfferId,
+    Guid OwnerId,
+    Guid HelperId,
+    OfferParty ProposedBy,
+    decimal Amount,
+    string Currency,
+    DateTime OccurredAt) : IDomainEvent;
+
 /// <summary>The offer proposed by <paramref name="ProposedBy"/> was accepted by the other side.</summary>
 public sealed record OfferAccepted(
     Guid AnnouncementId,

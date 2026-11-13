@@ -11,7 +11,7 @@ namespace ICanHelp.Application.Notifications;
 /// Krok 13: powiadomienia o transakcji – oferty, wiadomości, edycja ogłoszenia. Tu jest tylko wybór odbiorcy
 /// (zawsze druga strona niż ta, która działała) i parametry tekstu; zapis i dostarczenie robi <see cref="NotificationPublisher"/>.
 /// <list type="bullet">
-/// <item>OfferMade → właściciel; OfferCountered / OfferWithdrawn → druga strona niż autor oferty</item>
+/// <item>OfferMade → właściciel; OfferCountered / OfferRevised / OfferWithdrawn → druga strona niż autor oferty</item>
 /// <item>OfferAccepted / OfferRejected → autor oferty; odrzucona automatycznie (wybrano innego) → pomocnik</item>
 /// <item>MessageSent → druga osoba w wątku; AnnouncementEdited → pomocnicy z wątkami (każda oferta zakłada wątek)</item>
 /// </list>
@@ -20,6 +20,7 @@ namespace ICanHelp.Application.Notifications;
 internal sealed class TransactionNotificationHandler :
     IDomainEventHandler<OfferMade>,
     IDomainEventHandler<OfferCountered>,
+    IDomainEventHandler<OfferRevised>,
     IDomainEventHandler<OfferAccepted>,
     IDomainEventHandler<OfferRejected>,
     IDomainEventHandler<OfferWithdrawn>,
@@ -48,6 +49,17 @@ internal sealed class TransactionNotificationHandler :
             actor: SideOf(e.ProposedBy, e.OwnerId, e.HelperId),
             recipient: OtherSideOf(e.ProposedBy, e.OwnerId, e.HelperId),
             NotificationType.OfferCountered, e.OccurredAt,
+            new()
+            {
+                [NotificationPayload.Price] = new Price(e.Amount, e.Currency).ToString(),
+                [NotificationPayload.ProposedBy] = e.ProposedBy.ToString()
+            }, cancellationToken);
+
+    public Task HandleAsync(Guid eventId, OfferRevised e, CancellationToken cancellationToken = default)
+        => OfferAsync(eventId, e.AnnouncementId, e.HelperId,
+            actor: SideOf(e.ProposedBy, e.OwnerId, e.HelperId),
+            recipient: OtherSideOf(e.ProposedBy, e.OwnerId, e.HelperId),
+            NotificationType.OfferRevised, e.OccurredAt,
             new()
             {
                 [NotificationPayload.Price] = new Price(e.Amount, e.Currency).ToString(),

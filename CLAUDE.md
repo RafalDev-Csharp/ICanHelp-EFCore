@@ -40,9 +40,10 @@ porada). **Pomocnik (Helper)**, który zna się na rzeczy i najlepiej przejeżd�
 
 ## Przepływ statusów
 Announcement: `Open` → (AcceptOffer) `Accepted` → (Start) `InProgress` → (Complete) `Completed`; `Open`/`Accepted` → `Cancelled`.
-Offer: `Pending` → `Accepted` | `Rejected` | `Withdrawn` | `Countered` (zastąpiona kontrofertą).
+Offer: `Pending` → `Accepted` | `Rejected` | `Withdrawn` | `Countered` (zastąpiona kontrofertą) | `Revised` (autor zaktualizował nieaktualną).
 Akceptuje/odrzuca/kontruje **druga strona** niż autor oferty; wycofuje tylko autor. Oferty tylko w `Open`; po akceptacji pozostałe
-`Pending` → `Rejected`. Oferta sprzed ostatniej edycji jest nieaktualna (`IsOutdated`) – nie da się jej przyjąć, tylko kontrować.
+`Pending` → `Rejected`. Oferta sprzed ostatniej edycji jest nieaktualna (`IsOutdated`) – nie da się jej przyjąć; druga strona może kontrować,
+autor – zaktualizować (`ReviseOffer`, `POST …/offers/{id}/revise`).
 `Start` – właściciel albo zaakceptowany pomocnik; `Complete`/`Cancel` – właściciel. Ocena tylko po `Completed`, przez uczestnika.
 
 ## Gdzie co leży
@@ -108,7 +109,9 @@ cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /ap
 - [ ] F11 – poprawki po teście autora (`docs/PLAN-FRONTEND.md`) – przed testem z ludźmi. **A (błędy, czytelność) zrobione
   12.11.2026** (kolumna 720 px, logo, zakładki → korzeń, odświeżanie listy, karta i akcje w wątku, Brave; `verify.cmd`: dotnet 479/479, Vitest 259/259).
   **B nawigacja zrobiona 12.11.2026** (zakładki Szukaj · Ulubione · Dodaj · Zlecenia · Konto, dzwonek, „Zapytaj”, fraza
-  `phrase` w `GET api/announcements`; `verify.cmd`: dotnet 489/489, Vitest 275/275). Zostało: C aktualizacja oferty.
+  `phrase` w `GET api/announcements`; `verify.cmd`: dotnet 489/489, Vitest 275/275). **C zrobione 13.11.2026**: autor
+  aktualizuje nieaktualną ofertę (`ReviseOffer`, status `Revised`, powiadomienie `OfferRevised`, „Zaktualizuj ofertę”;
+  `verify.cmd`: dotnet 507/507, Vitest 281/281). Zostało: test ręczny przed testem z ludźmi.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)
