@@ -4,6 +4,8 @@ import type { GeoPoint } from '../../../core/geo/geo-point';
 export const PAGE_SIZE = 20;
 export const RADIUS_OPTIONS_KM: readonly number[] = [2, 5, 10, 25, 50];
 export const DEFAULT_RADIUS_KM = 10;
+/** Wartość opcji „Bez limitu” w wyborze promienia (F11 F) – wyłącza „Blisko mnie”, nie trafia do API. */
+export const NO_RADIUS_LIMIT = 0;
 /** Jak `GetAnnouncements.MaxPhraseLength` w API (dłuższa fraza → 400). */
 export const MAX_PHRASE_LENGTH = 100;
 

@@ -9,7 +9,7 @@ import { apiResourceUrl } from '../../core/api/api.providers';
 import { PricePipe } from '../../shared/pipes/price.pipe';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
 import { statusColor, statusLabel } from '../announcements/announcement-labels';
-import { offerStatusLabel } from '../offers/offer-labels';
+import { offerStateLabel } from '../offers/offer-labels';
 
 /**
  * Wątek na liście (`ion-list`): miniatura, tytuł ogłoszenia, druga strona, status, ostatnia oferta, podgląd wiadomości
@@ -36,12 +36,7 @@ import { offerStatusLabel } from '../offers/offer-labels';
           }}</ion-badge>
         </p>
         @if (item.lastOffer; as offer) {
-          <p class="last-offer">
-            {{ offer.price.amount | price }} · {{ offerStatusLabel(offer.status) }}
-            @if (offer.isOutdated && offer.status === 'Pending') {
-              · <span class="outdated">nieaktualna</span>
-            }
-          </p>
+          <p class="last-offer">{{ offer.price.amount | price }} · {{ offerStateLabel(offer) }}</p>
         } @else {
           <p class="last-offer">Pytania i odpowiedzi – bez oferty</p>
         }
@@ -74,7 +69,7 @@ export class ConversationItemComponent {
 
   protected readonly statusLabel = statusLabel;
   protected readonly statusColor = statusColor;
-  protected readonly offerStatusLabel = offerStatusLabel;
+  protected readonly offerStateLabel = offerStateLabel;
   protected readonly thumbnail = apiResourceUrl;
 
   constructor() {

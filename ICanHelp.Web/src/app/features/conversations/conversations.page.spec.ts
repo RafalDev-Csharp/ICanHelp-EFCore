@@ -1,3 +1,5 @@
+import { provideHttpClient } from '@angular/common/http';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
@@ -19,7 +21,8 @@ describe('ConversationsPage', () => {
       providers: [
         provideRouter([]),
         { provide: ConversationsClient, useValue: client },
-        { provide: NotificationsService, useValue: { received$: received.asObservable() } },
+        provideHttpClient(),
+        { provide: NotificationsService, useValue: { received$: received.asObservable(), unreadCount: signal(2) } },
       ],
     });
     const fixture = TestBed.createComponent(ConversationsPage);
@@ -62,7 +65,8 @@ describe('ConversationsPage', () => {
     const rows = element.querySelectorAll('ion-item.conversation');
     expect(rows).toHaveLength(2);
     expect(rows[0].textContent).toContain('Pomocnik: pomocnik1');
-    expect(rows[0].textContent).toContain('nieaktualna');
+    expect(rows[0].textContent).toContain('Czeka na odpowiedź na zmiany');
+    expect(rows[0].textContent).not.toContain('nieaktualna');
     expect(rows[0].textContent).toContain('Mogę jutro po 17.');
     expect(rows[0].querySelector('ion-badge[color="primary"]')?.textContent).toContain('3');
     expect(rows[1].textContent).toContain('Zleceniodawca:');
@@ -99,5 +103,15 @@ describe('ConversationsPage', () => {
     await render();
 
     expect(element.textContent).toContain('Nie udało się wczytać rozmów');
+  });
+
+  it('keeps the bell and a titled back arrow on this subpage', async () => {
+    client.getMine.mockReturnValue(of([]));
+    const { element, render } = create();
+    await render();
+
+    expect(element.querySelector('ion-title')?.textContent).toContain('Wszystkie rozmowy');
+    expect(element.querySelector('ion-back-button')?.getAttribute('defaulthref')).toBe('/conversations');
+    expect(element.querySelector('app-notifications-bell')).not.toBeNull();
   });
 });

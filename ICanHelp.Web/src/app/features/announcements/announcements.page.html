@@ -22,6 +22,17 @@
   </ion-toolbar>
   <ion-toolbar class="filters-toolbar">
     <div class="category-tiles page-column" role="group" aria-label="Kategorie">
+      <button
+        type="button"
+        class="category-tile"
+        data-testid="category-all"
+        [class.selected]="!current.categoryId"
+        [attr.aria-pressed]="!current.categoryId"
+        (click)="setCategory(undefined)"
+      >
+        <ion-icon name="apps-outline" aria-hidden="true"></ion-icon>
+        <span>Wszystkie</span>
+      </button>
       @for (category of categories.categories(); track category.id) {
       <button
         type="button"
@@ -36,14 +47,23 @@
       }
     </div>
   </ion-toolbar>
-  <ion-toolbar>
-    <ion-segment [value]="view()" (ionChange)="setView($event.detail.value)" aria-label="Widok ogłoszeń">
-      <ion-segment-button value="list"><ion-label>Lista</ion-label></ion-segment-button>
-      <ion-segment-button value="map"><ion-label>Mapa</ion-label></ion-segment-button>
-    </ion-segment>
-  </ion-toolbar>
+  <!-- F11 F: jeden wiersz – Lista / Mapa (ikony) + filtry, wyśrodkowany i zawijany zamiast nachodzenia. -->
   <ion-toolbar class="filters-toolbar">
-    <div class="filters">
+    <div class="filters page-column">
+      <ion-segment
+        class="view-switch"
+        [value]="view()"
+        (ionChange)="setView($event.detail.value)"
+        aria-label="Widok ogłoszeń"
+      >
+        <ion-segment-button value="list" aria-label="Lista" title="Lista">
+          <ion-icon name="list-outline" aria-hidden="true"></ion-icon>
+        </ion-segment-button>
+        <ion-segment-button value="map" aria-label="Mapa" title="Mapa">
+          <ion-icon name="map-outline" aria-hidden="true"></ion-icon>
+        </ion-segment-button>
+      </ion-segment>
+
       <ion-button
         class="near-me"
         size="small"
@@ -72,6 +92,7 @@
         @for (radius of radiusOptions; track radius) {
         <ion-select-option [value]="radius">do {{ radius }} km</ion-select-option>
         }
+        <ion-select-option [value]="noRadiusLimit">Bez limitu</ion-select-option>
       </ion-select>
       } @if (subcategories().length > 0) {
       <ion-select
@@ -89,6 +110,11 @@
         <ion-select-option [value]="subcategory.id">{{ subcategory.name }}</ion-select-option>
         }
       </ion-select>
+      } @if (hasFilters()) {
+      <ion-chip class="clear-filters" data-testid="clear-filters" (click)="clearFilters()">
+        <ion-icon name="close-circle" aria-hidden="true"></ion-icon>
+        <ion-label>Wyczyść filtry</ion-label>
+      </ion-chip>
       }
     </div>
   </ion-toolbar>

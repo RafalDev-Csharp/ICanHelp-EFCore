@@ -65,6 +65,13 @@
       <ion-icon name="mail-unread-outline" slot="start" aria-hidden="true"></ion-icon>
       <ion-label>Powiadomienia</ion-label>
     </ion-item>
+    <ion-item routerLink="/profile/ratings" [detail]="true">
+      <ion-icon name="star-outline" slot="start" aria-hidden="true"></ion-icon>
+      <ion-label>
+        Oceny
+        <p>Otrzymane i do wystawienia po zakończonych zleceniach</p>
+      </ion-label>
+    </ion-item>
     <ion-item routerLink="/profile/alerts" [detail]="true" lines="none">
       <ion-icon name="notifications-outline" slot="start" aria-hidden="true"></ion-icon>
       <ion-label>

@@ -31,6 +31,7 @@ import { concernsConversation } from '../../core/notifications/notification-text
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { NotificationsBellComponent } from '../../shared/components/notifications-bell/notifications-bell.component';
 
 import { ConversationItemComponent } from './conversation-item.component';
 
@@ -54,6 +55,7 @@ interface CompletableTarget {
   styleUrls: ['./conversations.page.scss'],
   imports: [
     BrandComponent,
+    NotificationsBellComponent,
     RouterLink,
     IonHeader,
     IonToolbar,

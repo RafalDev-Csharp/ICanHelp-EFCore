@@ -44,7 +44,9 @@ features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poz
                   `add-announcement.page` (`/add`) i `edit/` (`/announcements/:id/edit`); `likes/` – `LikesService`;
                   `details/announcement-negotiations.ts` – negocjacje per pomocnik i „Historia ogłoszenia” właściciela;
                   `testing/` – dane i zaślepki do specs),
-                  offers (`offer-labels` – teksty i `offerActions` = reguły domeny, `job-step` – krok realizacji zlecenia
+                  offers (`offer-labels` – teksty, `offerStateLabel` (bez „nieaktualna”) i `offerActions` = reguły domeny,
+                  `offer-changes` + `OfferChangesModalComponent` – podgląd zmian ogłoszenia było → jest i decyzja autora
+                  oferty (`OffersService.reviewChanges`: podtrzymaj / zmień / wycofaj), `job-step` – krok realizacji zlecenia
                   (Rozpocznij / Zgłoś wykonanie / Potwierdź wykonanie + notka; wątek i szczegóły), `offer-form` – formularz oferty /
                   kontroferty, okna `OfferFormModalComponent` i `RatingModalComponent`, `OffersService` – okno → potwierdzenie
                   → API → toast, wspólny dla wątku i szczegółów; `testing/offer-fixtures`),
@@ -52,16 +54,17 @@ features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poz
                   grupy po statusie – `order-groups.ts`; „Zakończone” zwinięte na dole, wyszarzone),
                   conversations (`/conversations/all` – wszystkie wątki z filtrem roli, `conversation-item` – wiersz wątku,
                   `/conversations/:conversationId` – wątek: wiadomości, oferty z akcjami, zmiany ogłoszenia, bez ofert =
-                  „Pytania i odpowiedzi”; `conversation-timeline.ts`),
+                  „Pytania i odpowiedzi”; `conversation-timeline.ts` – wpisy + `threadNotice` (zobacz zmiany / aktualną ofertę)),
                   notifications (`/notifications` – lista, „Oznacz wszystkie”, nowe z huba na górze),
                   profile (zakładka „Konto”, bez logowania: „Zaloguj się”; `liked-announcements` = zakładka „Ulubione” `/liked`;
                   `my-announcements` – bez trasy od F11 B, do usunięcia),
+                  ratings (`/profile/ratings` – „Do wystawienia” · „Jako pomocnik” · „Jako zleceniodawca”, `api/me/ratings`),
                   alerts (`/profile/alerts` – lista, `/profile/alerts/new?kind=Area|Route`, `/profile/alerts/:alertId` – edycja
                   + „Pasujące teraz”; `alert-form.ts` – stan, walidacja, `WeekDays` ↔ maska; `route-picker` – start/cel → trasa)
 tabs/             TabsPage – dolny pasek zakładek, rejestruje ikony zakładek (`addIcons`), uruchamia `NotificationsService`
                   i push; stuknięcie zakładki = jej korzeń (`openTabRoot`, nie ostatni ekran). Strony używające `NotificationsService` – w specs obiekt z `received$` (Subject)
 ```
-Trasy `/add`, `/liked`, `/announcements/:id/edit`, `/conversations` (+ `/all`, `/:conversationId`), `/notifications`, `/profile/alerts` (+ `/new`, `/:alertId`) mają `authGuard`; ogłoszenia (lista, szczegóły) i konto są publiczne –
+Trasy `/add`, `/liked`, `/announcements/:id/edit`, `/conversations` (+ `/all`, `/:conversationId`), `/notifications`, `/profile/ratings`, `/profile/alerts` (+ `/new`, `/:alertId`) mają `authGuard`; ogłoszenia (lista, szczegóły) i konto są publiczne –
 akcje wymagające konta same prowadzą na `/login?returnUrl=…`.
 Szeroki ekran: nowa strona dostaje `class="page-column"` na `ion-content` (i na treści stopki) – kolumna 720 px (`global.scss`);
 w nagłówku `<app-brand>` w `ion-buttons slot="start"` (po `ion-back-button`); korzeń zakładki dostaje też

@@ -134,6 +134,10 @@
   `announcementChangedSinceLastRead` (tylko pomocnik), sortowanie po `lastActivityAt`; filtry `role`, `status`, `announcementId`
   (F5: wątki jednego ogłoszenia – szczegóły ogłoszenia), `page`, `pageSize`.
   Jedno zapytanie SQL z podzapytaniami, sort/stronicowanie w pamięci (patrz komentarz w handlerze).
+- `api/me/ratings` (F11 F, `MyRatingsController`, query w `Infrastructure/DAL/Handlers/MyRatingsQueryHandlers.cs`): `GET` –
+  otrzymane oceny (`MyRatingDto`: ogłoszenie + tytuł, `myRole` = Client/Helper wg właściciela ogłoszenia – `MyRatingDto.RoleOf`,
+  `rater`, ocena, komentarz), `GET pending` – „do wystawienia” (`PendingRatingDto`: zakończone ogłoszenia, gdzie czytający jest
+  właścicielem albo autorem przyjętej oferty, bez jego oceny; `otherParty`, miniatura). Publiczne `api/users/{id}/ratings` bez zmian.
 - Tabele `Conversations` (unikalny indeks AnnouncementId+HelperId, indeksy ClientId/HelperId) i `ConversationMessages` (indeks ConversationId+SentAt),
   Cascade z ogłoszenia. Migracja `Conversations` zakłada wątki dla istniejących ofert.
 

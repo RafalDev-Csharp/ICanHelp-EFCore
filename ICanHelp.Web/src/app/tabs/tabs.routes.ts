@@ -74,6 +74,11 @@ export const routes: Routes = [
       { path: 'profile/announcements', redirectTo: '/conversations', pathMatch: 'full' },
       { path: 'profile/liked', redirectTo: '/liked', pathMatch: 'full' },
       {
+        path: 'profile/ratings',
+        canActivate: [authGuard],
+        loadComponent: () => import('../features/ratings/ratings.page').then((m) => m.RatingsPage),
+      },
+      {
         path: 'profile/alerts',
         canActivate: [authGuard],
         loadComponent: () => import('../features/alerts/alerts.page').then((m) => m.AlertsPage),

@@ -325,6 +325,16 @@ Content-Type: application/json
 GET {{baseUrl}}/api/announcements/{{announcementId}}/ratings
 
 ###
+# Moje otrzymane oceny (F11 F): myRole = Client (jako zleceniodawca) / Helper (jako pomocnik), rater, tytuł ogłoszenia
+GET {{baseUrl}}/api/me/ratings
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# Do wystawienia: zakończone zlecenia (właściciel / przyjęty pomocnik) bez mojej oceny -> otherParty do ocenienia
+GET {{baseUrl}}/api/me/ratings/pending
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+###
 # ---------- Powiadomienia (Krok 13) ----------
 # Powstają w tle (outbox, co ~2 s) po ofercie, kontrofercie, akceptacji, odrzuceniu, wycofaniu, wiadomości i edycji.
 # Na żywo: SignalR /hubs/notifications?access_token=JWT, metoda "notification".

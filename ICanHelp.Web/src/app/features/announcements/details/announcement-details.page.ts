@@ -37,6 +37,7 @@ import {
   cloudOfflineOutline,
   constructOutline,
   createOutline,
+  eyeOutline,
   flagOutline,
   heart,
   heartOutline,
@@ -50,7 +51,6 @@ import {
   pricetagOutline,
   star,
   starOutline,
-  warningOutline,
 } from 'ionicons/icons';
 import { catchError, filter, firstValueFrom, forkJoin, of } from 'rxjs';
 
@@ -79,7 +79,7 @@ import { TimeAgoPipe, parseApiDate } from '../../../shared/pipes/time-ago.pipe';
 import { pluralPl } from '../../../shared/text/plural';
 import type { JobAction, JobStep } from '../../offers/job-step';
 import { JOB_ACTION_ICONS, JOB_ACTION_LABELS, jobStep } from '../../offers/job-step';
-import { formatOfferTerm, offerStatusColor, offerStatusLabel, pendingOffer } from '../../offers/offer-labels';
+import { formatOfferTerm, offerStateColor, offerStateLabel, pendingOffer } from '../../offers/offer-labels';
 import { OffersService } from '../../offers/offers.service';
 import { difficultyColor, difficultyLabel, statusColor, statusLabel } from '../announcement-labels';
 import { LikesService } from '../likes/likes.service';
@@ -175,8 +175,8 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
   protected readonly difficultyColor = difficultyColor;
   protected readonly statusLabel = statusLabel;
   protected readonly statusColor = statusColor;
-  protected readonly offerStatusLabel = offerStatusLabel;
-  protected readonly offerStatusColor = offerStatusColor;
+  protected readonly offerStateLabel = offerStateLabel;
+  protected readonly offerStateColor = offerStateColor;
   protected readonly formatOfferTerm = formatOfferTerm;
   protected readonly jobLabels = JOB_ACTION_LABELS;
   protected readonly jobIcons = JOB_ACTION_ICONS;
@@ -288,6 +288,7 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
       cloudOfflineOutline,
       constructOutline,
       createOutline,
+      eyeOutline,
       flagOutline,
       heart,
       heartOutline,
@@ -301,7 +302,6 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
       pricetagOutline,
       star,
       starOutline,
-      warningOutline,
     });
 
     // F11 D: powiadomienie (hub albo push) o tym ogłoszeniu – np. pomocnik zgłosił wykonanie, druga strona zmieniła
@@ -357,8 +357,8 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
   }
 
   /**
-   * „Złóż ofertę”: niezalogowany → logowanie i powrót; pomocnik z własną nieaktualną ofertą → okno aktualizacji
-   * (`POST …/revise`); z inną oczekującą ofertą → jego wątek (tam kontroferty);
+   * „Złóż ofertę”: niezalogowany → logowanie i powrót; pomocnik z ofertą sprzed edycji ogłoszenia → podgląd zmian
+   * i decyzja (`OffersService.reviewChanges`: podtrzymaj / zmień / wycofaj); z inną oczekującą ofertą → jego wątek (tam kontroferty);
    * inaczej okno oferty → `POST …/offers` → wątek (oferta zakłada go sama).
    */
   async makeOffer(): Promise<void> {
@@ -370,7 +370,7 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     if (outdated) {
       this.busy.set(true);
       try {
-        if (await this.offers.revise(outdated)) {
+        if (await this.offers.reviewChanges(outdated)) {
           this.load();
         }
       } finally {

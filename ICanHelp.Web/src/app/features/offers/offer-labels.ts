@@ -15,6 +15,12 @@ export function formatOfferTerm(start: string, end: string): string {
     : `${fromText} – ${dayFormat.format(to)}, ${timeFormat.format(to)}`;
 }
 
+/** Data i godzina wpisu: „czw., 13 lis, 14:05” (np. „Edytowałeś ogłoszenie · …”). */
+export function formatDateTime(value: string): string {
+  const date = parseApiDate(value);
+  return `${dayFormat.format(date)}, ${timeFormat.format(date)}`;
+}
+
 /** Teksty enumów ofert z API (`OfferStatus`, `OfferParty`, `AnnouncementFields`) – nieznana wartość zostaje bez tłumaczenia. */
 const OFFER_STATUS_LABELS: Readonly<Record<string, string>> = {
   Pending: 'Czeka na odpowiedź',
@@ -56,6 +62,21 @@ export function offerStatusLabel(status: string): string {
 /** Kolor Ionic (`ion-badge [color]`) dla statusu oferty. */
 export function offerStatusColor(status: string): string {
   return OFFER_STATUS_COLORS[status] ?? 'medium';
+}
+
+/**
+ * Etykieta oferty na listach i w wątku (F11 F): oczekująca oferta sprzed edycji ogłoszenia to nie „nieaktualna”,
+ * tylko „Czeka na odpowiedź na zmiany” – autor ma ją podtrzymać, zmienić albo wycofać. Inaczej – `offerStatusLabel`.
+ */
+export function offerStateLabel(offer: Pick<OfferDto, 'status' | 'isOutdated'>): string {
+  return offer.status === 'Pending' && offer.isOutdated
+    ? 'Czeka na odpowiedź na zmiany'
+    : offerStatusLabel(offer.status);
+}
+
+/** Kolor do `offerStateLabel` – oferta czekająca na odpowiedź na zmiany jest spokojna (szara), nie ostrzeżeniem. */
+export function offerStateColor(offer: Pick<OfferDto, 'status' | 'isOutdated'>): string {
+  return offer.status === 'Pending' && offer.isOutdated ? 'medium' : offerStatusColor(offer.status);
 }
 
 /** „Zleceniodawca” / „Pomocnik” (`OfferParty`, `myRole`, `senderRole`). */

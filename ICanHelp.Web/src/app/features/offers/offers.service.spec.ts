@@ -4,9 +4,11 @@ import { of, throwError } from 'rxjs';
 
 import type { MakeOffer } from '../../core/api/api-client';
 import { AnnouncementsClient } from '../../core/api/api-client';
+import { CategoriesService } from '../../core/categories/categories.service';
 import { PushService } from '../../core/pwa/push.service';
 import { ToastService } from '../../core/ui/toast.service';
 
+import { OfferChangesModalComponent } from './offer-changes-modal.component';
 import { OfferFormModalComponent } from './offer-form-modal.component';
 import { OffersService } from './offers.service';
 import { RatingModalComponent } from './rating-modal.component';
@@ -27,6 +29,7 @@ describe('OffersService', () => {
   };
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
   const push = { suggest: vi.fn(() => Promise.resolve()) };
+  const categories = { load: () => of([]), name: (id: string): string => (id === 'c1' ? 'Dom' : '') };
   /** Wynik zamknięcia okna (modal) i rola wybrana w potwierdzeniu (alert). */
   let modalResult: { data?: unknown; role?: string } = {};
   let alertRole = 'confirm';
@@ -55,6 +58,7 @@ describe('OffersService', () => {
         { provide: AlertController, useValue: alerts },
         { provide: ToastService, useValue: toast },
         { provide: PushService, useValue: push },
+        { provide: CategoriesService, useValue: categories },
       ],
     });
     return TestBed.inject(OffersService);
@@ -142,6 +146,88 @@ describe('OffersService', () => {
 
     await expect(service.revise(offerFixture('o1', { isOutdated: true }))).resolves.toBe(false);
     expect(client.postReviseOffer).not.toHaveBeenCalled();
+  });
+
+  describe('changes to the announcement after the offer (F11 F)', () => {
+    const outdated = offerFixture('o1', {
+      isOutdated: true,
+      message: 'Mam narzędzia.',
+      changesSinceOffer: [{ field: 'Budget', oldValue: '150.00 PLN', newValue: '200.00 PLN' }],
+    });
+
+    it('shows the changes first and keeps the offer with the same terms in one click', async () => {
+      modalResult = { data: 'keep', role: 'confirm' };
+      client.postReviseOffer.mockReturnValue(of({ id: 'o2' }));
+      const service = create();
+
+      await expect(service.reviewChanges(outdated)).resolves.toBe(true);
+
+      const options = modals.create.mock.calls[0][0];
+      expect(options.component).toBe(OfferChangesModalComponent);
+      expect(options.componentProps?.['withActions']).toBe(true);
+      expect(options.componentProps?.['intro']).toContain('Zleceniodawca zmienił ogłoszenie');
+      expect(options.componentProps?.['rows']).toEqual([
+        expect.objectContaining({
+          label: 'Budżet',
+          before: expect.stringMatching(/150/),
+          after: expect.stringMatching(/200/),
+        }),
+      ]);
+      expect(modals.create).toHaveBeenCalledTimes(1);
+      expect(client.postReviseOffer).toHaveBeenCalledWith('a1', 'o1', {
+        price: outdated.price,
+        proposedStart: outdated.proposedStart,
+        proposedEnd: outdated.proposedEnd,
+        message: 'Mam narzędzia.',
+      });
+      expect(toast.success).toHaveBeenCalledWith('Oferta podtrzymana – druga strona może ją teraz przyjąć.');
+    });
+
+    it('opens the offer form after "change"', async () => {
+      const dialog = (result: { data?: unknown; role?: string }): ReturnType<typeof modals.create> =>
+        Promise.resolve({ present: () => Promise.resolve(), onWillDismiss: () => Promise.resolve(result) });
+      modals.create
+        .mockImplementationOnce(() => dialog({ data: 'change', role: 'confirm' }))
+        .mockImplementationOnce(() => dialog({ data: command, role: 'confirm' }));
+      client.postReviseOffer.mockReturnValue(of({ id: 'o2' }));
+      const service = create();
+
+      await expect(service.reviewChanges(outdated)).resolves.toBe(true);
+
+      expect(modals.create.mock.calls[1][0].component).toBe(OfferFormModalComponent);
+      expect(client.postReviseOffer).toHaveBeenCalledWith('a1', 'o1', command);
+    });
+
+    it('withdraws after "withdraw" and its confirmation', async () => {
+      modalResult = { data: 'withdraw', role: 'confirm' };
+      client.withdraw.mockReturnValue(of(undefined));
+      const service = create();
+
+      await expect(service.reviewChanges(outdated)).resolves.toBe(true);
+
+      expect(client.withdraw).toHaveBeenCalledWith('a1', 'o1');
+    });
+
+    it('does nothing when the preview is closed', async () => {
+      modalResult = { role: 'cancel' };
+      const service = create();
+
+      await expect(service.reviewChanges(outdated)).resolves.toBe(false);
+
+      expect(client.postReviseOffer).not.toHaveBeenCalled();
+      expect(client.withdraw).not.toHaveBeenCalled();
+    });
+
+    it('shows a single edit without actions, with category names', async () => {
+      modalResult = { role: 'cancel' };
+      const service = create();
+
+      await service.showChanges([{ field: 'Category', oldValue: 'c1/x', newValue: 'c1/y' }]);
+
+      const props = modals.create.mock.calls[0][0].componentProps;
+      expect(props?.['withActions']).toBe(false);
+      expect(props?.['rows']).toEqual([{ label: 'Kategoria', before: 'Dom › inna', after: 'Dom › inna' }]);
+    });
   });
 
   it('accepts only after confirmation', async () => {

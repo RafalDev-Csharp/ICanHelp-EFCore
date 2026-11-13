@@ -2851,6 +2851,134 @@ export class DevicesClient {
 @Injectable({
     providedIn: 'root'
 })
+export class MyRatingsClient {
+    private http: HttpClient;
+    private baseUrl: string;
+    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
+
+    constructor(@Inject(HttpClient) http: HttpClient, @Optional() @Inject(API_BASE_URL) baseUrl?: string) {
+        this.http = http;
+        this.baseUrl = baseUrl ?? "";
+    }
+
+    /**
+     * Otrzymane oceny od najnowszych; `myRole` = Client (jako zleceniodawca) albo Helper (jako pomocnik).
+     * @return OK
+     */
+    getMine(): Observable<MyRatingDto[]> {
+        let url_ = this.baseUrl + "/api/me/ratings";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetMine(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetMine(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<MyRatingDto[]>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<MyRatingDto[]>;
+        }));
+    }
+
+    protected processGetMine(response: HttpResponseBase): Observable<MyRatingDto[]> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as MyRatingDto[];
+            return _observableOf(result200);
+            }));
+        } else if (status === 401) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result401: any = null;
+            result401 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Unauthorized", status, _responseText, _headers, result401);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    /**
+     * Zakończone zlecenia (jako właściciel albo przyjęty pomocnik), w których nie oceniłem drugiej strony.
+     * @return OK
+     */
+    getPending(): Observable<PendingRatingDto[]> {
+        let url_ = this.baseUrl + "/api/me/ratings/pending";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetPending(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetPending(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<PendingRatingDto[]>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<PendingRatingDto[]>;
+        }));
+    }
+
+    protected processGetPending(response: HttpResponseBase): Observable<PendingRatingDto[]> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PendingRatingDto[];
+            return _observableOf(result200);
+            }));
+        } else if (status === 401) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result401: any = null;
+            result401 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Unauthorized", status, _responseText, _headers, result401);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+}
+
+@Injectable({
+    providedIn: 'root'
+})
 export class NotificationsClient {
     private http: HttpClient;
     private baseUrl: string;
@@ -4028,6 +4156,17 @@ export interface MyConversationDto {
     announcementChangedSinceLastRead: boolean;
 }
 
+export interface MyRatingDto {
+    id: string;
+    announcementId: string;
+    announcementTitle: string;
+    myRole: string;
+    rater: ConversationPartyDto;
+    rate: number;
+    comment: string | undefined;
+    createdAt: string;
+}
+
 export interface NotificationDto {
     id: string;
     title: string;
@@ -4061,6 +4200,15 @@ export interface OfferDto {
 }
 
 export type OfferParty = "Client" | "Helper";
+
+export interface PendingRatingDto {
+    announcementId: string;
+    announcementTitle: string;
+    thumbnailUrl: string | undefined;
+    myRole: string;
+    otherParty: ConversationPartyDto;
+    createdAt: string;
+}
 
 export interface PriceDto {
     amount: number;

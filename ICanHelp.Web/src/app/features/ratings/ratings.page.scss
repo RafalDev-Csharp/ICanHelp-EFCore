@@ -1,0 +1,38 @@
+.summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  margin: 16px 16px 0;
+  font-size: 1.125rem;
+}
+
+.stars {
+  display: inline-flex;
+  gap: 2px;
+  margin: 0 0 4px;
+
+  ion-icon {
+    font-size: 1.125rem;
+  }
+}
+
+.comment {
+  white-space: pre-line;
+}
+
+a {
+  color: inherit;
+}
+
+.no-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  background: var(--ion-color-light);
+  color: var(--ion-color-medium);
+  font-size: 1.5rem;
+}

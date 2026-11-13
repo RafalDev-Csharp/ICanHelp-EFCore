@@ -3,12 +3,22 @@ import { AlertController, ModalController } from '@ionic/angular';
 import type { Observable } from 'rxjs';
 import { firstValueFrom } from 'rxjs';
 
-import type { MakeOffer, OfferDto, RateAnnouncement } from '../../core/api/api-client';
+import type {
+  AnnouncementFieldChangeDto,
+  MakeOffer,
+  OfferDto,
+  RateAnnouncement,
+  ReviseOffer,
+} from '../../core/api/api-client';
 import { AnnouncementsClient } from '../../core/api/api-client';
+import { CategoriesService } from '../../core/categories/categories.service';
 import { PushService } from '../../core/pwa/push.service';
 import { ToastService } from '../../core/ui/toast.service';
 import { formatPrice } from '../../shared/pipes/price.pipe';
 
+import { fieldChangeRows } from './offer-changes';
+import type { OfferChangesChoice } from './offer-changes-modal.component';
+import { OfferChangesModalComponent } from './offer-changes-modal.component';
 import { OfferFormModalComponent } from './offer-form-modal.component';
 import { changedFieldsLabel } from './offer-labels';
 import { RatingModalComponent } from './rating-modal.component';
@@ -25,6 +35,7 @@ export class OffersService {
   private readonly alerts = inject(AlertController);
   private readonly toast = inject(ToastService);
   private readonly push = inject(PushService);
+  private readonly categories = inject(CategoriesService);
 
   /** Pierwsza oferta pomocnika (cena podpowiedziana z budżetu). Zwraca id oferty albo `null`. */
   async make(announcementId: string, suggestedPrice?: number): Promise<string | null> {
@@ -81,6 +92,54 @@ export class OffersService {
       offer.isOutdated ? 'Oferta zaktualizowana.' : 'Oferta zmieniona.',
     );
     return created !== null;
+  }
+
+  /**
+   * Autor oferty sprzed edycji ogłoszenia (F11 F): najpierw **podgląd zmian** (było → jest), dopiero z niego decyzja –
+   * „Podtrzymuję ofertę” (`keep`), „Zmień ofertę” (formularz – `revise`) albo „Wycofaj” (`withdraw`).
+   */
+  async reviewChanges(offer: OfferDto): Promise<boolean> {
+    const helper = offer.proposedBy === 'Helper';
+    const choice = await this.openChanges(offer.changesSinceOffer, {
+      heading: 'Zmiany w ogłoszeniu',
+      intro: helper
+        ? 'Zleceniodawca zmienił ogłoszenie po Twojej ofercie. Podtrzymaj ją, zmień albo wycofaj – dopiero wtedy może ją przyjąć.'
+        : 'Zmieniłeś ogłoszenie po swojej kontrofercie. Podtrzymaj ją, zmień albo wycofaj – dopiero wtedy pomocnik może ją przyjąć.',
+      withActions: true,
+    });
+    switch (choice) {
+      case 'keep':
+        return this.keep(offer);
+      case 'change':
+        return this.revise(offer);
+      case 'withdraw':
+        return this.withdraw(offer);
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * „Podtrzymuję ofertę” – jednym kliknięciem, bez formularza: te same warunki do aktualnej wersji ogłoszenia
+   * (`POST …/revise` z niezmienioną ceną, terminem i uzasadnieniem; stara oferta → „Zaktualizowana”).
+   */
+  async keep(offer: OfferDto): Promise<boolean> {
+    const command: ReviseOffer = {
+      price: offer.price,
+      proposedStart: offer.proposedStart,
+      proposedEnd: offer.proposedEnd,
+      message: offer.message,
+    };
+    const created = await this.run(
+      this.client.postReviseOffer(offer.announcementId, offer.id, command),
+      'Oferta podtrzymana – druga strona może ją teraz przyjąć.',
+    );
+    return created !== null;
+  }
+
+  /** Sam podgląd jednej edycji ogłoszenia (wpis „Ogłoszenie zmienione” w wątku). */
+  async showChanges(changes: readonly AnnouncementFieldChangeDto[], intro = ''): Promise<void> {
+    await this.openChanges(changes, { heading: 'Zmiany w ogłoszeniu', intro, withActions: false });
   }
 
   async accept(offer: OfferDto): Promise<boolean> {
@@ -154,6 +213,22 @@ export class OffersService {
       return false;
     }
     return (await this.run(this.client.postRating(announcementId, data), 'Dziękujemy za ocenę!')) !== null;
+  }
+
+  private async openChanges(
+    changes: readonly AnnouncementFieldChangeDto[],
+    props: Pick<OfferChangesModalComponent, 'heading' | 'intro' | 'withActions'>,
+  ): Promise<OfferChangesChoice | null> {
+    // Nazwy kategorii do wiersza „Kategoria” – zwykle już wczytane (lista, formularz); błąd = same id nie psują okna.
+    await firstValueFrom(this.categories.load(), { defaultValue: [] }).catch(() => []);
+    const rows = fieldChangeRows(changes, (id) => this.categories.name(id) || 'inna');
+    const modal = await this.modals.create({
+      component: OfferChangesModalComponent,
+      componentProps: { ...props, rows },
+    });
+    await modal.present();
+    const { data, role } = await modal.onWillDismiss<OfferChangesChoice>();
+    return role === 'confirm' && data ? data : null;
   }
 
   private async openForm(props: Partial<OfferFormModalComponent>): Promise<MakeOffer | null> {

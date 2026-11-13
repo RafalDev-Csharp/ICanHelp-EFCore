@@ -1,0 +1,47 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="close()">Zamknij</ion-button>
+    </ion-buttons>
+    <ion-title>{{ heading }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  @if (intro) {
+    <p class="intro">{{ intro }}</p>
+  }
+  <ion-list inset="true">
+    @for (row of rows; track row.label) {
+      <ion-item>
+        <ion-label class="ion-text-wrap">
+          <h3>{{ row.label }}</h3>
+          <p>
+            Było: <span class="change-before">{{ row.before }}</span>
+          </p>
+          <p>
+            Jest: <span class="change-after">{{ row.after }}</span>
+          </p>
+        </ion-label>
+      </ion-item>
+    } @empty {
+      <ion-item>
+        <ion-label class="ion-text-wrap">
+          <p>Treść ogłoszenia zmieniła się, ale różnica nie jest już widoczna (zmiana została cofnięta).</p>
+        </ion-label>
+      </ion-item>
+    }
+  </ion-list>
+</ion-content>
+
+@if (withActions) {
+  <ion-footer>
+    <ion-toolbar>
+      <div class="choices ion-padding-horizontal">
+        <ion-button expand="block" (click)="choose('keep')">Podtrzymuję ofertę</ion-button>
+        <ion-button expand="block" fill="outline" (click)="choose('change')">Zmień ofertę</ion-button>
+        <ion-button expand="block" fill="clear" color="medium" (click)="choose('withdraw')">Wycofaj ofertę</ion-button>
+      </div>
+    </ion-toolbar>
+  </ion-footer>
+}

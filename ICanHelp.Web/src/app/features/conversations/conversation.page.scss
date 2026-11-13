@@ -98,8 +98,16 @@
     border-left-color: var(--ion-color-medium);
   }
 
-  &.outdated {
-    border-left-color: var(--ion-color-warning);
+  /* F11 F: oferta czekająca na odpowiedź na zmiany ogłoszenia – spokojnie, bez ostrzeżenia. */
+  &.awaiting {
+    border-left-color: var(--ion-color-medium-tint);
+  }
+
+  /* Aktualna oferta po „zobacz aktualną” – chwilowe wyróżnienie. */
+  &.highlight {
+    border-color: var(--ion-color-primary);
+    box-shadow: 0 0 0 3px rgba(var(--ion-color-primary-rgb), 0.25);
+    transition: box-shadow 0.3s;
   }
 
   header {
@@ -132,11 +140,23 @@
   white-space: pre-line;
 }
 
-.offer-outdated {
+.offer-changes {
   display: flex;
   gap: 6px;
   align-items: flex-start;
+  color: var(--ion-color-medium-shade);
   font-size: 0.875rem;
+}
+
+/* Poprzednia wersja zmienionej oferty – zwinięta. */
+.offer.previous {
+  border-left-color: var(--ion-color-light-shade);
+  color: var(--ion-color-medium);
+  font-size: 0.875rem;
+
+  summary {
+    cursor: pointer;
+  }
 }
 
 .offer-actions {
@@ -153,6 +173,23 @@
   color: var(--ion-color-medium);
   font-size: 0.8125rem;
   text-align: center;
+
+  .saved {
+    margin-left: 4px;
+    color: var(--ion-color-success-shade);
+    font-weight: 600;
+  }
+
+  .change-link {
+    margin: 0;
+    vertical-align: baseline;
+    --padding-start: 4px;
+    --padding-end: 4px;
+  }
+}
+
+.notice {
+  padding: 4px 0;
 }
 
 .composer {

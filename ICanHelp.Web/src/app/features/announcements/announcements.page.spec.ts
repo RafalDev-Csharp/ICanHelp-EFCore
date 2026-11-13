@@ -188,8 +188,12 @@ describe('AnnouncementsPage', () => {
     const { page, element, render } = create();
     await render();
 
-    const tiles = element.querySelectorAll<HTMLButtonElement>('.category-tile');
-    expect(tiles).toHaveLength(1);
+    // Pierwszy kafelek „Wszystkie” (wybrany bez filtra kategorii), potem kategorie.
+    const all = element.querySelectorAll<HTMLButtonElement>('.category-tile');
+    expect(all).toHaveLength(2);
+    expect(all[0].textContent).toContain('Wszystkie');
+    expect(all[0].getAttribute('aria-pressed')).toBe('true');
+    const tiles = element.querySelectorAll<HTMLButtonElement>('.category-tile:not([data-testid="category-all"])');
     expect(tiles[0].textContent).toContain('Dom');
 
     page.setPhrase('  kran ');
@@ -219,6 +223,12 @@ describe('AnnouncementsPage', () => {
     await render();
     expect(client.getAll.mock.lastCall?.[1]).toBeUndefined();
 
+    tiles[0].click();
+    await render();
+    all[0].click();
+    await render();
+    expect(client.getAll.mock.lastCall?.[1]).toBeUndefined();
+
     page.clearFilters();
     expect(client.getAll).toHaveBeenLastCalledWith(
       undefined,
@@ -232,5 +242,40 @@ describe('AnnouncementsPage', () => {
       1,
       PAGE_SIZE,
     );
+  });
+
+  it('shows "clear filters" only with active filters and clears them', async () => {
+    client.getAll.mockReturnValue(of([announcement('a1')]));
+    const { page, element, render } = create();
+    await render();
+    const chip = (): Element | null => element.querySelector('[data-testid="clear-filters"]');
+    expect(chip()).toBeNull();
+
+    page.setPhrase('kran');
+    page.setCategory('cat-home');
+    await render();
+    expect(chip()?.textContent).toContain('Wyczyść filtry');
+
+    (chip() as HTMLElement).click();
+    await render();
+
+    expect(client.getAll.mock.lastCall?.[1]).toBeUndefined();
+    expect(client.getAll.mock.lastCall?.[7]).toBeUndefined();
+    expect(chip()).toBeNull();
+  });
+
+  it('turns "near me" off with the "no limit" radius', async () => {
+    client.getAll.mockReturnValue(of([]));
+    geolocation.getCurrentPosition.mockResolvedValue({ latitude: 53.84, longitude: 22.98 });
+    const { page } = create();
+
+    await page.toggleNearMe();
+    page.setRadius(25);
+    expect(client.getAll.mock.lastCall?.[6]).toBe(25);
+
+    page.setRadius(0);
+
+    expect(client.getAll.mock.lastCall?.[4]).toBeUndefined();
+    expect(client.getAll.mock.lastCall?.[6]).toBeUndefined();
   });
 });

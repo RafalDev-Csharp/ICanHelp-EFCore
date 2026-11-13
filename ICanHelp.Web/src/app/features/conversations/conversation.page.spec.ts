@@ -24,6 +24,8 @@ describe('ConversationPage', () => {
     counter: vi.fn(() => Promise.resolve(true)),
     withdraw: vi.fn(),
     revise: vi.fn(() => Promise.resolve(true)),
+    reviewChanges: vi.fn(() => Promise.resolve(true)),
+    showChanges: vi.fn(() => Promise.resolve()),
     start: vi.fn(() => Promise.resolve(true)),
     reportDone: vi.fn(() => Promise.resolve(true)),
     complete: vi.fn(() => Promise.resolve(true)),
@@ -179,14 +181,6 @@ describe('ConversationPage', () => {
     expect(offers.complete).toHaveBeenCalledWith('a1');
   });
 
-  it('lets the author change an up-to-date pending offer', async () => {
-    const { element, render } = create(conversationFixture({ myRole: 'Helper', timeline: [offerEntry()] }));
-    await render();
-
-    const buttons = [...element.querySelectorAll('.offer-actions ion-button')].map((b) => b.textContent?.trim());
-    expect(buttons).toEqual(['Wycofaj', 'Zmień ofertę']);
-  });
-
   it('has no job actions in a thread whose offer was not accepted', async () => {
     const { page, render } = create(
       conversationFixture({ announcementStatus: 'Accepted', timeline: [offerEntry({ status: 'Rejected' })] }),
@@ -235,30 +229,114 @@ describe('ConversationPage', () => {
     expect(notifications.closeConversation).toHaveBeenCalledWith('c1');
   });
 
-  it('offers only a counter-offer for an outdated offer', async () => {
+  const changes = [{ field: 'Budget', oldValue: '150.00 PLN', newValue: '200.00 PLN' }];
+  const changeEntry = {
+    type: 'AnnouncementChanged',
+    at: '2026-11-09T12:00:00Z',
+    change: { revision: 1, changedAt: '2026-11-09T12:00:00Z', fields: changes },
+  } as ConversationEntryDto;
+
+  it('shows the owner a calm note instead of "outdated" for an offer before his edit', async () => {
     const { element, render } = create(
-      conversationFixture({ myRole: 'Client', timeline: [offerEntry({ isOutdated: true })] }),
+      conversationFixture({
+        myRole: 'Client',
+        timeline: [offerEntry({ isOutdated: true, changesSinceOffer: changes }), changeEntry],
+      }),
     );
     await render();
 
-    expect(element.querySelector('.offer-outdated')?.textContent).toContain('Nieaktualna');
+    expect(element.textContent).not.toContain('Nieaktualna');
+    expect(element.querySelector('.offer ion-badge')?.textContent).toContain('Czeka na odpowiedź na zmiany');
+    expect(element.querySelector('.offer-changes')?.textContent).toContain('Czeka na odpowiedź pomocnika na zmiany');
     const buttons = [...element.querySelectorAll('.offer-actions ion-button')].map((b) => b.textContent?.trim());
     expect(buttons).toEqual(['Odrzuć', 'Zaproponuj kontrofertę']);
+    // Wpis edycji: „Edytowałeś ogłoszenie · data, godzina” + „zapisano”.
+    const change = element.querySelector('.change.mine')?.textContent ?? '';
+    expect(change).toContain('Edytowałeś ogłoszenie: budżet');
+    expect(change).toContain('zapisano');
+    expect(element.querySelector('.notice')).toBeNull();
     expect(conversations.markAsRead).not.toHaveBeenCalled();
   });
 
-  it('lets the author update an outdated offer and reloads the thread', async () => {
-    const outdated = offerEntry({ isOutdated: true });
-    const { page, element, render } = create(conversationFixture({ myRole: 'Helper', timeline: [outdated] }));
+  it('lets the helper see the changes first and then keep, change or withdraw the offer', async () => {
+    const outdated = offerEntry({ isOutdated: true, changesSinceOffer: changes });
+    const { page, element, render } = create(
+      conversationFixture({ myRole: 'Helper', timeline: [outdated, changeEntry] }),
+    );
     await render();
 
-    expect(element.querySelector('.offer-outdated')?.textContent).toContain('Zaktualizuj ją');
+    expect(element.querySelector('.offer-changes')?.textContent).toContain('Zleceniodawca zmienił ogłoszenie');
     const buttons = [...element.querySelectorAll('.offer-actions ion-button')].map((b) => b.textContent?.trim());
-    expect(buttons).toEqual(['Wycofaj', 'Zaktualizuj ofertę']);
+    expect(buttons).toEqual(['Zobacz zmiany']);
+    expect(element.querySelector('.notice')?.textContent).toContain('Zleceniodawca zmienił ogłoszenie – zobacz zmiany');
+    expect(element.querySelector('.change')?.textContent).toContain('Zleceniodawca zmienił ogłoszenie: budżet');
 
-    await page.revise(outdated.offer);
+    await page.openNotice(page.notice()!);
 
-    expect(offers.revise).toHaveBeenCalledWith(outdated.offer);
+    expect(offers.reviewChanges).toHaveBeenCalledWith(outdated.offer);
+    expect(conversations.getById).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows one edit of the announcement on its own', async () => {
+    const { page, render } = create(conversationFixture({ myRole: 'Helper', timeline: [changeEntry] }));
+    await render();
+
+    await page.showChange(changes);
+
+    expect(offers.showChanges).toHaveBeenCalledWith(changes);
+  });
+
+  it('collapses the previous version and points the receiver to the changed offer', async () => {
+    const previous = {
+      type: 'Offer',
+      at: '2026-11-09T11:00:00Z',
+      offer: offerFixture('o1', { status: 'Revised' }),
+    } as ConversationEntryDto;
+    const current = {
+      type: 'Offer',
+      at: '2026-11-09T13:00:00Z',
+      offer: offerFixture('o2', { parentOfferId: 'o1', price: { amount: 150, currency: 'PLN' } }),
+    } as ConversationEntryDto;
+    const { page, element, render } = create(conversationFixture({ myRole: 'Client', timeline: [previous, current] }));
+    await render();
+
+    expect(element.querySelector('details.previous summary')?.textContent).toContain('Poprzednia wersja');
+    expect(element.querySelectorAll('article.offer')).toHaveLength(1);
+    expect(element.querySelector('.notice')?.textContent).toContain('Pomocnik zmienił ofertę – zobacz aktualną');
+
+    await page.openNotice(page.notice()!);
+    await render();
+
+    expect(page.highlightedOfferId()).toBe('o2');
+    expect(element.querySelector('article.offer.highlight')?.id).toBe('offer-o2');
+  });
+
+  it('tells the owner when the helper kept his offer after the changes', async () => {
+    const previous = {
+      type: 'Offer',
+      at: '2026-11-09T11:00:00Z',
+      offer: offerFixture('o1', { status: 'Revised' }),
+    } as ConversationEntryDto;
+    const kept = { type: 'Offer', at: '2026-11-09T13:00:00Z', offer: offerFixture('o2', { parentOfferId: 'o1' }) };
+    const { element, render } = create(
+      conversationFixture({ myRole: 'Client', timeline: [previous, kept as ConversationEntryDto] }),
+    );
+    await render();
+
+    expect(element.querySelector('.notice')?.textContent).toContain('Pomocnik podtrzymał ofertę po zmianach');
+  });
+
+  it('lets the author change an up-to-date pending offer and reloads the thread', async () => {
+    const pending = offerEntry();
+    const { page, element, render } = create(conversationFixture({ myRole: 'Helper', timeline: [pending] }));
+    await render();
+
+    const buttons = [...element.querySelectorAll('.offer-actions ion-button')].map((b) => b.textContent?.trim());
+    expect(buttons).toEqual(['Wycofaj', 'Zmień ofertę']);
+
+    await page.revise(pending.offer);
+
+    expect(offers.revise).toHaveBeenCalledWith(pending.offer);
     expect(conversations.getById).toHaveBeenCalledTimes(2);
   });
 

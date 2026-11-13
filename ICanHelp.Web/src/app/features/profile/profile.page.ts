@@ -18,7 +18,7 @@ import {
 } from '@ionic/angular';
 import type { ViewWillEnter } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { mailUnreadOutline, notificationsOutline } from 'ionicons/icons';
+import { mailUnreadOutline, notificationsOutline, starOutline } from 'ionicons/icons';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { PushService } from '../../core/pwa/push.service';
@@ -66,7 +66,7 @@ export class ProfilePage implements ViewWillEnter {
   protected readonly parseApiDate = parseApiDate;
 
   constructor() {
-    addIcons({ mailUnreadOutline, notificationsOutline });
+    addIcons({ mailUnreadOutline, notificationsOutline, starOutline });
   }
 
   /** Zakładki Ionic zostają w pamięci – dane odświeżamy przy każdym wejściu na zakładkę. */

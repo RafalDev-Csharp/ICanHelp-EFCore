@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import {
   IonButton,
   IonButtons,
+  IonChip,
   IonContent,
   IonHeader,
   IonIcon,
@@ -25,7 +26,16 @@ import {
 } from '@ionic/angular';
 import type { ViewWillEnter } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { close, cloudOfflineOutline, locateOutline, searchOutline } from 'ionicons/icons';
+import {
+  appsOutline,
+  close,
+  closeCircle,
+  cloudOfflineOutline,
+  listOutline,
+  locateOutline,
+  mapOutline,
+  searchOutline,
+} from 'ionicons/icons';
 
 import { CategoriesService } from '../../core/categories/categories.service';
 import { categoryIcon, registerCategoryIcons } from '../../core/categories/category-icons';
@@ -41,7 +51,7 @@ import { pluralPl } from '../../shared/text/plural';
 
 import { LikesService } from './likes/likes.service';
 import { AnnouncementCardComponent } from './list/announcement-card.component';
-import { RADIUS_OPTIONS_KM, activeFilterCount, normalizePhrase } from './list/announcement-filters';
+import { NO_RADIUS_LIMIT, RADIUS_OPTIONS_KM, activeFilterCount, normalizePhrase } from './list/announcement-filters';
 import { AnnouncementListStore } from './list/announcement-list.store';
 
 export type AnnouncementsView = 'list' | 'map';
@@ -83,6 +93,7 @@ interface CompletableTarget {
     IonInfiniteScrollContent,
     IonSkeletonText,
     IonButton,
+    IonChip,
     EmptyStateComponent,
     AnnouncementCardComponent,
     MapComponent,
@@ -97,6 +108,8 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
   protected readonly likes = inject(LikesService);
 
   protected readonly radiusOptions = RADIUS_OPTIONS_KM;
+  /** Opcja promienia „Bez limitu” – wyłącza „Blisko mnie”. */
+  protected readonly noRadiusLimit = NO_RADIUS_LIMIT;
   protected readonly categoryIcon = categoryIcon;
   protected readonly skeletons = [1, 2, 3, 4, 5];
   protected readonly view = signal<AnnouncementsView>('list');
@@ -128,7 +141,16 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
   });
 
   constructor() {
-    addIcons({ locateOutline, searchOutline, cloudOfflineOutline, close });
+    addIcons({
+      appsOutline,
+      close,
+      closeCircle,
+      cloudOfflineOutline,
+      listOutline,
+      locateOutline,
+      mapOutline,
+      searchOutline,
+    });
     registerCategoryIcons();
   }
 
@@ -165,7 +187,10 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
     }
   }
 
-  /** Kafelek kategorii: stuknięcie wybiera kategorię, ponowne stuknięcie wybranej – wyłącza filtr. */
+  /**
+   * Kafelek kategorii: stuknięcie wybiera kategorię, ponowne stuknięcie wybranej – wyłącza filtr (tak samo jak
+   * pierwszy kafelek „Wszystkie”).
+   */
   toggleCategory(categoryId: string): void {
     this.setCategory(this.filters().categoryId === categoryId ? undefined : categoryId);
   }
@@ -185,8 +210,13 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
     }
   }
 
+  /** Promień „blisko mnie”; „Bez limitu” (`NO_RADIUS_LIMIT`) = wyłączenie filtra odległości. */
   setRadius(value: unknown): void {
     const radiusKm = Number(value);
+    if (radiusKm === NO_RADIUS_LIMIT) {
+      void this.store.setFilters({ near: undefined });
+      return;
+    }
     if (this.radiusOptions.includes(radiusKm) && radiusKm !== this.filters().radiusKm) {
       void this.store.setFilters({ radiusKm });
     }
@@ -209,6 +239,7 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
     }
   }
 
+  /** „Wyczyść filtry” (chip przy aktywnych filtrach i pusty stan): fraza, kategoria, podkategoria, „blisko mnie”. */
   clearFilters(): void {
     void this.store.setFilters({ phrase: undefined, categoryId: undefined, subcategoryId: undefined, near: undefined });
   }

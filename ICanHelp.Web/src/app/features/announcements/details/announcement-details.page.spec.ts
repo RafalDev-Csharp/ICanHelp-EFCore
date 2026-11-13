@@ -40,6 +40,7 @@ describe('AnnouncementDetailsPage', () => {
   const offers = {
     make: vi.fn(),
     revise: vi.fn(),
+    reviewChanges: vi.fn(),
     rate: vi.fn(),
     start: vi.fn(),
     reportDone: vi.fn(),
@@ -222,21 +223,23 @@ describe('AnnouncementDetailsPage', () => {
     expect(navigate).toHaveBeenCalledWith(['/conversations', 'c1']);
   });
 
-  it('lets a helper update his outdated offer from the footer', async () => {
+  it('lets a helper review the changes to the announcement from the footer', async () => {
     auth.isAuthenticated.set(true);
     auth.currentUser.set({ id: 'helper-1' } as UserDto);
     const outdated = offerFixture('o1', { isOutdated: true });
     announcements.getById.mockReturnValue(of(announcementDetails('a1', { offers: [outdated] })));
     conversations.getMine.mockReturnValue(of([myConversationFixture('c1', { myRole: 'Helper' })]));
-    offers.revise.mockResolvedValue(true);
+    offers.reviewChanges.mockResolvedValue(true);
     const { page, element, render } = create();
     await render();
 
-    expect(element.querySelector('ion-footer')?.textContent).toContain('Zaktualizuj ofertę');
+    expect(element.querySelector('ion-footer')?.textContent).toContain('Zobacz zmiany');
+    expect(element.textContent).not.toContain('nieaktualna');
+    expect(element.textContent).toContain('Czeka na odpowiedź na zmiany');
 
     await page.makeOffer();
 
-    expect(offers.revise).toHaveBeenCalledWith(outdated);
+    expect(offers.reviewChanges).toHaveBeenCalledWith(outdated);
     expect(offers.make).not.toHaveBeenCalled();
     expect(announcements.getById).toHaveBeenCalledTimes(2);
   });

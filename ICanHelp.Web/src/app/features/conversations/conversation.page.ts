@@ -24,9 +24,11 @@ import type { ViewWillEnter, ViewWillLeave } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
   alertCircleOutline,
+  arrowDownCircleOutline,
   checkmarkDoneOutline,
   cloudOfflineOutline,
   createOutline,
+  eyeOutline,
   flagOutline,
   helpCircleOutline,
   hourglassOutline,
@@ -35,11 +37,10 @@ import {
   playOutline,
   pricetagOutline,
   send,
-  warningOutline,
 } from 'ionicons/icons';
 import { catchError, filter, of } from 'rxjs';
 
-import type { ConversationDto, OfferDto } from '../../core/api/api-client';
+import type { AnnouncementFieldChangeDto, ConversationDto, OfferDto } from '../../core/api/api-client';
 import { AnnouncementsClient, ConversationsClient, UsersClient } from '../../core/api/api-client';
 import { errorStatus } from '../../core/api/api-errors';
 import { apiResourceUrl } from '../../core/api/api.providers';
@@ -53,10 +54,11 @@ import { statusColor, statusLabel } from '../announcements/announcement-labels';
 import type { JobAction, JobStep } from '../offers/job-step';
 import { JOB_ACTION_ICONS, JOB_ACTION_LABELS, jobStep } from '../offers/job-step';
 import { OFFER_RULES } from '../offers/offer-form';
-import { formatOfferTerm, offerStatusColor, offerStatusLabel, partyLabel, pendingOffer } from '../offers/offer-labels';
+import { formatDateTime, formatOfferTerm, partyLabel, pendingOffer } from '../offers/offer-labels';
 import { OffersService } from '../offers/offers.service';
 
-import { offersOf, toTimelineItems } from './conversation-timeline';
+import type { ThreadNotice } from './conversation-timeline';
+import { offersOf, threadNotice, toTimelineItems } from './conversation-timeline';
 
 type LoadState = 'loading' | 'ready' | 'not-found' | 'failed';
 
@@ -120,10 +122,11 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
   protected readonly maxMessage = OFFER_RULES.message.max;
   protected readonly statusLabel = statusLabel;
   protected readonly statusColor = statusColor;
-  protected readonly offerStatusLabel = offerStatusLabel;
-  protected readonly offerStatusColor = offerStatusColor;
   protected readonly partyLabel = partyLabel;
   protected readonly formatOfferTerm = formatOfferTerm;
+  protected readonly formatDateTime = formatDateTime;
+  /** Oferta wyróżniona po „zobacz aktualną” (`notice` typu `revised`). */
+  readonly highlightedOfferId = signal<string | null>(null);
   protected readonly jobLabels = JOB_ACTION_LABELS;
   protected readonly jobIcons = JOB_ACTION_ICONS;
 
@@ -163,6 +166,14 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
     return step.action || step.note ? step : null;
   });
   readonly jobAction = computed<JobAction | null>(() => this.job()?.action ?? null);
+  /**
+   * F11 F: co czeka na czytającego – „Zleceniodawca zmienił ogłoszenie – zobacz zmiany” (autor oferty sprzed edycji)
+   * albo „Pomocnik zmienił ofertę – zobacz aktualną” (odbiorca zmienionej oferty). Wyróżniony przycisk nad polem.
+   */
+  readonly notice = computed<ThreadNotice | null>(() => {
+    const conversation = this.conversation();
+    return conversation ? threadNotice(conversation) : null;
+  });
 
   /** Pomocnik w otwartym ogłoszeniu bez oczekującej oferty może złożyć nową (np. po odrzuceniu). */
   readonly canMakeOffer = computed(() => {
@@ -182,7 +193,7 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
       case 'InProgress':
         return 'Zleceniodawca przyjął inną ofertę – rozmowa jest tylko do odczytu.';
       case 'Completed':
-        return 'Zlecenie zakończone – rozmowa jest tylko do odczytu. Ocenę wystawisz w ogłoszeniu.';
+        return 'Zlecenie zakończone – rozmowa jest tylko do odczytu. Ocenę wystawisz w Koncie → Oceny.';
       case 'Cancelled':
         return 'Ogłoszenie anulowane – rozmowa jest tylko do odczytu.';
       default:
@@ -193,9 +204,11 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
   constructor() {
     addIcons({
       alertCircleOutline,
+      arrowDownCircleOutline,
       checkmarkDoneOutline,
       cloudOfflineOutline,
       createOutline,
+      eyeOutline,
       flagOutline,
       helpCircleOutline,
       hourglassOutline,
@@ -204,7 +217,6 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
       playOutline,
       pricetagOutline,
       send,
-      warningOutline,
     });
 
     // Powiadomienie (hub albo push) o tym wątku albo jego ogłoszeniu – np. druga strona zmieniła ofertę, pomocnik
@@ -311,9 +323,34 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
     await this.act(() => this.offers.withdraw(offer));
   }
 
-  /** Autor oczekującej oferty: nowe warunki (nieaktualna – do aktualnej wersji ogłoszenia). */
+  /** Autor oczekującej oferty: nowe warunki (formularz). */
   async revise(offer: OfferDto): Promise<void> {
     await this.act(() => this.offers.revise(offer));
+  }
+
+  /** Autor oferty sprzed edycji ogłoszenia: podgląd zmian → podtrzymaj / zmień / wycofaj (`OffersService`). */
+  async reviewChanges(offer: OfferDto): Promise<void> {
+    await this.act(() => this.offers.reviewChanges(offer));
+  }
+
+  /** Wpis „Ogłoszenie zmienione” – sam podgląd było → jest. */
+  async showChange(changes: readonly AnnouncementFieldChangeDto[]): Promise<void> {
+    await this.offers.showChanges(changes);
+  }
+
+  /** Przycisk nad polem wiadomości: podgląd zmian albo przewinięcie do aktualnej (zmienionej) oferty. */
+  async openNotice(notice: ThreadNotice): Promise<void> {
+    if (notice.kind === 'changes') {
+      await this.reviewChanges(notice.offer);
+      return;
+    }
+    this.highlightedOfferId.set(notice.offer.id);
+    document.getElementById(`offer-${notice.offer.id}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  }
+
+  /** „Czeka na odpowiedź pomocnika / zleceniodawcy”. */
+  protected partyGenitive(party: string): string {
+    return party === 'Helper' ? 'pomocnika' : 'zleceniodawcy';
   }
 
   /** Akcja zlecenia w przyjętym wątku (potwierdzenie i komunikat – `OffersService`, wspólne ze szczegółami). */

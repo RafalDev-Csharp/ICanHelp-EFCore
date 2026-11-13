@@ -317,5 +317,23 @@
   (wątek, szczegóły, zlecenia, oferty, powiadomienia).
   13.11.2026 lokalnie (`verify.cmd`, Docker): dotnet 532/532 (Core 223, Application 202, integracyjne 107), `npm run api`
   (klient zgodny z ręczną edycją), lint + Vitest 295/295 + build zielone. Przepływ w przeglądarce – do sprawdzenia ręcznie.
+  Część F (13.11.2026): uwagi z testu D. Edycja ogłoszenia a oferty – bez „nieaktualna” (domena bez zmian):
+  `offerStateLabel` („Czeka na odpowiedź na zmiany”), w wątku notka `respond` / `wait`, wpis „Edytowałeś ogłoszenie ·
+  data, godzina · zapisano” (właściciel) / „Zleceniodawca zmienił ogłoszenie” (pomocnik) z „zobacz zmiany”,
+  `threadNotice` (przycisk „… zmienił ogłoszenie – zobacz zmiany” / „… zmienił (podtrzymał) ofertę – zobacz aktualną”,
+  przewinięcie i wyróżnienie), poprzednia wersja oferty zwinięta. Nowe `features/offers/offer-changes.ts`
+  (`fieldChangeRows` – było → jest) i `OfferChangesModalComponent`; `OffersService.reviewChanges` / `keep`
+  („Podtrzymuję ofertę” = `POST …/revise` z tymi samymi warunkami) / `showChanges`; stopka szczegółów pomocnika
+  „Zobacz zmiany”. Oceny: backend `GET api/me/ratings` (`MyRatingDto` z rolą i tytułem) i `GET api/me/ratings/pending`
+  (`PendingRatingDto`), `MyRatingsController`, handlery `MyRatingsQueryHandlers.cs`, bez migracji, przykłady w `.http`;
+  front `features/ratings/ratings.page` (`/profile/ratings`, wpis w Koncie), ręcznie `MyRatingsClient` w `api-client.ts`.
+  Szukaj: kafelek „Wszystkie”, „Bez limitu” w promieniu (`NO_RADIUS_LIMIT`), chip „Wyczyść filtry”, Lista / Mapa jako
+  ikony w jednym, wyśrodkowanym i zawijanym wierszu z filtrami. `/conversations/all`: dzwonek + strzałka „Zlecenia”.
+  Testy: Application `MyRatingRoleTests`, Api `MyRatingsTests` (do wystawienia → ocena → otrzymane z rolą, 401);
+  Vitest – nowe `offer-changes.spec`, `ratings.page.spec`; dopisane w `conversation-timeline`, `conversation.page`,
+  `offer-labels`, `offers.service`, `announcement-details.page`, `announcements.page`, `conversations.page`.
+  13.11.2026 lokalnie (`verify.cmd`, Docker; działające `ICanHelp.Api.exe` zatrzymane za zgodą autora): dotnet 536/536
+  (Core 223, Application 204, integracyjne 109), `npm run api` (klient zgodny z ręczną edycją), lint + Vitest 322/322
+  + build zielone. Przepływ w przeglądarce – do sprawdzenia ręcznie.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

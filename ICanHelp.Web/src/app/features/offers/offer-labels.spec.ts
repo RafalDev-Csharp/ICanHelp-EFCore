@@ -1,8 +1,11 @@
 import {
   changedFieldsLabel,
+  formatDateTime,
   formatOfferTerm,
   offerActions,
   offerKindLabel,
+  offerStateColor,
+  offerStateLabel,
   offerStatusLabel,
   pendingOffer,
 } from './offer-labels';
@@ -77,6 +80,18 @@ describe('offer texts', () => {
 
     expect(formatOfferTerm(start, sameDay)).toMatch(/10 lis.*17:00–19:30$/);
     expect(formatOfferTerm(start, nextDay)).toMatch(/10 lis.*17:00 – .*11 lis.*09:00$/);
+  });
+
+  it('calls a pending offer before the edit "waiting for an answer to the changes", not outdated', () => {
+    expect(offerStateLabel({ status: 'Pending', isOutdated: true })).toBe('Czeka na odpowiedź na zmiany');
+    expect(offerStateColor({ status: 'Pending', isOutdated: true })).toBe('medium');
+    expect(offerStateLabel({ status: 'Pending', isOutdated: false })).toBe('Czeka na odpowiedź');
+    expect(offerStateLabel({ status: 'Rejected', isOutdated: true })).toBe('Odrzucona');
+    expect(offerStateColor({ status: 'Accepted', isOutdated: false })).toBe('success');
+  });
+
+  it('formats a date with the time', () => {
+    expect(formatDateTime(new Date(2026, 10, 13, 14, 5).toISOString())).toMatch(/13 lis.*, 14:05$/);
   });
 
   it('names an offer by its place in the negotiation', () => {

@@ -1,10 +1,13 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/conversations"></ion-back-button>
+      <ion-back-button defaultHref="/conversations" text="Zlecenia"></ion-back-button>
       <app-brand></app-brand>
     </ion-buttons>
     <ion-title>Wszystkie rozmowy</ion-title>
+    <ion-buttons slot="end">
+      <app-notifications-bell></app-notifications-bell>
+    </ion-buttons>
   </ion-toolbar>
   <ion-toolbar>
     <ion-segment [value]="role()" (ionChange)="setRole($event.detail.value)" aria-label="Rola w rozmowie">

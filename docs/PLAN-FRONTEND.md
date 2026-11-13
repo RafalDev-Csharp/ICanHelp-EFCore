@@ -377,6 +377,78 @@ Zrobione D (13.11.2026), decyzje:
 - Do sprawdzenia ręcznie (Chrome ↔ Brave): pomocnik zmienia aktualną ofertę → u zleceniodawcy wątek odświeża się sam;
   przyjęcie → pomocnik „Rozpocznij” → „Zgłoś wykonanie” → zleceniodawca dostaje push i potwierdza → oceny.
 
+**F. Uwagi z testu D (13.11.2026)** – zrobione 13.11.2026 (opis niżej)
+Ustalone z autorem 13.11.2026: po podglądzie zmian pomocnik ma „Podtrzymuję ofertę” (jedno kliknięcie, te same warunki
+do nowej wersji) obok „Zmień ofertę” i „Wycofaj”; oceny – **ekran „Oceny” w Koncie** (otrzymane jako pomocnik / jako
+zleceniodawca + „Do wystawienia”), bez karty w wątku i bez przycisku w „Zleceniach” (wystawienie oceny – z ekranu
+„Oceny” i jak dotąd ze szczegółów ogłoszenia).
+- [x] **Edycja ogłoszenia a oferty – bez mylącego „nieaktualna”.** Dziś obie strony widzą przy ofercie „Nieaktualna –
+      ogłoszenie zmieniło się…”, a „Zaktualizuj ofertę” od razu otwiera formularz (jak kontroferta), zanim pomocnik zobaczy,
+      co się zmieniło. Propozycja:
+      - **Kto edytował (zleceniodawca):** zamiast ostrzeżenia – wpis w osi „Edytowałeś ogłoszenie · data, godzina” (zielony
+        „zapisano”), przy ofercie pomocnika spokojna notka „Czeka na odpowiedź pomocnika na zmiany” (bez „Przyjmij”, bez
+        etykiety „nieaktualna”).
+      - **Druga strona (pomocnik):** „Zleceniodawca zmienił ogłoszenie – zobacz zmiany”. Przycisk otwiera **podgląd zmian**
+        (było → jest, jak w historii ogłoszenia) i dopiero z niego: „Podtrzymuję ofertę” (te same warunki do nowej wersji –
+        `ReviseOffer` z niezmienionymi danymi, bez formularza) albo „Zmień ofertę” (formularz) albo „Wycofaj”.
+      - **Zmiana oferty (revise) przez drugą stronę:** u odbiorcy „Pomocnik / Zleceniodawca zmienił ofertę – zobacz aktualną”
+        (przewinięcie i wyróżnienie nowej oferty, stara zwinięta jako „poprzednia wersja”), dopiero przy aktualnej –
+        Przyjmij / Odrzuć / Kontroferta.
+      - Etykieta „nieaktualna” znika z listy negocjacji i „Zleceń”; zastępuje ją „czeka na odpowiedź na zmiany”.
+- [x] **Oceny – ekran w Koncie** (`/profile/ratings`): otrzymane (jako pomocnik / jako zleceniodawca – segment)
+      i „Do wystawienia” (zakończone zlecenia bez mojej oceny → „Oceń”). Backend: oceny są (`api/users/{id}/ratings`, `api/announcements/{id}/ratings`);
+      do sprawdzenia – czy potrzebne zapytanie „moje oceny do wystawienia” (`api/me/ratings/pending`) i rola oceniającego w `RatingDto`.
+- [x] **Filtry „Szukaj” – powrót do stanu początkowego.** Kategoria: kafelek „Wszystkie” na początku (dziś wyłączenie =
+      ponowne stuknięcie, niewidoczne). Promień: opcja „Bez limitu” (= wyłączenie „Blisko mnie”). Przy aktywnych filtrach
+      chip „Wyczyść filtry”.
+- [x] **Układ „Szukaj”.** Segment Lista / Mapa prawie nachodzi na listy promienia i podkategorii – filtry wyśrodkować
+      w jednym wierszu z odstępem, ewentualnie Lista / Mapa jako ikony w tym samym wierszu (mniej pasków na niskim telefonie).
+- [x] **Ikony w nagłówku.** Ikona „Wszystkie rozmowy” jest tylko na korzeniu „Zleceń”; po wejściu w `/conversations/all`
+      (podstrona) znika razem z dzwonkiem – wygląda jak błąd. Dzwonek (i licznik nieprzeczytanych wiadomości) także na
+      podstronach albo czytelna strzałka wstecz z tytułem „Wszystkie rozmowy”.
+
+Zrobione F (13.11.2026), decyzje:
+- Domena bez zmian: oferty sprzed edycji nadal nie da się przyjąć – zmienia się tylko UI. `offerStateLabel` /
+  `offerStateColor` (`offer-labels`): oczekująca sprzed edycji = „Czeka na odpowiedź na zmiany” (szara), wszędzie
+  zamiast „nieaktualna” (wątek, lista negocjacji w szczegółach, wiersz rozmowy w „Zleceniach” / „Wszystkie rozmowy”).
+- Wątek (`conversation-timeline.ts`): oferta dostaje `changes` – `respond` (jestem autorem: notka „Zleceniodawca zmienił
+  ogłoszenie po tej ofercie (budżet)…” i jedyny przycisk „Zobacz zmiany”) albo `wait` (druga strona: spokojna notka
+  „Czeka na odpowiedź pomocnika na zmiany w ogłoszeniu”, zostają Odrzuć / Kontroferta – domena na nie pozwala, bez
+  Przyjmij). Wpis edycji: u właściciela „Edytowałeś ogłoszenie: budżet · czw., 13 lis, 14:05 **zapisano**”, u pomocnika
+  „Zleceniodawca zmienił ogłoszenie: … · 2 h temu”; oba z „zobacz zmiany” (sam podgląd tej edycji).
+- `threadNotice` – wyróżniony przycisk nad polem wiadomości: „Zleceniodawca zmienił ogłoszenie – zobacz zmiany” (autor
+  oferty sprzed edycji; właściciel z własną kontrofertą – „Zmieniłeś ogłoszenie po swojej kontrofercie…”) albo „Pomocnik /
+  Zleceniodawca zmienił ofertę – zobacz aktualną” (odbiorca; przewinięcie i obwódka `highlight` na aktualnej). Gdy
+  warunki są te same co w poprzedniej wersji – „… podtrzymał ofertę po zmianach – zobacz aktualną”.
+- Poprzednia wersja oferty (`Revised`) zwinięta w `<details>` „Poprzednia wersja · Ty · 120 zł”.
+- Podgląd zmian: `OfferChangesModalComponent` + `fieldChangeRows` (`features/offers/offer-changes.ts`) – „Było / Jest”:
+  kategoria i podkategoria po nazwie (`CategoriesService`), trudność, budżet jako cena, opis i tytuł w całości, miejsce
+  tylko „nowe miejsce na mapie” (współrzędnych nie pokazujemy), zdjęcia jako liczba + dodane / usunięte.
+  `OffersService.reviewChanges` → „Podtrzymuję ofertę” (`keep`: `POST …/revise` z tą samą ceną, terminem
+  i uzasadnieniem, bez formularza, toast „Oferta podtrzymana…”), „Zmień ofertę” (formularz `revise`), „Wycofaj ofertę”
+  (z potwierdzeniem). Stopka szczegółów pomocnika: „Zobacz zmiany” zamiast „Zaktualizuj ofertę” (to samo okno).
+  Uwaga: jeśli termin starej oferty już minął, backend odrzuci „Podtrzymuję” (walidacja terminu) – wtedy „Zmień ofertę”.
+- Oceny – backend: `RatingDto` nie miał roli ani tytułu, a „do wystawienia” wymagałoby wielu zapytań z frontu → nowe
+  `GET api/me/ratings` (`MyRatingDto`: ogłoszenie + tytuł, `myRole` Client/Helper, `rater` {id, userName}, ocena,
+  komentarz) i `GET api/me/ratings/pending` (`PendingRatingDto`: zakończone ogłoszenia, w których byłem właścicielem
+  albo autorem przyjętej oferty, bez mojej oceny; `otherParty` do ocenienia, miniatura). Zapytania `GetMyRatings` /
+  `GetMyPendingRatings`, handlery `MyRatingsQueryHandlers.cs`, `MyRatingsController`, rola – `MyRatingDto.RoleOf`.
+  Bez migracji. Klient: ręcznie `MyRatingsClient` (`getMine`, `getPending`) w stylu NSwag.
+- Oceny – front: `features/ratings/ratings.page` (`/profile/ratings`, `authGuard`, wpis „Oceny” w Koncie): segment
+  „Do wystawienia (N)” · „Jako pomocnik” · „Jako zleceniodawca”; na start „Do wystawienia”, gdy coś czeka. „Oceń” →
+  `OffersService.rate` (to samo okno co w szczegółach), po ocenie lista od nowa. Otrzymane – średnia z gwiazdkami
+  (połówki), komentarz, @oceniający, link do ogłoszenia. Wątek zakończonego zlecenia: „Ocenę wystawisz w Koncie → Oceny”.
+- Szukaj: pierwszy kafelek „Wszystkie” (`apps-outline`, wybrany bez kategorii); w promieniu „Bez limitu”
+  (`NO_RADIUS_LIMIT` = 0 → wyłącza „Blisko mnie”, do API nie trafia); chip „Wyczyść filtry” przy aktywnych filtrach.
+  Układ: Lista / Mapa jako mały segment z ikonami w **tym samym wierszu** co „Blisko mnie”, promień, podkategoria
+  i chip – wiersz wyśrodkowany, `flex-wrap` (na wąskim ekranie druga linia zamiast nachodzenia). Pasków w nagłówku: 3 zamiast 4.
+- `/conversations/all`: dzwonek w nagłówku podstrony, strzałka wstecz z tekstem „Zlecenia” (iOS), tytuł „Wszystkie rozmowy”.
+- 13.11.2026 `verify.cmd`: dotnet 536/536 (Core 223, Application 204, integracyjne 109), `npm run api` (klient zgodny
+  z ręczną edycją), lint + Vitest 322/322 + build.
+- Do sprawdzenia ręcznie (Chrome ↔ Brave): pomocnik składa ofertę → zleceniodawca edytuje (widzi „Edytowałeś…”, notkę
+  „Czeka na odpowiedź pomocnika”) → pomocnik „Zobacz zmiany” → „Podtrzymuję ofertę” → zleceniodawca „podtrzymał ofertę –
+  zobacz aktualną” → przyjmuje; ekran „Oceny” po zakończeniu; układ „Szukaj” na niskim telefonie.
+
 **E. Rezygnacja i przerwanie zlecenia (reguła domeny)** – po D
 Aplikacja nie obsługuje pieniędzy – nie rozstrzyga sporów; daje każdej stronie legalne wyjście, zapisuje co i dlaczego,
 pokazuje to innym (historia, licznik, oceny). Ustalone z autorem 13.11.2026:

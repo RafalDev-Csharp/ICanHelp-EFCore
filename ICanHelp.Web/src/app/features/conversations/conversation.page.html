@@ -77,27 +77,58 @@
       <p class="bubble">{{ item.message.text }}</p>
       <span class="when">{{ item.at | timeAgo }}</span>
     </div>
-    } @else if (item.kind === 'offer') {
-    <article class="offer" [class.mine]="item.mine" [class.outdated]="item.offer.isOutdated">
+    } @else if (item.kind === 'offer') { @if (item.previous) {
+    <details class="offer previous" [id]="'offer-' + item.offer.id">
+      <summary>
+        Poprzednia wersja · {{ item.mine ? 'Ty' : partyLabel(item.offer.proposedBy) }} · {{ item.offer.price.amount |
+        price }}
+      </summary>
+      <p class="offer-term">{{ formatOfferTerm(item.offer.proposedStart, item.offer.proposedEnd) }}</p>
+      @if (item.offer.message) {
+      <p class="offer-message">{{ item.offer.message }}</p>
+      }
+      <span class="when">{{ item.at | timeAgo }}</span>
+    </details>
+    } @else {
+    <article
+      class="offer"
+      [id]="'offer-' + item.offer.id"
+      [class.mine]="item.mine"
+      [class.awaiting]="!!item.changes"
+      [class.highlight]="highlightedOfferId() === item.offer.id"
+    >
       <header>
         <ion-icon name="pricetag-outline" aria-hidden="true"></ion-icon>
         <span class="offer-title"
           >{{ item.kindLabel }} · {{ item.mine ? 'Ty' : partyLabel(item.offer.proposedBy) }}</span
         >
-        <ion-badge [color]="offerStatusColor(item.offer.status)">{{ offerStatusLabel(item.offer.status) }}</ion-badge>
+        <ion-badge [color]="item.stateColor">{{ item.stateLabel }}</ion-badge>
       </header>
       <p class="offer-price">{{ item.offer.price.amount | price }}</p>
       <p class="offer-term">{{ formatOfferTerm(item.offer.proposedStart, item.offer.proposedEnd) }}</p>
       @if (item.offer.message) {
       <p class="offer-message">{{ item.offer.message }}</p>
-      } @if (item.offer.isOutdated && item.offer.status === 'Pending') {
-      <p class="offer-outdated">
-        <ion-icon name="warning-outline" color="warning" aria-hidden="true"></ion-icon>
-        Nieaktualna – ogłoszenie zmieniło się po jej złożeniu{{ item.changedSince ? ' (' + item.changedSince + ')' : ''
-        }}. {{ item.actions.revise ? 'Zaktualizuj ją, żeby druga strona mogła ją przyjąć.' : 'Przyjąć można tylko ofertę
-        do aktualnej wersji.' }}
+      } @if (item.changes === 'respond') {
+      <p class="offer-changes">
+        <ion-icon name="create-outline" aria-hidden="true"></ion-icon>
+        {{ conversation()?.myRole === 'Helper' ? 'Zleceniodawca zmienił ogłoszenie' : 'Zmieniłeś ogłoszenie' }} po tej
+        ofercie{{ item.changedSince ? ' (' + item.changedSince + ')' : '' }}. Zobacz zmiany i podtrzymaj ofertę, zmień
+        ją albo wycofaj.
       </p>
-      } @if (item.actions.accept || item.actions.reject || item.actions.counter || item.actions.withdraw ||
+      } @else if (item.changes === 'wait') {
+      <p class="offer-changes">
+        <ion-icon name="hourglass-outline" aria-hidden="true"></ion-icon>
+        Czeka na odpowiedź {{ partyGenitive(item.offer.proposedBy) }} na zmiany w ogłoszeniu{{ item.changedSince ? ' ('
+        + item.changedSince + ')' : '' }}.
+      </p>
+      } @if (item.changes === 'respond') {
+      <div class="offer-actions">
+        <ion-button size="small" (click)="reviewChanges(item.offer)" [disabled]="busy()">
+          <ion-icon name="eye-outline" slot="start" aria-hidden="true"></ion-icon>
+          Zobacz zmiany
+        </ion-button>
+      </div>
+      } @else if (item.actions.accept || item.actions.reject || item.actions.counter || item.actions.withdraw ||
       item.actions.revise) {
       <div class="offer-actions">
         @if (item.actions.withdraw) {
@@ -105,12 +136,8 @@
           >Wycofaj</ion-button
         >
         } @if (item.actions.revise) {
-        <ion-button
-          size="small"
-          [fill]="item.offer.isOutdated ? 'solid' : 'outline'"
-          (click)="revise(item.offer)"
-          [disabled]="busy()"
-          >{{ item.offer.isOutdated ? 'Zaktualizuj ofertę' : 'Zmień ofertę' }}</ion-button
+        <ion-button size="small" fill="outline" (click)="revise(item.offer)" [disabled]="busy()"
+          >Zmień ofertę</ion-button
         >
         } @if (item.actions.reject) {
         <ion-button size="small" fill="outline" color="danger" (click)="reject(item.offer)" [disabled]="busy()"
@@ -131,10 +158,16 @@
       }
       <span class="when">{{ item.at | timeAgo }}</span>
     </article>
-    } @else {
-    <p class="change">
-      <ion-icon name="create-outline" aria-hidden="true"></ion-icon>
-      Ogłoszenie zmienione{{ item.fields ? ': ' + item.fields : '' }} · {{ item.at | timeAgo }}
+    } } @else {
+    <p class="change" [class.mine]="item.mine">
+      <ion-icon [name]="item.mine ? 'checkmark-done-outline' : 'create-outline'" aria-hidden="true"></ion-icon>
+      @if (item.mine) { Edytowałeś ogłoszenie{{ item.fields ? ': ' + item.fields : '' }} · {{ formatDateTime(item.at) }}
+      <span class="saved">zapisano</span> } @else { Zleceniodawca zmienił ogłoszenie{{ item.fields ? ': ' + item.fields
+      : '' }} · {{ item.at | timeAgo }} } @if (item.changes.length > 0) {
+      <ion-button size="small" fill="clear" class="change-link" (click)="showChange(item.changes)"
+        >zobacz zmiany</ion-button
+      >
+      }
     </p>
     } } @empty {
     <p class="change">
@@ -169,6 +202,25 @@
         {{ jobLabels[action] }}
       </ion-button>
       }
+    </div>
+  </ion-toolbar>
+  } @if (notice(); as current) {
+  <ion-toolbar>
+    <div class="notice page-column">
+      <ion-button
+        expand="block"
+        class="ion-padding-horizontal"
+        [fill]="current.kind === 'changes' ? 'solid' : 'outline'"
+        (click)="openNotice(current)"
+        [disabled]="busy()"
+      >
+        <ion-icon
+          [name]="current.kind === 'changes' ? 'eye-outline' : 'arrow-down-circle-outline'"
+          slot="start"
+          aria-hidden="true"
+        ></ion-icon>
+        {{ current.text }}
+      </ion-button>
     </div>
   </ion-toolbar>
   } @if (thread.canWrite) { @if (canMakeOffer()) {

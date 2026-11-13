@@ -1,7 +1,7 @@
 import type { ConversationEntryDto } from '../../core/api/api-client';
 import { conversationFixture, offerFixture } from '../offers/testing/offer-fixtures';
 
-import { offersOf, toTimelineItems } from './conversation-timeline';
+import { offersOf, threadNotice, toTimelineItems } from './conversation-timeline';
 
 function entry(value: Partial<ConversationEntryDto> & Pick<ConversationEntryDto, 'type' | 'at'>): ConversationEntryDto {
   return value as ConversationEntryDto;
@@ -53,11 +53,77 @@ describe('toTimelineItems', () => {
       revise: false,
     });
     expect(offer.kind === 'offer' && offer.kindLabel).toBe('Oferta');
+    // F11 F: bez „nieaktualna” – druga strona (pomocnik) ma odpowiedzieć na zmiany.
+    expect(offer).toMatchObject({ stateLabel: 'Czeka na odpowiedź na zmiany', changes: 'wait', previous: false });
 
-    expect(items[2]).toMatchObject({ kind: 'change', fields: 'budżet', revision: 1 });
+    expect(items[2]).toMatchObject({ kind: 'change', fields: 'budżet', revision: 1, mine: true });
   });
 
   it('lists offers of the thread', () => {
     expect(offersOf(conversation).map((offer) => offer.id)).toEqual(['o1']);
+  });
+});
+
+describe('threadNotice', () => {
+  const offerEntry = (id: string, overrides = {}): ConversationEntryDto =>
+    entry({ type: 'Offer', at: '2026-11-09T11:00:00Z', offer: offerFixture(id, overrides) });
+
+  it('asks the author of an offer before the edit to see the changes', () => {
+    const helper = conversationFixture({ myRole: 'Helper', timeline: [offerEntry('o1', { isOutdated: true })] });
+    expect(threadNotice(helper)).toMatchObject({
+      kind: 'changes',
+      text: 'Zleceniodawca zmienił ogłoszenie – zobacz zmiany',
+    });
+
+    const owner = conversationFixture({
+      myRole: 'Client',
+      timeline: [offerEntry('o1', { isOutdated: true, proposedBy: 'Client' })],
+    });
+    expect(threadNotice(owner)?.text).toBe('Zmieniłeś ogłoszenie po swojej kontrofercie – zobacz zmiany');
+  });
+
+  it('points the receiver to a changed or kept offer', () => {
+    const changed = conversationFixture({
+      myRole: 'Client',
+      timeline: [
+        offerEntry('o1', { status: 'Revised' }),
+        offerEntry('o2', { parentOfferId: 'o1', price: { amount: 99, currency: 'PLN' } }),
+      ],
+    });
+    expect(threadNotice(changed)).toMatchObject({ kind: 'revised', text: 'Pomocnik zmienił ofertę – zobacz aktualną' });
+
+    const kept = conversationFixture({
+      myRole: 'Client',
+      timeline: [offerEntry('o1', { status: 'Revised' }), offerEntry('o2', { parentOfferId: 'o1' })],
+    });
+    expect(threadNotice(kept)?.text).toBe('Pomocnik podtrzymał ofertę po zmianach – zobacz aktualną');
+  });
+
+  it('is empty without anything waiting for the reader', () => {
+    expect(threadNotice(conversationFixture({ timeline: [offerEntry('o1')] }))).toBeNull();
+    // Kontroferta to nie „zmienił ofertę”.
+    const countered = conversationFixture({
+      myRole: 'Client',
+      timeline: [
+        offerEntry('o1', { status: 'Countered', proposedBy: 'Client' }),
+        offerEntry('o2', { parentOfferId: 'o1' }),
+      ],
+    });
+    expect(threadNotice(countered)).toBeNull();
+    const closed = conversationFixture({
+      announcementStatus: 'Accepted',
+      timeline: [offerEntry('o1', { isOutdated: true })],
+    });
+    expect(threadNotice(closed)).toBeNull();
+  });
+
+  it('marks previous versions of a revised offer', () => {
+    const items = toTimelineItems(
+      conversationFixture({
+        timeline: [offerEntry('o1', { status: 'Revised' }), offerEntry('o2', { parentOfferId: 'o1' })],
+      }),
+      'helper-1',
+    );
+    expect(items.map((item) => item.kind === 'offer' && item.previous)).toEqual([true, false]);
   });
 });

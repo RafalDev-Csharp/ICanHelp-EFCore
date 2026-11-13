@@ -75,7 +75,7 @@ Api.Tests       Infrastructure/ApiFactory (kontener, RecordingPushSender), Infra
 - Auth: JWT HS256 (`Auth:SigningKey` ≥ 32 bajty, poza Development z env) + refresh tokeny z rotacją. Prywatność: oferty widzi właściciel
   (wszystkie) i pomocnik (swoje), kontakt po akceptacji, wątki tylko dla dwóch uczestników (obcy → 404), cudze zasoby `api/me/*` → 404.
 - Endpointy: `api/users` (+ refresh, sign-out), `api/categories`, `api/announcements` (+ offers, images, conversations, contact,
-  ratings, like), `api/conversations/{id}`, `api/me/` conversations | notifications (+ hub `/hubs/notifications`) | alerts | devices.
+  ratings, like), `api/conversations/{id}`, `api/me/` conversations | notifications (+ hub `/hubs/notifications`) | alerts | devices | ratings (+ `pending`).
   Przykłady w `ICanHelp.Api.http`. Porty 5080/7080, `/health`, Swagger w Development.
 - Migracje w `Infrastructure/DAL/Migrations`: `dotnet ef migrations add` działa (Krok 15), ale sprawdź wynik – EF nie zna indeksu
   przestrzennego `IX_Announcements_GeoPoint` (kolumna `GeoPoint`); linie, które go dotykają, usuń.
@@ -114,7 +114,9 @@ cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /ap
   aktualizuje nieaktualną ofertę (`ReviseOffer`, status `Revised`, powiadomienie `OfferRevised`, „Zaktualizuj ofertę”;
   `verify.cmd`: dotnet 507/507, Vitest 281/281; test ręczny Chrome ↔ Brave OK). **D zrobione 13.11.2026** (`activity$`
   hub + push, zmiana każdej oczekującej oferty, Start tylko pomocnik, `ReportDone` + potwierdzenie, powiadomienia `Job*`,
-  „Zakończone” zwinięte; `verify.cmd`: dotnet 532/532, Vitest 295/295). Zostało: **E** (rezygnacja / przerwanie zlecenia).
+  „Zakończone” zwinięte; `verify.cmd`: dotnet 532/532, Vitest 295/295). **F zrobione 13.11.2026** (bez „nieaktualna”: podgląd zmian +
+  „Podtrzymuję ofertę”, ekran „Oceny” + `api/me/ratings`, filtry i układ „Szukaj”, dzwonek w `/conversations/all`;
+  `verify.cmd`: dotnet 536/536, Vitest 322/322). Zostało: **E** (rezygnacja / przerwanie zlecenia).
 - [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)
