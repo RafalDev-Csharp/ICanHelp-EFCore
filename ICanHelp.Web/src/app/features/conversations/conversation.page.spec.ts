@@ -3,9 +3,10 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 
-import type { ConversationDto, ConversationEntryDto, NotificationDto, UserDto } from '../../core/api/api-client';
+import type { ConversationDto, ConversationEntryDto, UserDto } from '../../core/api/api-client';
 import { AnnouncementsClient, ConversationsClient, UsersClient } from '../../core/api/api-client';
 import { AuthService } from '../../core/auth/auth.service';
+import type { NotificationActivity } from '../../core/notifications/notifications.service';
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { announcementDetails } from '../announcements/testing/announcement-fixtures';
 import { OffersService } from '../offers/offers.service';
@@ -24,6 +25,7 @@ describe('ConversationPage', () => {
     withdraw: vi.fn(),
     revise: vi.fn(() => Promise.resolve(true)),
     start: vi.fn(() => Promise.resolve(true)),
+    reportDone: vi.fn(() => Promise.resolve(true)),
     complete: vi.fn(() => Promise.resolve(true)),
   };
   const announcements = { getById: vi.fn() };
@@ -31,9 +33,9 @@ describe('ConversationPage', () => {
     currentUser: signal<UserDto | null>({ id: 'owner-1' } as UserDto),
     loadCurrentUser: vi.fn(() => of()),
   };
-  const received = new Subject<NotificationDto>();
+  const activity = new Subject<NotificationActivity>();
   const notifications = {
-    received$: received.asObservable(),
+    activity$: activity.asObservable(),
     openConversation: vi.fn(),
     closeConversation: vi.fn(),
   };
@@ -117,7 +119,7 @@ describe('ConversationPage', () => {
     expect(element.querySelector('.subject h2')?.textContent).toContain('Cieknący kran');
   });
 
-  it('offers "start" in the accepted thread to both sides and "complete" only to the client', async () => {
+  it('lets only the helper start the accepted job; the client waits but can confirm', async () => {
     const accepted = [offerEntry({ status: 'Accepted' })];
     const helper = create(conversationFixture({ announcementStatus: 'Accepted', timeline: accepted }));
     await helper.render();
@@ -129,18 +131,60 @@ describe('ConversationPage', () => {
     expect(conversations.getById).toHaveBeenCalledTimes(2);
     TestBed.resetTestingModule();
 
-    const helperInProgress = create(conversationFixture({ announcementStatus: 'InProgress', timeline: accepted }));
-    await helperInProgress.render();
-    expect(helperInProgress.element.querySelector('.job-action')).toBeNull();
-    TestBed.resetTestingModule();
-
     const client = create(
-      conversationFixture({ myRole: 'Client', announcementStatus: 'InProgress', timeline: accepted }),
+      conversationFixture({ myRole: 'Client', announcementStatus: 'Accepted', timeline: accepted }),
     );
     await client.render();
-    expect(client.element.querySelector('.job-action')?.textContent).toContain('Zakończ zlecenie');
+    expect(client.element.querySelector('.job-note')?.textContent).toContain('pomocnik rozpocznie');
+    expect(client.element.querySelector('.job-action')?.textContent).toContain('Potwierdź wykonanie');
+    expect(offers.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets the helper report the work as done and then shows that he waits', async () => {
+    const accepted = [offerEntry({ status: 'Accepted' })];
+    const helper = create(conversationFixture({ announcementStatus: 'InProgress', timeline: accepted }));
+    await helper.render();
+
+    expect(helper.element.querySelector('.job-action')?.textContent).toContain('Zgłoś wykonanie');
+    await helper.page.runJobAction();
+    expect(offers.reportDone).toHaveBeenCalledWith('a1');
+    TestBed.resetTestingModule();
+
+    const waiting = create(
+      conversationFixture({
+        announcementStatus: 'InProgress',
+        announcementDoneReportedAt: '2026-11-13T10:00:00Z',
+        timeline: accepted,
+      }),
+    );
+    await waiting.render();
+    expect(waiting.element.querySelector('.job-action')).toBeNull();
+    expect(waiting.element.querySelector('.job-note')?.textContent).toContain('czekasz na potwierdzenie');
+  });
+
+  it('highlights the confirmation for the client after the helper reported the work', async () => {
+    const client = create(
+      conversationFixture({
+        myRole: 'Client',
+        announcementStatus: 'InProgress',
+        announcementDoneReportedAt: '2026-11-13T10:00:00Z',
+        timeline: [offerEntry({ status: 'Accepted' })],
+      }),
+    );
+    await client.render();
+
+    expect(client.element.querySelector('.job-note.highlight')?.textContent).toContain('Pomocnik zgłosił wykonanie');
+    expect(client.element.querySelector('.job-action')?.textContent).toContain('Potwierdź wykonanie');
     await client.page.runJobAction();
     expect(offers.complete).toHaveBeenCalledWith('a1');
+  });
+
+  it('lets the author change an up-to-date pending offer', async () => {
+    const { element, render } = create(conversationFixture({ myRole: 'Helper', timeline: [offerEntry()] }));
+    await render();
+
+    const buttons = [...element.querySelectorAll('.offer-actions ion-button')].map((b) => b.textContent?.trim());
+    expect(buttons).toEqual(['Wycofaj', 'Zmień ofertę']);
   });
 
   it('has no job actions in a thread whose offer was not accepted', async () => {
@@ -168,17 +212,24 @@ describe('ConversationPage', () => {
     expect(buttons).toEqual(['Odrzuć', 'Kontroferta', 'Przyjmij']);
   });
 
-  it('tells notifications the thread is open and reloads on a live notification from it', async () => {
+  it('tells notifications the thread is open and reloads on a live notification about it', async () => {
     const { page, render } = create(conversationFixture());
     await render();
     expect(notifications.openConversation).toHaveBeenCalledWith('c1');
     expect(conversations.getById).toHaveBeenCalledTimes(1);
 
-    received.next({ id: 'n1', type: 'MessageReceived', conversationId: 'other' } as NotificationDto);
+    activity.next({ announcementId: 'other-a', conversationId: 'other' });
     expect(conversations.getById).toHaveBeenCalledTimes(1);
 
-    received.next({ id: 'n2', type: 'MessageReceived', conversationId: 'c1' } as NotificationDto);
+    activity.next({ announcementId: 'a1', conversationId: 'c1' });
     expect(conversations.getById).toHaveBeenCalledTimes(2);
+
+    // Push / hub o tym ogłoszeniu bez wątku (np. przyszło tylko id ogłoszenia) – też przeładowanie.
+    activity.next({ announcementId: 'a1' });
+    expect(conversations.getById).toHaveBeenCalledTimes(3);
+
+    page.ionViewWillEnter();
+    expect(conversations.getById).toHaveBeenCalledTimes(4);
 
     page.ionViewWillLeave();
     expect(notifications.closeConversation).toHaveBeenCalledWith('c1');

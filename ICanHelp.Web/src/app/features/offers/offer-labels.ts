@@ -92,7 +92,10 @@ export interface OfferActions {
   counter: boolean;
   /** Wycofanie: tylko autor. */
   withdraw: boolean;
-  /** Aktualizacja: autor nieaktualnej oferty (`Announcement.ReviseOffer`) – nowe warunki do bieżącej wersji ogłoszenia. */
+  /**
+   * Zmiana: autor oczekującej oferty (`Announcement.ReviseOffer`, F11 D – także aktualnej) – nowe warunki do bieżącej
+   * wersji ogłoszenia, dopóki druga strona nie odpowie.
+   */
   revise: boolean;
 }
 
@@ -111,7 +114,7 @@ export function offerActions(
     return NO_ACTIONS;
   }
   if (offer.proposedBy === myParty) {
-    return { ...NO_ACTIONS, withdraw: true, revise: offer.isOutdated };
+    return { ...NO_ACTIONS, withdraw: true, revise: true };
   }
   return { ...NO_ACTIONS, accept: !offer.isOutdated, reject: true, counter: true };
 }

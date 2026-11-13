@@ -177,6 +177,29 @@ describe('NotificationsService', () => {
     expect(toast.action).toHaveBeenCalledTimes(1);
   });
 
+  it('tells open screens what changed – from the hub and from a push in the open thread', () => {
+    const service = create();
+    const activity: unknown[] = [];
+    service.activity$.subscribe((a) => activity.push(a));
+
+    connections[0].push(notification({ id: 'n1', type: 'JobDoneReported' }));
+    expect(activity).toEqual([{ announcementId: 'a1', conversationId: 'c1' }]);
+
+    // Push przy otwartym wątku (hub nie działa / był wolniejszy): bez toastu, ale ekran wątku i tak się przeładuje.
+    service.openConversation('c2');
+    service.showPush({
+      notificationId: 'n2',
+      title: 'Oferta zaktualizowana',
+      announcementId: 'a2',
+      conversationId: 'c2',
+    });
+    expect(activity).toEqual([
+      { announcementId: 'a1', conversationId: 'c1' },
+      { announcementId: 'a2', conversationId: 'c2' },
+    ]);
+    expect(toast.action).toHaveBeenCalledTimes(1);
+  });
+
   it('marks all as read and restores the counter from the API on error', async () => {
     const service = create();
 

@@ -40,6 +40,20 @@ describe('notification texts', () => {
     expect(revised.icon).toBe('refresh-outline');
   });
 
+  it('describes the job steps and leads to the thread', () => {
+    const started = describeNotification(notification('JobStarted', title));
+    expect(started).toEqual({ title: 'Pomocnik rozpoczął zlecenie', body: 'Cieknący kran', icon: 'play-outline' });
+    const done = describeNotification(notification('JobDoneReported', title));
+    expect(done.title).toBe('Pomocnik zgłosił wykonanie – potwierdź');
+    expect(done.icon).toBe('flag-outline');
+    const completed = describeNotification(notification('JobCompleted', title));
+    expect(completed.title).toBe('Zlecenie zakończone – możesz ocenić');
+    expect(completed.icon).toBe('star-outline');
+
+    expect(notificationLink(notification('JobDoneReported', title))).toEqual(['/conversations', 'c1']);
+    expect(concernsConversation(notification('JobCompleted', title))).toBe(true);
+  });
+
   it('prefers the ready text from the API and keeps the icon from the type', () => {
     const text = describeNotification(
       notification('OfferReceived', { ...title, price: '120.00 PLN' }, { title: 'Z serwera', body: 'Treść' }),

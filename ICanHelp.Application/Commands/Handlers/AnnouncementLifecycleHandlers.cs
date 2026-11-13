@@ -1,4 +1,5 @@
 using ICanHelp.Application.Abstractions;
+using ICanHelp.Application.Time;
 using ICanHelp.Core.Repositories;
 using ICanHelp.Core.ValueObjects;
 
@@ -29,18 +30,41 @@ internal sealed class StartAnnouncementHandler : ICommandHandler<StartAnnounceme
 {
     private readonly IAnnouncementRepository _announcements;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IClock _clock;
 
-    public StartAnnouncementHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork)
+    public StartAnnouncementHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
     {
         _announcements = announcements;
         _unitOfWork = unitOfWork;
+        _clock = clock;
     }
 
     public Task HandleAsync(StartAnnouncement command, CancellationToken cancellationToken = default)
         => _unitOfWork.ExecuteAsync(async () =>
         {
             var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
-            announcement.Start(new UserId(command.ActorId));
+            announcement.Start(new UserId(command.ActorId), _clock.UtcNow);
+        }, cancellationToken);
+}
+
+internal sealed class ReportAnnouncementDoneHandler : ICommandHandler<ReportAnnouncementDone>
+{
+    private readonly IAnnouncementRepository _announcements;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IClock _clock;
+
+    public ReportAnnouncementDoneHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
+    {
+        _announcements = announcements;
+        _unitOfWork = unitOfWork;
+        _clock = clock;
+    }
+
+    public Task HandleAsync(ReportAnnouncementDone command, CancellationToken cancellationToken = default)
+        => _unitOfWork.ExecuteAsync(async () =>
+        {
+            var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
+            announcement.ReportDone(new UserId(command.ActorId), _clock.UtcNow);
         }, cancellationToken);
 }
 
@@ -48,17 +72,19 @@ internal sealed class CompleteAnnouncementHandler : ICommandHandler<CompleteAnno
 {
     private readonly IAnnouncementRepository _announcements;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IClock _clock;
 
-    public CompleteAnnouncementHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork)
+    public CompleteAnnouncementHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
     {
         _announcements = announcements;
         _unitOfWork = unitOfWork;
+        _clock = clock;
     }
 
     public Task HandleAsync(CompleteAnnouncement command, CancellationToken cancellationToken = default)
         => _unitOfWork.ExecuteAsync(async () =>
         {
             var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
-            announcement.Complete(new UserId(command.ActorId));
+            announcement.Complete(new UserId(command.ActorId), _clock.UtcNow);
         }, cancellationToken);
 }

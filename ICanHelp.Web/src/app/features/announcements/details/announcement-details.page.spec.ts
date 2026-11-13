@@ -7,6 +7,7 @@ import { of, throwError } from 'rxjs';
 import type { UserDto } from '../../../core/api/api-client';
 import { AnnouncementsClient, CategoriesClient, ConversationsClient, UsersClient } from '../../../core/api/api-client';
 import { AuthService } from '../../../core/auth/auth.service';
+import { notificationsStub, provideNotificationsStub } from '../../../core/testing/notifications-stub';
 import { ToastService } from '../../../core/ui/toast.service';
 import { MapComponent } from '../../../shared/components/map/map.component';
 import { OffersService } from '../../offers/offers.service';
@@ -36,7 +37,15 @@ describe('AnnouncementDetailsPage', () => {
     postConversation: vi.fn(),
   };
   const conversations = { getMine: vi.fn() };
-  const offers = { make: vi.fn(), revise: vi.fn(), rate: vi.fn(), start: vi.fn(), complete: vi.fn() };
+  const offers = {
+    make: vi.fn(),
+    revise: vi.fn(),
+    rate: vi.fn(),
+    start: vi.fn(),
+    reportDone: vi.fn(),
+    complete: vi.fn(),
+  };
+  let notifications = notificationsStub();
   const likes = { load: vi.fn(() => of([])), isLiked: vi.fn(() => false), sync: vi.fn(), toggle: vi.fn() };
   /** Potwierdzenie z okna: `confirm` wybiera przycisk o tej roli. */
   let alertButtons: { role?: string; handler?: () => void }[] = [];
@@ -73,6 +82,7 @@ describe('AnnouncementDetailsPage', () => {
         { provide: ToastService, useValue: toast },
         { provide: LikesService, useValue: likes },
         { provide: AlertController, useValue: alerts },
+        provideNotificationsStub(notifications),
       ],
     });
     TestBed.overrideComponent(AnnouncementDetailsPage, {
@@ -92,6 +102,7 @@ describe('AnnouncementDetailsPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    notifications = notificationsStub();
     auth.isAuthenticated.set(false);
     auth.currentUser.set(null);
     alertRole = 'cancel';
@@ -287,8 +298,10 @@ describe('AnnouncementDetailsPage', () => {
     const { page, element, render } = create();
     await render();
 
-    expect(element.querySelector('ion-footer')?.textContent).toContain('Zakończ');
-    await page.complete();
+    const footer = element.querySelector('ion-footer')?.textContent ?? '';
+    expect(footer).toContain('W realizacji – pomocnik zgłosi wykonanie.');
+    expect(footer).toContain('Potwierdź wykonanie');
+    await page.runJobAction();
     expect(offers.complete).toHaveBeenCalledWith('a1');
 
     announcements.getById.mockReturnValue(
@@ -305,6 +318,79 @@ describe('AnnouncementDetailsPage', () => {
 
     expect(announcements.getRatings).toHaveBeenCalledWith('a1');
     expect(element.querySelector('ion-footer')?.textContent).toContain('Oceń pomocnika');
+  });
+
+  it('lets the accepted helper report the work as done and then shows that he waits', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'helper-1' } as UserDto);
+    const inProgress = {
+      status: 'InProgress',
+      acceptedOfferId: 'o1',
+      offers: [offerFixture('o1', { status: 'Accepted' })],
+    };
+    announcements.getById.mockReturnValue(of(announcementDetails('a1', inProgress)));
+    offers.reportDone.mockResolvedValue(true);
+    const { page, element, render } = create();
+    await render();
+
+    expect(element.querySelector('.job-action')?.textContent).toContain('Zgłoś wykonanie');
+    await page.runJobAction();
+    expect(offers.reportDone).toHaveBeenCalledWith('a1');
+
+    announcements.getById.mockReturnValue(
+      of(announcementDetails('a1', { ...inProgress, doneReportedAt: '2026-11-13T10:00:00Z' })),
+    );
+    page.load();
+    await render();
+
+    expect(element.querySelector('.job-action')).toBeNull();
+    expect(element.querySelector('.job-note')?.textContent).toContain('czekasz na potwierdzenie');
+  });
+
+  it('highlights the confirmation for the owner and reloads on a notification about the announcement', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'owner-1' } as UserDto);
+    announcements.getById.mockReturnValue(
+      of(
+        announcementDetails('a1', {
+          status: 'InProgress',
+          acceptedOfferId: 'o1',
+          doneReportedAt: '2026-11-13T10:00:00Z',
+          offers: [offerFixture('o1', { status: 'Accepted' })],
+        }),
+      ),
+    );
+    const { element, render } = create();
+    await render();
+
+    expect(element.querySelector('.job-note.highlight')?.textContent).toContain('Pomocnik zgłosił wykonanie');
+    expect(announcements.getById).toHaveBeenCalledTimes(1);
+
+    notifications.activity$.next({ announcementId: 'other' });
+    expect(announcements.getById).toHaveBeenCalledTimes(1);
+    notifications.activity$.next({ announcementId: 'a1', conversationId: 'c1' });
+    expect(announcements.getById).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not give the owner "start" – only the helper starts the job', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'owner-1' } as UserDto);
+    announcements.getById.mockReturnValue(
+      of(
+        announcementDetails('a1', {
+          status: 'Accepted',
+          acceptedOfferId: 'o1',
+          offers: [offerFixture('o1', { status: 'Accepted' })],
+        }),
+      ),
+    );
+    const { element, render } = create();
+    await render();
+
+    const footer = element.querySelector('ion-footer')?.textContent ?? '';
+    expect(footer).not.toContain('Rozpocznij');
+    expect(footer).toContain('Przyjęte – pomocnik rozpocznie zlecenie.');
+    expect(footer).toContain('Potwierdź wykonanie');
   });
 
   it('lists negotiations and the history for the owner', async () => {

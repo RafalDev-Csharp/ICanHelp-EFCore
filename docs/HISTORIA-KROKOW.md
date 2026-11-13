@@ -297,5 +297,25 @@
   `announcement-details.page`, `notification-texts`.
   13.11.2026 lokalnie (`verify.cmd`, Docker): dotnet 507/507 (Core 210, Application 191, integracyjne 106), `npm run api`
   (klient zgodny z ręczną edycją), lint + Vitest 281/281 + build zielone. Przepływ w przeglądarce – do sprawdzenia ręcznie.
+  Część D (13.11.2026): wątek i realizacja zlecenia. Odświeżanie: przyczyna objawu „dalej nieaktualna” – otwarty ekran
+  budził tylko hub; push przy otwartej aplikacji (`showPush`) go pomijał. Nowy `NotificationsService.activity$`
+  (`{announcementId, conversationId}` z huba i pusha; `PushNotice.announcementId`) → przeładowanie wątku (swój wątek albo
+  ogłoszenie), szczegółów ogłoszenia (nowe) i „Zleceń”. Core: z `ReviseOffer` zniknął warunek „tylko nieaktualna”;
+  `Start(actor, at)` – tylko przyjęty pomocnik; nowe `ReportDone(actor, at)` (InProgress, raz, `DoneReportedAt`);
+  `Complete(actor, at)` z Accepted lub InProgress; zdarzenia `JobStarted` / `JobDoneReported` / `JobCompleted`
+  (`Core/Events/JobEvents.cs`). Application: komenda `ReportAnnouncementDone` + handler, handlery cyklu z `IClock`,
+  `TransactionNotificationHandler` (Job* → druga strona, link do wątku), `NotificationType.Job*`, teksty w
+  `NotificationTextFormatter`. Infrastructure: kolumna `DoneReportedAt` (migracja `JobDoneReported` – czysta, bez indeksu
+  przestrzennego; wygenerowana z `--configuration Release`, bo działające API blokowało `bin/Debug`), mapowanie w DTO.
+  Api: `POST api/announcements/{id}/report-done`, `doneReportedAt` w `AnnouncementDto`, `announcementDoneReportedAt`
+  w `ConversationDto`, przykłady w `.http`. Front: `api-client.ts` (`reportDone`, nowe pola), `features/offers/job-step.ts`
+  (wspólny krok zlecenia dla wątku i szczegółów), `OffersService.reportDone` + teksty, „Zmień ofertę” / „Zaktualizuj
+  ofertę”, `.job-note` w `global.scss`, ikony powiadomień `play-outline` / `flag-outline` / `star-outline`, „Zlecenia” –
+  zwinięta, wyszarzona sekcja „Zakończone (N)”. Testy: nowe `AnnouncementJobTests` (Core), `job-step.spec`; dopisane /
+  zmienione w testach Core (cykl, uczestnicy, `ReviseOffer`), Application (handlery, powiadomienia, teksty), Api
+  (`AnnouncementFlowTests` – przepływ z powiadomieniami i 409, `Complete` z Accepted; `AnnouncementEditTests`), Vitest
+  (wątek, szczegóły, zlecenia, oferty, powiadomienia).
+  13.11.2026 lokalnie (`verify.cmd`, Docker): dotnet 532/532 (Core 223, Application 202, integracyjne 107), `npm run api`
+  (klient zgodny z ręczną edycją), lint + Vitest 295/295 + build zielone. Przepływ w przeglądarce – do sprawdzenia ręcznie.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

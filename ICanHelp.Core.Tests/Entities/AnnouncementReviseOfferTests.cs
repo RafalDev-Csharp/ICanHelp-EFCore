@@ -8,7 +8,10 @@ using static ICanHelp.Core.Tests.Entities.AnnouncementTestData;
 
 namespace ICanHelp.Core.Tests.Entities;
 
-/// <summary>F11 C: autor aktualizuje własną nieaktualną ofertę (ogłoszenie zmieniło się po jej złożeniu).</summary>
+/// <summary>
+/// F11 C: autor aktualizuje własną nieaktualną ofertę (ogłoszenie zmieniło się po jej złożeniu);
+/// F11 D: także aktualną – dopóki druga strona nie odpowie.
+/// </summary>
 public class AnnouncementReviseOfferTests
 {
     private static void Edit(Announcement announcement, string description = "Kran i syfon w kuchni.")
@@ -90,15 +93,32 @@ public class AnnouncementReviseOfferTests
     }
 
     [Fact]
-    public void ReviseOffer_UpToDateOffer_Throws()
+    public void ReviseOffer_UpToDateOffer_ChangesTermsBeforeTheAnswer()
     {
+        // F11 D: autor zmienia każdą swoją oczekującą propozycję, nie tylko nieaktualną.
         var announcement = CreateAnnouncement();
         var offer = announcement.AddHelperOffer(Helper);
 
-        Should.Throw<DomainRuleException>(() => Revise(announcement, offer, Helper));
+        var revised = Revise(announcement, offer, Helper, price: 90m);
 
-        offer.Status.ShouldBe(OfferStatus.Pending);
-        announcement.Offers.Count.ShouldBe(1);
+        offer.Status.ShouldBe(OfferStatus.Revised);
+        revised.Status.ShouldBe(OfferStatus.Pending);
+        revised.Price.ShouldBe(Price.Pln(90m));
+        revised.AnnouncementRevision.ShouldBe(announcement.Revision);
+        announcement.Offers.Count(o => o.Status == OfferStatus.Pending).ShouldBe(1);
+    }
+
+    [Fact]
+    public void ReviseOffer_UpToDateClientCounter_CanBeChangedByOwner()
+    {
+        var announcement = CreateAnnouncement();
+        var first = announcement.AddHelperOffer(Helper);
+        var clientCounter = announcement.Counter(first, OwnerId);
+
+        var revised = Revise(announcement, clientCounter, OwnerId, price: 105m);
+
+        clientCounter.Status.ShouldBe(OfferStatus.Revised);
+        revised.ProposedBy.ShouldBe(OfferParty.Client);
     }
 
     [Fact]

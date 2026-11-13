@@ -14,6 +14,9 @@ public sealed record ConversationDto
     /// <summary>The current revision of the announcement (messages and offers made on an older one refer to an older text).</summary>
     public int AnnouncementRevision { get; init; }
 
+    /// <summary>F11 D: when the accepted helper reported the work as done (null = not yet).</summary>
+    public DateTime? AnnouncementDoneReportedAt { get; init; }
+
     public Guid ClientId { get; init; }
     public Guid HelperId { get; init; }
 

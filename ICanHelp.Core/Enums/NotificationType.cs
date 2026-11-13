@@ -30,6 +30,15 @@ public enum NotificationType
     /// <summary>Krok 14: over the daily limit of alerts – one digest a day ("and N more new announcements").</summary>
     NewAnnouncementsDigest,
 
-    /// <summary>F11 C: the other side updated its outdated offer to the current version of the announcement.</summary>
-    OfferRevised
+    /// <summary>F11 C/D: the other side changed its pending offer (new terms, also an outdated one brought up to date).</summary>
+    OfferRevised,
+
+    /// <summary>F11 D: the accepted helper started the work on my announcement.</summary>
+    JobStarted,
+
+    /// <summary>F11 D: the helper reported the work as done – confirm it.</summary>
+    JobDoneReported,
+
+    /// <summary>F11 D: the owner confirmed the work – the job is completed, I can rate.</summary>
+    JobCompleted
 }

@@ -21,6 +21,7 @@ describe('OffersService', () => {
     reject: vi.fn(),
     withdraw: vi.fn(),
     start: vi.fn(),
+    reportDone: vi.fn(),
     complete: vi.fn(),
     postRating: vi.fn(),
   };
@@ -122,6 +123,19 @@ describe('OffersService', () => {
     expect(toast.success).toHaveBeenCalledWith('Oferta zaktualizowana.');
   });
 
+  it('changes an up-to-date pending offer before the other side answers', async () => {
+    modalResult = { data: command, role: 'confirm' };
+    client.postReviseOffer.mockReturnValue(of({ id: 'o2' }));
+    const service = create();
+
+    await expect(service.revise(offerFixture('o1'))).resolves.toBe(true);
+
+    const props = modals.create.mock.calls[0][0].componentProps;
+    expect(props?.['heading']).toBe('Zmień ofertę');
+    expect(props?.['note']).toContain('zastąpią poprzednie');
+    expect(toast.success).toHaveBeenCalledWith('Oferta zmieniona.');
+  });
+
   it('does not revise when the form is closed', async () => {
     modalResult = { role: 'cancel' };
     const service = create();
@@ -144,8 +158,9 @@ describe('OffersService', () => {
     expect(toast.success).toHaveBeenCalledWith('Oferta przyjęta.');
   });
 
-  it('starts and completes the job only after confirmation', async () => {
+  it('starts, reports and completes the job only after confirmation', async () => {
     client.start.mockReturnValue(of(undefined));
+    client.reportDone.mockReturnValue(of(undefined));
     client.complete.mockReturnValue(of(undefined));
     const service = create();
 
@@ -157,6 +172,10 @@ describe('OffersService', () => {
     await expect(service.start('a1')).resolves.toBe(true);
     expect(client.start).toHaveBeenCalledWith('a1');
     expect(toast.success).toHaveBeenCalledWith('Zlecenie w realizacji.');
+
+    await expect(service.reportDone('a1')).resolves.toBe(true);
+    expect(client.reportDone).toHaveBeenCalledWith('a1');
+    expect(toast.success).toHaveBeenCalledWith('Wykonanie zgłoszone – czekasz na potwierdzenie.');
 
     await expect(service.complete('a1')).resolves.toBe(true);
     expect(client.complete).toHaveBeenCalledWith('a1');

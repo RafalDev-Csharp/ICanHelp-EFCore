@@ -22,6 +22,9 @@ public record AnnouncementDto
     /// <summary>When the content was last edited (null if never).</summary>
     public DateTime? UpdatedAt { get; init; }
 
+    /// <summary>When the accepted helper reported the work as done (status InProgress, waits for the owner's confirmation).</summary>
+    public DateTime? DoneReportedAt { get; init; }
+
     /// <summary>URL of the first (oldest) image – the thumbnail on a list; null if there are no images.</summary>
     public string? ThumbnailUrl { get; init; }
 

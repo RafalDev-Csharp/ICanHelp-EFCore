@@ -78,11 +78,12 @@ public sealed class AnnouncementEditTests
         var helper = await _factory.CreateUserAsync();
         var announcementId = await owner.CreateAnnouncementAsync();
         var url = $"/api/announcements/{announcementId}";
-        var offerId = await helper.MakeOfferAsync(announcementId, 120m);
+        var firstOfferId = await helper.MakeOfferAsync(announcementId, 120m);
 
-        // Aktualnej oferty nie można „aktualizować” – czeka na odpowiedź.
-        await (await helper.Client.PostAsJsonAsync($"{url}/offers/{offerId}/revise", TestApi.OfferBody(150m)))
-            .ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
+        // F11 D: aktualną ofertę autor też może zmienić, dopóki druga strona nie odpowie.
+        var changed = await helper.Client.PostAsJsonAsync($"{url}/offers/{firstOfferId}/revise", TestApi.OfferBody(150m));
+        changed.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var offerId = (await changed.ReadAsync<CreatedDto>()).Id;
 
         (await owner.Client.PatchAsJsonAsync(url, new { description = "Kran i syfon pod zlewem do wymiany." }))
             .StatusCode.ShouldBe(HttpStatusCode.NoContent);
@@ -110,8 +111,9 @@ public sealed class AnnouncementEditTests
         await _factory.ProcessOutboxAsync();
         var notifications = await owner.GetNotificationsAsync();
         notifications.Count.ShouldBe(before + 1);
-        var notification = notifications.Single(n => n.Type == "OfferRevised");
-        notification.Parameters[NotificationPayload.Price].ShouldBe("170.00 PLN");
+        // Dwie zmiany oferty (aktualnej i nieaktualnej) = dwa powiadomienia; nowsze – ze 170 zł.
+        var notification = notifications.Single(n =>
+            n.Type == "OfferRevised" && n.Parameters[NotificationPayload.Price] == "170.00 PLN");
         notification.Title.ShouldBe("Oferta zaktualizowana: 170 zł");
 
         (await owner.Client.PostEmptyAsync($"{url}/offers/{revisedId}/accept")).StatusCode

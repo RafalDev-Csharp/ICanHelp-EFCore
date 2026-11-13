@@ -27,6 +27,7 @@ internal static class Extensions
             AcceptedOfferId = entity.AcceptedOfferId?.Value,
             Revision = entity.Revision,
             UpdatedAt = entity.UpdatedAt,
+            DoneReportedAt = entity.DoneReportedAt,
             ThumbnailUrl = entity.GetThumbnailUrl()
             // HelperCount: the list queries count it with a subquery (offers are not loaded there).
         };
@@ -56,6 +57,7 @@ internal static class Extensions
             AcceptedOfferId = entity.AcceptedOfferId?.Value,
             Revision = entity.Revision,
             UpdatedAt = entity.UpdatedAt,
+            DoneReportedAt = entity.DoneReportedAt,
             ThumbnailUrl = entity.GetThumbnailUrl(),
             Offers = entity.GetOffersVisibleTo(viewerId).OrderBy(o => o.CreatedAt).Select(o => o.AsDto(entity)).ToList(),
             HelperCount = entity.Offers.Select(o => o.HelperId).Distinct().Count(),
@@ -130,6 +132,7 @@ internal static class Extensions
             AnnouncementTitle = announcement.Title,
             AnnouncementStatus = announcement.Status.ToString(),
             AnnouncementRevision = announcement.Revision,
+            AnnouncementDoneReportedAt = announcement.DoneReportedAt,
             ClientId = entity.ClientId,
             HelperId = entity.HelperId,
             MyRole = entity.GetParty(readerId).ToString(),

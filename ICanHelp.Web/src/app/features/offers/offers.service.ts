@@ -61,22 +61,24 @@ export class OffersService {
   }
 
   /**
-   * Autor aktualizuje własną nieaktualną ofertę (ogłoszenie zmieniło się po jej złożeniu): okno z poprzednimi
-   * warunkami i informacją, co się zmieniło → `POST …/revise` (stara oferta → „Zaktualizowana”).
+   * Autor zmienia własną oczekującą ofertę, zanim druga strona odpowie (F11 D – także aktualną): okno z poprzednimi
+   * warunkami → `POST …/revise` (stara oferta → „Zaktualizowana”). Nieaktualna – z informacją, co się zmieniło.
    */
   async revise(offer: OfferDto): Promise<boolean> {
     const changed = changedFieldsLabel(offer.changesSinceOffer);
     const command = await this.openForm({
-      heading: 'Zaktualizuj ofertę',
+      heading: offer.isOutdated ? 'Zaktualizuj ofertę' : 'Zmień ofertę',
       basis: offer,
-      note: `Ogłoszenie zmieniło się od Twojej oferty${changed ? ` (${changed})` : ''}. Sprawdź warunki i wyślij je do aktualnej wersji – dopiero wtedy druga strona może ją przyjąć.`,
+      note: offer.isOutdated
+        ? `Ogłoszenie zmieniło się od Twojej oferty${changed ? ` (${changed})` : ''}. Sprawdź warunki i wyślij je do aktualnej wersji – dopiero wtedy druga strona może ją przyjąć.`
+        : 'Nowe warunki zastąpią poprzednie – druga strona dostanie powiadomienie.',
     });
     if (!command) {
       return false;
     }
     const created = await this.run(
       this.client.postReviseOffer(offer.announcementId, offer.id, command),
-      'Oferta zaktualizowana.',
+      offer.isOutdated ? 'Oferta zaktualizowana.' : 'Oferta zmieniona.',
     );
     return created !== null;
   }
@@ -106,22 +108,36 @@ export class OffersService {
     );
   }
 
-  /** „Rozpocznij” – właściciel albo przyjęty pomocnik (Accepted → InProgress). */
+  /** „Rozpocznij” – tylko przyjęty pomocnik (Accepted → InProgress); zleceniodawca dostaje powiadomienie. */
   async start(announcementId: string): Promise<boolean> {
     const confirmed = await this.confirm(
       'Rozpocząć zlecenie?',
-      'Oznaczy zlecenie jako „w realizacji”. Po wszystkim zleceniodawca potwierdzi zakończenie.',
+      'Zleceniodawca dostanie informację, że zaczynasz. Po wszystkim zgłosisz wykonanie.',
       'Rozpocznij',
     );
     return confirmed && (await this.run(this.client.start(announcementId), 'Zlecenie w realizacji.')) !== null;
   }
 
-  /** „Zakończ” – tylko właściciel (InProgress → Completed), potem obie strony mogą się ocenić. */
+  /** „Zgłoś wykonanie” – przyjęty pomocnik (InProgress, raz); zleceniodawca potwierdza. */
+  async reportDone(announcementId: string): Promise<boolean> {
+    const confirmed = await this.confirm(
+      'Zgłosić wykonanie?',
+      'Zleceniodawca dostanie prośbę o potwierdzenie. Potem możecie się wzajemnie ocenić.',
+      'Zgłoś wykonanie',
+    );
+    return (
+      confirmed &&
+      (await this.run(this.client.reportDone(announcementId), 'Wykonanie zgłoszone – czekasz na potwierdzenie.')) !==
+        null
+    );
+  }
+
+  /** „Potwierdź wykonanie” – tylko właściciel (Accepted / InProgress → Completed), potem obie strony mogą się ocenić. */
   async complete(announcementId: string): Promise<boolean> {
     const confirmed = await this.confirm(
       'Potwierdzić wykonanie?',
       'Zlecenie zostanie zakończone, a rozmowa – zamknięta. Potem możecie się wzajemnie ocenić.',
-      'Zakończ',
+      'Potwierdź',
     );
     return (
       confirmed &&

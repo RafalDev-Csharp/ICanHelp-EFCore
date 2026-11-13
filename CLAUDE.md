@@ -43,8 +43,9 @@ Announcement: `Open` → (AcceptOffer) `Accepted` → (Start) `InProgress` → (
 Offer: `Pending` → `Accepted` | `Rejected` | `Withdrawn` | `Countered` (zastąpiona kontrofertą) | `Revised` (autor zaktualizował nieaktualną).
 Akceptuje/odrzuca/kontruje **druga strona** niż autor oferty; wycofuje tylko autor. Oferty tylko w `Open`; po akceptacji pozostałe
 `Pending` → `Rejected`. Oferta sprzed ostatniej edycji jest nieaktualna (`IsOutdated`) – nie da się jej przyjąć; druga strona może kontrować,
-autor – zaktualizować (`ReviseOffer`, `POST …/offers/{id}/revise`).
-`Start` – właściciel albo zaakceptowany pomocnik; `Complete`/`Cancel` – właściciel. Ocena tylko po `Completed`, przez uczestnika.
+autor – zmienić każdą swoją oczekującą (`ReviseOffer`, `POST …/offers/{id}/revise`).
+`Start` – tylko zaakceptowany pomocnik; `ReportDone` (InProgress, raz, `DoneReportedAt`) – pomocnik; `Complete` (z Accepted lub
+InProgress) i `Cancel` – właściciel; Start / ReportDone / Complete → powiadomienia `Job*`. Ocena tylko po `Completed`, przez uczestnika.
 
 ## Gdzie co leży
 `docs/`: `ARCHITEKTURA.md` (szczegóły obszarów), `PLAN-NEGOCJACJE.md` (Kroki 9–12), `PLAN-POWIADOMIENIA.md` (Kroki 13–17),
@@ -111,9 +112,9 @@ cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /ap
   **B nawigacja zrobiona 12.11.2026** (zakładki Szukaj · Ulubione · Dodaj · Zlecenia · Konto, dzwonek, „Zapytaj”, fraza
   `phrase` w `GET api/announcements`; `verify.cmd`: dotnet 489/489, Vitest 275/275). **C zrobione 13.11.2026**: autor
   aktualizuje nieaktualną ofertę (`ReviseOffer`, status `Revised`, powiadomienie `OfferRevised`, „Zaktualizuj ofertę”;
-  `verify.cmd`: dotnet 507/507, Vitest 281/281; test ręczny Chrome ↔ Brave OK). Zostało: **D** (odświeżanie wątku, zmiana
-  oczekującej oferty, „Rozpocznij” / „Zgłoś wykonanie” u pomocnika, potwierdzenie u zleceniodawcy, powiadomienia,
-  „Zakończone” osobno), potem **E** (rezygnacja / przerwanie zlecenia).
+  `verify.cmd`: dotnet 507/507, Vitest 281/281; test ręczny Chrome ↔ Brave OK). **D zrobione 13.11.2026** (`activity$`
+  hub + push, zmiana każdej oczekującej oferty, Start tylko pomocnik, `ReportDone` + potwierdzenie, powiadomienia `Job*`,
+  „Zakończone” zwinięte; `verify.cmd`: dotnet 532/532, Vitest 295/295). Zostało: **E** (rezygnacja / przerwanie zlecenia).
 - [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)

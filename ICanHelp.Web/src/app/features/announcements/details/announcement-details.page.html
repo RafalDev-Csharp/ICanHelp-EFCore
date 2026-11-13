@@ -256,7 +256,13 @@
         {{ isOwner() ? 'Oceń pomocnika' : 'Oceń zleceniodawcę' }}
       </ion-button>
     </div>
-    } } @else if (isParticipant() && (status() === 'Accepted' || status() === 'InProgress')) {
+    } } @else if (isParticipant() && (status() === 'Accepted' || status() === 'InProgress')) { @if (job().note; as note)
+    {
+    <p class="job-note page-column" [class.highlight]="job().highlight">
+      <ion-icon [name]="job().highlight ? 'flag-outline' : 'hourglass-outline'" aria-hidden="true"></ion-icon>
+      {{ note }}
+    </p>
+    }
     <div class="actions page-column">
       @if (isOwner() && status() === 'Accepted') {
       <ion-button fill="outline" color="danger" (click)="cancel()" [disabled]="cancelling() || busy()">
@@ -268,18 +274,17 @@
         <ion-icon name="chatbubble-outline" slot="start" aria-hidden="true"></ion-icon>
         Rozmowa
       </ion-button>
-      } @if (status() === 'Accepted') {
-      <ion-button class="primary-action" (click)="start()" [disabled]="busy()">
-        <ion-icon name="play-outline" slot="start" aria-hidden="true"></ion-icon>
-        Rozpocznij
+      } @if (job().action; as action) {
+      <ion-button
+        class="primary-action job-action"
+        [color]="action === 'complete' ? 'success' : 'primary'"
+        [fill]="job().primary ? 'solid' : 'outline'"
+        (click)="runJobAction()"
+        [disabled]="busy()"
+      >
+        <ion-icon [name]="jobIcons[action]" slot="start" aria-hidden="true"></ion-icon>
+        {{ jobLabels[action] }}
       </ion-button>
-      } @else if (isOwner()) {
-      <ion-button class="primary-action" color="success" (click)="complete()" [disabled]="busy()">
-        <ion-icon name="checkmark-done-outline" slot="start" aria-hidden="true"></ion-icon>
-        Zakończ
-      </ion-button>
-      } @else {
-      <p class="footer-note primary-action">W realizacji – zakończenie potwierdzi zleceniodawca.</p>
       }
     </div>
     } @else if (isOwner()) { @if (isOpen()) {

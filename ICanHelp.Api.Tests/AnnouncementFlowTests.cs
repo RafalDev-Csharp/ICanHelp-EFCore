@@ -55,8 +55,20 @@ public sealed class AnnouncementFlowTests
         helperContact!.UserId.ShouldBe(helper.Id);
         (await stranger.Client.GetAsync($"{url}/contact")).StatusCode.ShouldBe(HttpStatusCode.NotFound);
 
-        // Start (pomocnik) i koniec (tylko właściciel).
+        // Start (tylko pomocnik), zgłoszenie wykonania (pomocnik, raz) i potwierdzenie (tylko właściciel).
+        await (await owner.Client.PostEmptyAsync($"{url}/start"))
+            .ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
         (await helper.Client.PostEmptyAsync($"{url}/start")).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        await (await owner.Client.PostEmptyAsync($"{url}/report-done"))
+            .ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
+        (await helper.Client.PostEmptyAsync($"{url}/report-done")).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        await (await helper.Client.PostEmptyAsync($"{url}/report-done"))
+            .ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
+
+        var reported = await owner.Client.GetFromJsonAsync<AnnouncementDetailsDto>(url);
+        reported!.Status.ShouldBe("InProgress");
+        reported.DoneReportedAt.ShouldNotBeNull();
+
         await (await helper.Client.PostEmptyAsync($"{url}/complete"))
             .ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
         (await owner.Client.PostEmptyAsync($"{url}/complete")).StatusCode.ShouldBe(HttpStatusCode.NoContent);
@@ -79,6 +91,54 @@ public sealed class AnnouncementFlowTests
             .GetFromJsonAsync<List<RatingDto>>($"/api/users/{helper.Id}/ratings");
         helperRatings.ShouldNotBeNull();
         helperRatings.ShouldHaveSingleItem().Rate.ShouldBe(5);
+    }
+
+    [Fact]
+    public async Task Job_NotifiesOtherSide_AndOwnerCanCompleteWithoutStart()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var helper = await _factory.CreateUserAsync();
+
+        // 1) Pełna realizacja: start → zgłoszenie → potwierdzenie, każda strona dostaje swoje powiadomienia.
+        var announcementId = await owner.CreateAnnouncementAsync();
+        var url = $"/api/announcements/{announcementId}";
+        var offerId = await helper.MakeOfferAsync(announcementId, 120m);
+        (await owner.Client.PostEmptyAsync($"{url}/offers/{offerId}/accept")).StatusCode
+            .ShouldBe(HttpStatusCode.NoContent);
+        await _factory.ProcessOutboxAsync();
+        var ownerBefore = (await owner.GetNotificationsAsync()).Count;
+        var helperBefore = (await helper.GetNotificationsAsync()).Count;
+
+        (await helper.Client.PostEmptyAsync($"{url}/start")).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await helper.Client.PostEmptyAsync($"{url}/report-done")).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await owner.Client.PostEmptyAsync($"{url}/complete")).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        await _factory.ProcessOutboxAsync();
+
+        var ownerNotifications = (await owner.GetNotificationsAsync())
+            .Where(n => n.AnnouncementId == announcementId).ToList();
+        (await owner.GetNotificationsAsync()).Count.ShouldBe(ownerBefore + 2);
+        ownerNotifications.ShouldContain(n => n.Type == "JobStarted" && n.Title == "Pomocnik rozpoczął zlecenie");
+        var done = ownerNotifications.Single(n => n.Type == "JobDoneReported");
+        done.ConversationId.ShouldNotBeNull();
+        done.Url.ShouldBe($"/conversations/{done.ConversationId}");
+
+        var helperNotifications = await helper.GetNotificationsAsync();
+        helperNotifications.Count.ShouldBe(helperBefore + 1);
+        helperNotifications.Single(n => n.Type == "JobCompleted").Title.ShouldBe("Zlecenie zakończone – możesz ocenić");
+
+        var conversation = await helper.Client.GetFromJsonAsync<ConversationDto>($"/api/conversations/{done.ConversationId}");
+        conversation!.AnnouncementStatus.ShouldBe("Completed");
+        conversation.AnnouncementDoneReportedAt.ShouldNotBeNull();
+        conversation.CanWrite.ShouldBeFalse();
+
+        // 2) Pomocnik zapomniał „Rozpocznij” – zleceniodawca i tak potwierdza wykonanie z Accepted.
+        var secondId = await owner.CreateAnnouncementAsync();
+        var secondUrl = $"/api/announcements/{secondId}";
+        var secondOffer = await helper.MakeOfferAsync(secondId, 90m);
+        (await owner.Client.PostEmptyAsync($"{secondUrl}/offers/{secondOffer}/accept")).StatusCode
+            .ShouldBe(HttpStatusCode.NoContent);
+        (await owner.Client.PostEmptyAsync($"{secondUrl}/complete")).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await owner.Client.GetFromJsonAsync<AnnouncementDetailsDto>(secondUrl))!.Status.ShouldBe("Completed");
     }
 
     [Fact]

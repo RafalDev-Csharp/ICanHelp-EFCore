@@ -77,13 +77,13 @@ internal static class AnnouncementTestData
             return announcement;
         }
 
-        announcement.Start(OwnerId);
+        announcement.Start(Helper, Now.AddDays(1));
         if (status == AnnouncementStatus.InProgress)
         {
             return announcement;
         }
 
-        announcement.Complete(OwnerId);
+        announcement.Complete(OwnerId, Now.AddDays(2));
         return announcement;
     }
 }

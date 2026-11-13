@@ -51,6 +51,9 @@ public class Announcement : AggregateRoot
     /// <summary>When the content was last edited (null if never).</summary>
     public DateTime? UpdatedAt { get; private set; }
 
+    /// <summary>When the accepted helper reported the work as done (null until then) – the owner confirms it.</summary>
+    public DateTime? DoneReportedAt { get; private set; }
+
     public IReadOnlyCollection<Offer> Offers => _offers.AsReadOnly();
     public IReadOnlyCollection<Image> Images => _images.AsReadOnly();
 
@@ -263,10 +266,9 @@ public class Announcement : AggregateRoot
     }
 
     /// <summary>
-    /// The author updates his own offer that became outdated (the announcement was edited after it was made):
-    /// new terms on the current revision, the old offer becomes <see cref="OfferStatus.Revised"/>.
-    /// Without it the author could only withdraw and start again – the other side cannot accept an outdated offer.
-    /// An up-to-date offer cannot be revised: it waits for the other side's answer (or is withdrawn).
+    /// The author changes his own pending offer before the other side answers it (other price, dates, message) –
+    /// also one that became outdated (the announcement was edited after it was made). The new offer is made on the
+    /// current revision, the old one becomes <see cref="OfferStatus.Revised"/>. Still one pending offer per helper.
     /// </summary>
     public Offer ReviseOffer(Id offerId, Id newOfferId, UserId actorId, Price price, DateTime proposedStart,
         DateTime proposedEnd, Description? message, DateTime createdAtUtc)
@@ -279,12 +281,6 @@ public class Announcement : AggregateRoot
         if (party != original.ProposedBy)
         {
             throw new DomainRuleException("Only the author of an offer can revise it. Make a counter-offer instead.");
-        }
-
-        if (original.AnnouncementRevision == Revision)
-        {
-            throw new DomainRuleException(
-                "The offer is up to date – wait for the answer or withdraw it. Only an outdated offer can be revised.");
         }
 
         // As in CounterOffer: the new offer first, so invalid data leaves the original untouched.
@@ -417,22 +413,49 @@ public class Announcement : AggregateRoot
 
     // ---------- lifecycle ----------
 
-    /// <summary>Work begins. Either participant can mark it: the owner or the helper of the accepted offer.</summary>
-    public void Start(UserId actorId)
+    /// <summary>Work begins – only the helper of the accepted offer marks it (he is the one who comes and works).</summary>
+    public void Start(UserId actorId, DateTime startedAtUtc)
     {
         EnsureStatus(AnnouncementStatus.Accepted, "be started");
-        EnsureParticipant(actorId);
+        var helperId = EnsureAcceptedHelper(actorId, "start");
 
         Status = AnnouncementStatus.InProgress;
+        AddDomainEvent(new JobStarted(Id, OwnerId, helperId, startedAtUtc));
     }
 
-    /// <summary>Only the owner (the client) confirms that the work is done.</summary>
-    public void Complete(UserId actorId)
+    /// <summary>
+    /// The helper says the work is done and waits for the owner's confirmation (<see cref="Complete"/>).
+    /// The status stays <see cref="AnnouncementStatus.InProgress"/>; only once.
+    /// </summary>
+    public void ReportDone(UserId actorId, DateTime reportedAtUtc)
     {
-        EnsureStatus(AnnouncementStatus.InProgress, "be completed");
+        EnsureStatus(AnnouncementStatus.InProgress, "be reported as done");
+        var helperId = EnsureAcceptedHelper(actorId, "report");
+
+        if (DoneReportedAt is not null)
+        {
+            throw new DomainRuleException("The work has already been reported as done.");
+        }
+
+        DoneReportedAt = reportedAtUtc;
+        AddDomainEvent(new JobDoneReported(Id, OwnerId, helperId, reportedAtUtc));
+    }
+
+    /// <summary>
+    /// Only the owner (the client) confirms that the work is done. Also from <see cref="AnnouncementStatus.Accepted"/>:
+    /// the helper may forget to press "start" / "done" – the job cannot get stuck because of it.
+    /// </summary>
+    public void Complete(UserId actorId, DateTime completedAtUtc)
+    {
+        if (Status is not (AnnouncementStatus.Accepted or AnnouncementStatus.InProgress))
+        {
+            throw new DomainRuleException($"Announcement in status {Status} cannot be completed.");
+        }
+
         EnsureOwner(actorId, "complete");
 
         Status = AnnouncementStatus.Completed;
+        AddDomainEvent(new JobCompleted(Id, OwnerId, GetAcceptedHelperId()!, completedAtUtc));
     }
 
     public void Cancel(UserId actorId)
@@ -533,6 +556,17 @@ public class Announcement : AggregateRoot
         {
             throw new DomainRuleException("Only the owner or the accepted helper can do this.");
         }
+    }
+
+    private UserId EnsureAcceptedHelper(UserId actorId, string action)
+    {
+        var helperId = GetAcceptedHelperId();
+        if (helperId is null || actorId != helperId)
+        {
+            throw new DomainRuleException($"Only the accepted helper can {action} the work.");
+        }
+
+        return helperId;
     }
 
     private void EnsureOwner(UserId actorId, string action)

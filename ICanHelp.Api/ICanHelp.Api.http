@@ -270,8 +270,8 @@ Content-Type: application/json
 }
 
 ###
-# Autor aktualizuje własną NIEAKTUALNĄ ofertę (ogłoszenie edytowano po jej złożeniu) -> 201 { id nowej oferty },
-# stara oferta -> "Revised", druga strona dostaje powiadomienie OfferRevised. Aktualna oferta / cudza oferta -> 409.
+# Autor zmienia własną OCZEKUJĄCĄ ofertę (aktualną albo nieaktualną po edycji ogłoszenia) -> 201 { id nowej oferty },
+# stara oferta -> "Revised", druga strona dostaje powiadomienie OfferRevised. Cudza / już rozpatrzona oferta -> 409.
 # Przykład: po PATCH ogłoszenia właściciel aktualizuje swoją kontrofertę.
 POST {{baseUrl}}/api/announcements/{{announcementId}}/offers/{{counterOffer.response.body.$.id}}/revise
 Authorization: Bearer {{signIn.response.body.$.accessToken}}
@@ -295,12 +295,18 @@ GET {{baseUrl}}/api/announcements/{{announcementId}}/contact
 Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
 
 ###
-# Start (pomocnik albo właściciel) -> 204
+# Start (tylko przyjęty pomocnik; właściciel -> 409) -> 204, zleceniodawca dostaje powiadomienie JobStarted
 POST {{baseUrl}}/api/announcements/{{announcementId}}/start
 Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
 
 ###
-# Zakończenie (tylko właściciel) -> 204
+# F11 D: pomocnik zgłasza wykonanie (InProgress, raz; drugi raz -> 409) -> 204. Status zostaje InProgress,
+# w szczegółach i wątku pojawia się doneReportedAt; zleceniodawca dostaje powiadomienie JobDoneReported.
+POST {{baseUrl}}/api/announcements/{{announcementId}}/report-done
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# Potwierdzenie wykonania (tylko właściciel, z InProgress albo Accepted) -> 204, pomocnik dostaje JobCompleted
 POST {{baseUrl}}/api/announcements/{{announcementId}}/complete
 Authorization: Bearer {{signIn.response.body.$.accessToken}}
 

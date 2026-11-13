@@ -10,15 +10,17 @@
 - `Announcement` (agregat): OwnerId, CategoryId, SubcategoryId, Difficulty (enum), Title, Description, Budget (Price),
   Location (VO lat/lon), Status, CreatedAt, AcceptedOfferId?, **Offers**, **Images** (max 5),
   **Revision** (0 = opublikowane, +1 przy realnej edycji; token współbieżności), UpdatedAt?, **Changes** (`AnnouncementChange`:
-  rewizja, czas, `AnnouncementFields` [Flags]).
+  rewizja, czas, `AnnouncementFields` [Flags]), DoneReportedAt? (F11 D: pomocnik zgłosił wykonanie).
   - metody: `Update(actor, ..., at)` (tylko właściciel, `Open`), `GetChangesSince(rev)`, `AddOffer`, `CounterOffer`, `ReviseOffer`, `AcceptOffer`,
-    `RejectOffer`, `WithdrawOffer`, `AddImage(actor,…,at)`, `RemoveImage(actor, id, at)`, `GetThumbnail()`, `Start(actor)`,
-    `Complete(actor)`, `Cancel(actor)`, `GetAcceptedHelperId()`, `IsParticipant(user)`, `CreateRating(...)`,
-    `GetOffersVisibleTo(viewer?)`, `StartConversation(...)`, `AllowsConversationWith(helper)`.
+    `RejectOffer`, `WithdrawOffer`, `AddImage(actor,…,at)`, `RemoveImage(actor, id, at)`, `GetThumbnail()`, `Start(actor, at)`
+    (tylko przyjęty pomocnik → `JobStarted`), `ReportDone(actor, at)` (przyjęty pomocnik, InProgress, raz → `JobDoneReported`),
+    `Complete(actor, at)` (właściciel, z Accepted lub InProgress → `JobCompleted`), `Cancel(actor)`, `GetAcceptedHelperId()`,
+    `IsParticipant(user)`, `CreateRating(...)`, `GetOffersVisibleTo(viewer?)`, `StartConversation(...)`, `AllowsConversationWith(helper)`.
   - `Offer` (część agregatu): HelperId, ProposedBy (Client/Helper), Price, ProposedStart/End, Message?, Status, ParentOfferId?,
     AnnouncementRevision (kontroferta = nowy `Offer` wskazujący poprzedni; poprzedni dostaje status `Countered`;
-    F11 C: autor nieaktualnej oczekującej oferty może ją zaktualizować – `ReviseOffer`, nowa oferta tej samej strony na
-    bieżącej rewizji, poprzednia → `Revised`, zdarzenie `OfferRevised` → powiadomienie `OfferRevised` dla drugiej strony).
+    F11 C/D: autor oczekującej oferty (aktualnej albo nieaktualnej) może ją zmienić, zanim druga strona odpowie –
+    `ReviseOffer`, nowa oferta tej samej strony na bieżącej rewizji, poprzednia → `Revised`, zdarzenie `OfferRevised` →
+    powiadomienie `OfferRevised` dla drugiej strony).
   - `Image` (część agregatu): FileName (do wyświetlania), FileExtension, FilePath (ścieżka w magazynie, nie trafia do DTO), AddedAt
     (najstarsze = miniatura). Dodanie/usunięcie = nowa rewizja z flagą `Images` (stare/nowe = lista id zdjęć „id1, id2”).
 - `Category` (agregat) → `Subcategory` (część agregatu, unikalna nazwa w kategorii).
@@ -34,7 +36,8 @@
   tylko zaakceptowany pomocnik, Completed/Cancelled – nikt (wątek tylko do odczytu). `MarkAsRead` (znacznik nie cofa się; wysłanie =
   przeczytane), `CountUnread`. Rozmowa ≠ oferta (wiadomości nie da się zaakceptować).
 - `AggregateRoot` (baza `Announcement`, `Conversation`): `DomainEvents` (`Core/Events`: `AnnouncementPublished/Edited`,
-  `OfferMade/Countered/Revised/Accepted/Rejected/Withdrawn`, `MessageSent`), czas = parametr metody. `SqlUnitOfWork` przenosi je do outboksa.
+  `OfferMade/Countered/Revised/Accepted/Rejected/Withdrawn`, `MessageSent`, F11 D: `JobStarted/DoneReported/Completed`),
+  czas = parametr metody. `SqlUnitOfWork` przenosi je do outboksa.
 - `Notification` (agregat, `Entities/Notifications`): UserId (odbiorca), Type, Payload (JSON parametrów), AnnouncementId?,
   ConversationId?, CreatedAt, ReadAt?, SourceEventId (unikalne z UserId) – sekcja „Powiadomienia”.
 - `AnnouncementAlert` (agregat, `Entities/Alerts`): Area (1 punkt) | Route (2–1000), kategoria + podkategorie, RadiusKm 0,5–50,

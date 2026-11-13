@@ -105,7 +105,13 @@
           >Wycofaj</ion-button
         >
         } @if (item.actions.revise) {
-        <ion-button size="small" (click)="revise(item.offer)" [disabled]="busy()">Zaktualizuj ofertę</ion-button>
+        <ion-button
+          size="small"
+          [fill]="item.offer.isOutdated ? 'solid' : 'outline'"
+          (click)="revise(item.offer)"
+          [disabled]="busy()"
+          >{{ item.offer.isOutdated ? 'Zaktualizuj ofertę' : 'Zmień ofertę' }}</ion-button
+        >
         } @if (item.actions.reject) {
         <ion-button size="small" fill="outline" color="danger" (click)="reject(item.offer)" [disabled]="busy()"
           >Odrzuć</ion-button
@@ -142,22 +148,28 @@
 
 @if (conversation(); as thread) {
 <ion-footer>
-  @if (jobAction(); as action) {
+  @if (job(); as step) {
   <ion-toolbar>
-    <ion-button
-      expand="block"
-      class="ion-padding-horizontal job-action page-column"
-      [color]="action === 'complete' ? 'success' : 'primary'"
-      (click)="runJobAction()"
-      [disabled]="busy()"
-    >
-      <ion-icon
-        [name]="action === 'start' ? 'play-outline' : 'checkmark-done-outline'"
-        slot="start"
-        aria-hidden="true"
-      ></ion-icon>
-      {{ action === 'start' ? 'Rozpocznij zlecenie' : 'Zakończ zlecenie' }}
-    </ion-button>
+    <div class="job page-column">
+      @if (step.note) {
+      <p class="job-note" [class.highlight]="step.highlight">
+        <ion-icon [name]="step.highlight ? 'flag-outline' : 'hourglass-outline'" aria-hidden="true"></ion-icon>
+        {{ step.note }}
+      </p>
+      } @if (step.action; as action) {
+      <ion-button
+        expand="block"
+        class="ion-padding-horizontal job-action"
+        [color]="action === 'complete' ? 'success' : 'primary'"
+        [fill]="step.primary ? 'solid' : 'outline'"
+        (click)="runJobAction()"
+        [disabled]="busy()"
+      >
+        <ion-icon [name]="jobIcons[action]" slot="start" aria-hidden="true"></ion-icon>
+        {{ jobLabels[action] }}
+      </ion-button>
+      }
+    </div>
   </ion-toolbar>
   } @if (thread.canWrite) { @if (canMakeOffer()) {
   <ion-toolbar>

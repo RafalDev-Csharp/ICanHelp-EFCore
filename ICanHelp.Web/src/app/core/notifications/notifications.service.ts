@@ -32,6 +32,7 @@ export class NotificationsService {
 
   private readonly started = signal(false);
   private readonly receivedSubject = new Subject<NotificationDto>();
+  private readonly activitySubject = new Subject<NotificationActivity>();
   private connection: NotificationHubConnection | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private retryCount = 0;
@@ -47,6 +48,12 @@ export class NotificationsService {
   readonly unreadCount = signal(0);
   /** Nowe powiadomienia z huba (już po aktualizacji licznika). */
   readonly received$: Observable<NotificationDto> = this.receivedSubject.asObservable();
+  /**
+   * F11 D: czego dotyczy nowe powiadomienie – z huba **i** z pusha przy otwartej aplikacji (gdy hub nie działa albo
+   * push był pierwszy). Otwarte ekrany (wątek, szczegóły ogłoszenia) przeładowują dane, jeśli to ich ogłoszenie / wątek.
+   * To samo zdarzenie może przyjść dwa razy (hub + push) – przeładowanie jest bezpieczne.
+   */
+  readonly activity$: Observable<NotificationActivity> = this.activitySubject.asObservable();
 
   constructor() {
     // Zalogowanie → połączenie i licznik; wylogowanie (także w innej karcie) → rozłączenie i zero.
@@ -135,6 +142,7 @@ export class NotificationsService {
     if (!push.notificationId || !this.remember(push.notificationId) || !this.auth.isAuthenticated()) {
       return;
     }
+    this.activitySubject.next({ announcementId: push.announcementId, conversationId: push.conversationId });
     if (push.conversationId && push.conversationId === this.activeConversationId) {
       return;
     }
@@ -212,6 +220,10 @@ export class NotificationsService {
   }
 
   private onNotification(notification: NotificationDto): void {
+    this.activitySubject.next({
+      announcementId: notification.announcementId,
+      conversationId: notification.conversationId,
+    });
     if (notification.conversationId && notification.conversationId === this.activeConversationId) {
       // Użytkownik patrzy na ten wątek – widzi zmianę od razu (ekran przeładuje wątek).
       this.client.markAsRead(notification.id).subscribe({ error: () => undefined });
@@ -254,6 +266,13 @@ export interface PushNotice {
   title: string;
   body?: string;
   url?: string;
+  announcementId?: string;
+  conversationId?: string;
+}
+
+/** Czego dotyczy nowe powiadomienie (`activity$`) – do przeładowania otwartego ekranu. */
+export interface NotificationActivity {
+  announcementId?: string;
   conversationId?: string;
 }
 

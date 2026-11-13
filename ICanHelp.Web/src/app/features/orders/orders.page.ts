@@ -23,7 +23,14 @@ import {
 } from '@ionic/angular';
 import type { ViewWillEnter } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { briefcaseOutline, chatbubblesOutline, cloudOfflineOutline, handLeftOutline } from 'ionicons/icons';
+import {
+  briefcaseOutline,
+  chatbubblesOutline,
+  chevronDown,
+  chevronUp,
+  cloudOfflineOutline,
+  handLeftOutline,
+} from 'ionicons/icons';
 import type { Observable } from 'rxjs';
 import { filter, of, switchMap } from 'rxjs';
 
@@ -31,7 +38,6 @@ import type { AnnouncementDto, MyConversationDto, OfferParty } from '../../core/
 import { AnnouncementsClient, ConversationsClient } from '../../core/api/api-client';
 import { AuthService } from '../../core/auth/auth.service';
 import { CategoriesService } from '../../core/categories/categories.service';
-import { concernsConversation } from '../../core/notifications/notification-texts';
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
@@ -103,7 +109,8 @@ class PagedList<T> {
  * Zakładka „Zlecenia” (tylko zalogowani), segment **Zlecam / Pomagam**, pogrupowane po statusie (w trakcie negocjacji,
  * przyjęte, w realizacji, zakończone). Zlecam – moje ogłoszenia (wszystkie statusy → szczegóły z ofertami i rozmowami);
  * Pomagam – moje wątki jako pomocnik (pytania i oferty). Ogłoszenia po akceptacji są tylko tutaj (lista „Szukaj”
- * pokazuje wyłącznie otwarte). Odświeżana przy każdym wejściu i po powiadomieniu o wątku.
+ * pokazuje wyłącznie otwarte). Odświeżana przy każdym wejściu i po powiadomieniu o wątku. F11 D: aktywne na górze,
+ * zakończone / anulowane w osobnej, domyślnie zwiniętej sekcji „Zakończone (N)”, wyszarzone.
  */
 @Component({
   selector: 'app-orders',
@@ -156,14 +163,30 @@ export class OrdersPage implements ViewWillEnter {
   readonly current = computed(() => (this.role() === 'Client' ? this.mine : this.helping));
   readonly clientGroups = computed(() => groupOrders(this.mine.items(), clientOrderGroup));
   readonly helperGroups = computed(() => groupOrders(this.helping.items(), helperOrderGroup));
+  /** Sekcja „Zakończone” (zakończone, anulowane, wybrano innego) – domyślnie zwinięta, aktywne są na górze. */
+  readonly finishedOpen = signal(false);
 
   constructor() {
-    addIcons({ briefcaseOutline, chatbubblesOutline, cloudOfflineOutline, handLeftOutline });
+    addIcons({
+      briefcaseOutline,
+      chatbubblesOutline,
+      chevronDown,
+      chevronUp,
+      cloudOfflineOutline,
+      handLeftOutline,
+    });
 
-    // Nowa wiadomość / oferta / akceptacja (SignalR) – „Pomagam” od razu z nowym stanem.
+    // Nowa wiadomość / oferta / krok zlecenia (hub albo push) – lista od razu z nowym stanem.
     inject(NotificationsService)
-      .received$.pipe(filter(concernsConversation), takeUntilDestroyed())
+      .activity$.pipe(
+        filter((activity) => !!activity.conversationId),
+        takeUntilDestroyed(),
+      )
       .subscribe(() => this.current().reload());
+  }
+
+  toggleFinished(): void {
+    this.finishedOpen.update((open) => !open);
   }
 
   /** Przy każdym wejściu – po akcji w szczegółach albo w wątku status mógł się zmienić. */

@@ -158,6 +158,41 @@ public class TransactionNotificationHandlerTests
     }
 
     [Fact]
+    public async Task JobStarted_NotifiesOwner_WithConversation()
+    {
+        await _handler.HandleAsync(Guid.NewGuid(), new JobStarted(_announcement.Id, _owner, _helper, Now));
+
+        var notification = _notifications.Notifications.ShouldHaveSingleItem();
+        notification.UserId.ShouldBe(_owner);
+        notification.Type.ShouldBe(NotificationType.JobStarted);
+        notification.ConversationId.ShouldBe(_conversation.Id);
+        NotificationPayload.Deserialize(notification.Payload)[NotificationPayload.AnnouncementTitle]
+            .ShouldBe("Cieknący kran");
+    }
+
+    [Fact]
+    public async Task JobDoneReported_NotifiesOwner()
+    {
+        await _handler.HandleAsync(Guid.NewGuid(), new JobDoneReported(_announcement.Id, _owner, _helper, Now));
+
+        var notification = _notifications.Notifications.ShouldHaveSingleItem();
+        notification.UserId.ShouldBe(_owner);
+        notification.Type.ShouldBe(NotificationType.JobDoneReported);
+        notification.ConversationId.ShouldBe(_conversation.Id);
+    }
+
+    [Fact]
+    public async Task JobCompleted_NotifiesHelper()
+    {
+        await _handler.HandleAsync(Guid.NewGuid(), new JobCompleted(_announcement.Id, _owner, _helper, Now));
+
+        var notification = _notifications.Notifications.ShouldHaveSingleItem();
+        notification.UserId.ShouldBe(_helper);
+        notification.Type.ShouldBe(NotificationType.JobCompleted);
+        notification.ConversationId.ShouldBe(_conversation.Id);
+    }
+
+    [Fact]
     public async Task SameEventTwice_GivesOneNotification_AndOneDelivery()
     {
         var eventId = Guid.NewGuid();

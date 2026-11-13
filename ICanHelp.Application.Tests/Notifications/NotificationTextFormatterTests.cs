@@ -30,6 +30,23 @@ public class NotificationTextFormatterTests
                 (NotificationPayload.Price, "180.00 PLN"))
             .ShouldBe(new NotificationText($"Oferta zaktualizowana: 180{Nbsp}zł", Title));
 
+    [Theory]
+    [InlineData(NotificationType.JobStarted, "Pomocnik rozpoczął zlecenie")]
+    [InlineData(NotificationType.JobDoneReported, "Pomocnik zgłosił wykonanie – potwierdź")]
+    [InlineData(NotificationType.JobCompleted, "Zlecenie zakończone – możesz ocenić")]
+    public void Job_TitleAndAnnouncement(NotificationType type, string expected)
+        => Format(type, (NotificationPayload.AnnouncementTitle, Title)).ShouldBe(new NotificationText(expected, Title));
+
+    [Theory]
+    [InlineData(NotificationType.JobStarted)]
+    [InlineData(NotificationType.JobDoneReported)]
+    [InlineData(NotificationType.JobCompleted)]
+    public void Job_LinkToConversation(NotificationType type)
+    {
+        var conversationId = Guid.NewGuid();
+        NotificationTextFormatter.Link(type, Guid.NewGuid(), conversationId).ShouldBe($"/conversations/{conversationId}");
+    }
+
     [Fact]
     public void Offer_WithoutPrice_TitleOnly()
         => Format(NotificationType.OfferReceived, (NotificationPayload.AnnouncementTitle, Title))

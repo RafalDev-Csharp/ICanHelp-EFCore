@@ -10,20 +10,20 @@
  */
 
 /* Core CSS required for Ionic components to work properly */
-@import "@ionic/angular/css/core.css";
+@import '@ionic/angular/css/core.css';
 
 /* Basic CSS for apps built with Ionic */
-@import "@ionic/angular/css/normalize.css";
-@import "@ionic/angular/css/structure.css";
-@import "@ionic/angular/css/typography.css";
-@import "@ionic/angular/css/display.css";
+@import '@ionic/angular/css/normalize.css';
+@import '@ionic/angular/css/structure.css';
+@import '@ionic/angular/css/typography.css';
+@import '@ionic/angular/css/display.css';
 
 /* Optional CSS utils that can be commented out */
-@import "@ionic/angular/css/padding.css";
-@import "@ionic/angular/css/float-elements.css";
-@import "@ionic/angular/css/text-alignment.css";
-@import "@ionic/angular/css/text-transformation.css";
-@import "@ionic/angular/css/flex-utils.css";
+@import '@ionic/angular/css/padding.css';
+@import '@ionic/angular/css/float-elements.css';
+@import '@ionic/angular/css/text-alignment.css';
+@import '@ionic/angular/css/text-transformation.css';
+@import '@ionic/angular/css/flex-utils.css';
 
 /**
  * Ionic Dark Mode
@@ -59,6 +59,29 @@ ion-content.page-column::part(scroll) {
   width: 100%;
   max-width: var(--app-column-width);
   margin-inline: auto;
+}
+
+/*
+ * Krok zlecenia (F11 D, `jobStep`): notka w stopce wątku i szczegółów – na co czekamy; `.highlight` – pomocnik zgłosił
+ * wykonanie, zleceniodawca ma potwierdzić.
+ */
+.job-note {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  margin: 4px 16px 8px;
+  color: var(--ion-color-medium);
+  font-size: 0.875rem;
+  text-align: center;
+
+  &.highlight {
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(var(--ion-color-success-rgb), 0.12);
+    color: var(--ion-color-success-shade);
+    font-weight: 600;
+  }
 }
 
 /* Mapy (Leaflet, F3): kolory warstw rysowanych przez `app-map` (poza widokiem komponentu). */

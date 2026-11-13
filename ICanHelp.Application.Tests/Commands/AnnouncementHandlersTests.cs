@@ -203,22 +203,27 @@ public class AnnouncementHandlersTests
     }
 
     [Fact]
-    public async Task ReviseOffer_UpToDateOffer_Throws()
+    public async Task ReviseOffer_UpToDateOffer_ReplacesIt()
     {
+        // F11 D: autor zmienia oczekującą ofertę także wtedy, gdy jest aktualna.
         var announcement = await CreateAnnouncementAsync();
         var offerId = await MakeOfferAsync(announcement);
+        var newOfferId = Guid.NewGuid();
 
-        await Should.ThrowAsync<DomainRuleException>(() => new ReviseOfferHandler(_announcements, _unitOfWork, _clock)
+        await new ReviseOfferHandler(_announcements, _unitOfWork, _clock)
             .HandleAsync(new ReviseOffer
             {
                 AnnouncementId = announcement.Id,
                 OfferId = offerId,
-                NewOfferId = Guid.NewGuid(),
+                NewOfferId = newOfferId,
                 ActorId = _helper.Id,
                 Price = new PriceDto { Amount = 180, Currency = "PLN" },
                 ProposedStart = _clock.UtcNow.AddDays(2),
                 ProposedEnd = _clock.UtcNow.AddDays(2).AddHours(2)
-            }));
+            });
+
+        announcement.Offers.Single(o => o.Id == new Id(offerId)).Status.ShouldBe(OfferStatus.Revised);
+        announcement.Offers.Single(o => o.Id == new Id(newOfferId)).Status.ShouldBe(OfferStatus.Pending);
     }
 
     [Fact]
@@ -278,12 +283,38 @@ public class AnnouncementHandlersTests
     {
         var announcement = await AcceptedAnnouncementAsync();
 
-        await new StartAnnouncementHandler(_announcements, _unitOfWork)
+        await new StartAnnouncementHandler(_announcements, _unitOfWork, _clock)
             .HandleAsync(new StartAnnouncement(announcement.Id, _helper.Id));
         announcement.Status.ShouldBe(AnnouncementStatus.InProgress);
 
-        await new CompleteAnnouncementHandler(_announcements, _unitOfWork)
+        await new ReportAnnouncementDoneHandler(_announcements, _unitOfWork, _clock)
+            .HandleAsync(new ReportAnnouncementDone(announcement.Id, _helper.Id));
+        announcement.Status.ShouldBe(AnnouncementStatus.InProgress);
+        announcement.DoneReportedAt.ShouldBe(_clock.UtcNow);
+
+        await new CompleteAnnouncementHandler(_announcements, _unitOfWork, _clock)
             .HandleAsync(new CompleteAnnouncement(announcement.Id, _owner.Id));
+        announcement.Status.ShouldBe(AnnouncementStatus.Completed);
+    }
+
+    [Fact]
+    public async Task Start_ByOwner_Throws()
+    {
+        var announcement = await AcceptedAnnouncementAsync();
+
+        await Should.ThrowAsync<DomainRuleException>(() => new StartAnnouncementHandler(_announcements, _unitOfWork, _clock)
+            .HandleAsync(new StartAnnouncement(announcement.Id, _owner.Id)));
+        announcement.Status.ShouldBe(AnnouncementStatus.Accepted);
+    }
+
+    [Fact]
+    public async Task Complete_WhenAccepted_CompletesWithoutStart()
+    {
+        var announcement = await AcceptedAnnouncementAsync();
+
+        await new CompleteAnnouncementHandler(_announcements, _unitOfWork, _clock)
+            .HandleAsync(new CompleteAnnouncement(announcement.Id, _owner.Id));
+
         announcement.Status.ShouldBe(AnnouncementStatus.Completed);
     }
 
@@ -434,8 +465,8 @@ public class AnnouncementHandlersTests
     private async Task<Announcement> CompletedAnnouncementAsync()
     {
         var announcement = await AcceptedAnnouncementAsync();
-        announcement.Start(_owner.Id);
-        announcement.Complete(_owner.Id);
+        announcement.Start(_helper.Id, _clock.UtcNow);
+        announcement.Complete(_owner.Id, _clock.UtcNow);
         return announcement;
     }
 }

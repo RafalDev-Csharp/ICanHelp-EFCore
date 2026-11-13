@@ -30,6 +30,7 @@ export function conversationFixture(overrides: Partial<ConversationDto> = {}): C
     announcementTitle: 'Cieknący kran',
     announcementStatus: 'Open',
     announcementRevision: 0,
+    announcementDoneReportedAt: undefined,
     clientId: 'owner-1',
     helperId: 'helper-1',
     myRole: 'Helper',

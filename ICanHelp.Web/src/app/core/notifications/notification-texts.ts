@@ -57,6 +57,12 @@ function describeFromParameters(notification: NotificationDto): NotificationText
         : { title: 'Twoja oferta została odrzucona', body: title, icon: 'close-circle-outline' };
     case 'OfferWithdrawn':
       return { title: 'Oferta wycofana', body: title, icon: 'arrow-undo-outline' };
+    case 'JobStarted':
+      return { title: 'Pomocnik rozpoczął zlecenie', body: title, icon: 'play-outline' };
+    case 'JobDoneReported':
+      return { title: 'Pomocnik zgłosił wykonanie – potwierdź', body: title, icon: 'flag-outline' };
+    case 'JobCompleted':
+      return { title: 'Zlecenie zakończone – możesz ocenić', body: title, icon: 'star-outline' };
     case 'MessageReceived':
       return {
         title: title ? `Nowa wiadomość: ${title}` : 'Nowa wiadomość',

@@ -51,10 +51,13 @@ public sealed record UpdateAnnouncement : ICommand
 /// <summary>Anulowanie ogłoszenia (tylko właściciel, status Open albo Accepted).</summary>
 public sealed record CancelAnnouncement(Guid AnnouncementId, Guid ActorId) : ICommand;
 
-/// <summary>Rozpoczęcie pracy (właściciel albo pomocnik z zaakceptowanej oferty).</summary>
+/// <summary>Rozpoczęcie pracy (tylko pomocnik z zaakceptowanej oferty, status Accepted).</summary>
 public sealed record StartAnnouncement(Guid AnnouncementId, Guid ActorId) : ICommand;
 
-/// <summary>Potwierdzenie wykonania (tylko właściciel). Potem obie strony mogą się ocenić.</summary>
+/// <summary>Pomocnik zgłasza wykonanie (status InProgress, raz) – zleceniodawca potwierdza przez <see cref="CompleteAnnouncement"/>.</summary>
+public sealed record ReportAnnouncementDone(Guid AnnouncementId, Guid ActorId) : ICommand;
+
+/// <summary>Potwierdzenie wykonania (tylko właściciel, Accepted albo InProgress). Potem obie strony mogą się ocenić.</summary>
 public sealed record CompleteAnnouncement(Guid AnnouncementId, Guid ActorId) : ICommand;
 
 /// <summary>Ocena drugiej strony po zakończeniu ogłoszenia (raz na ogłoszenie).</summary>

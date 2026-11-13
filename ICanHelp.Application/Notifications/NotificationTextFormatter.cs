@@ -49,6 +49,12 @@ public static class NotificationTextFormatter
                     : new("Twoja oferta została odrzucona", title);
             case NotificationType.OfferWithdrawn:
                 return new("Oferta wycofana", title);
+            case NotificationType.JobStarted:
+                return new("Pomocnik rozpoczął zlecenie", title);
+            case NotificationType.JobDoneReported:
+                return new("Pomocnik zgłosił wykonanie – potwierdź", title);
+            case NotificationType.JobCompleted:
+                return new("Zlecenie zakończone – możesz ocenić", title);
             case NotificationType.MessageReceived:
                 return new(title.Length > 0 ? $"Nowa wiadomość: {title}" : "Nowa wiadomość",
                     Get(parameters, NotificationPayload.MessagePreview));

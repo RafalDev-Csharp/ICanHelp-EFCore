@@ -311,23 +311,23 @@ Zrobione C (13.11.2026), decyzje:
 
 Uwagi z testu C (13.11.2026, Chrome ↔ Brave – przepływ działa) → części D i E.
 
-**D. Wątek i realizacja zlecenia (backend + front)** – następny krok
+**D. Wątek i realizacja zlecenia (backend + front)** – zrobione 13.11.2026 (opis niżej)
 Ustalone z autorem 13.11.2026:
-- [ ] **Odświeżanie wątku**: `ion-refresher` (przeciągnij w dół) w wątku, wczytanie wątku przy każdym `ionViewWillEnter`
+- [x] **Odświeżanie wątku**: `ion-refresher` (przeciągnij w dół) w wątku, wczytanie wątku przy każdym `ionViewWillEnter`
       (nie tylko raz) i sprawdzenie, że otwarty wątek / szczegóły przeładowują się po powiadomieniu z huba dla tego
       ogłoszenia (m.in. `OfferRevised`, `OfferCountered`, nowe powiadomienia z punktu „Powiadomienia” niżej). Objaw z testu:
       po wejściu w ofertę dalej „nieaktualna”, choć druga strona już ją zaktualizowała.
-- [ ] **Zmiana własnej oczekującej propozycji**: autor może zaktualizować **każdą** swoją oczekującą ofertę / kontrofertę
+- [x] **Zmiana własnej oczekującej propozycji**: autor może zaktualizować **każdą** swoją oczekującą ofertę / kontrofertę
       (nowa cena, termin, uzasadnienie), dopóki druga strona nie odpowie – nie tylko nieaktualną. Domena: z
       `Announcement.ReviseOffer` znika warunek „tylko nieaktualna” (reszta bez zmian: Open, Pending, tylko autor, stara →
       `Revised`, zdarzenie `OfferRevised`). Testy Core/Application/Api z C – odwrócić przypadek „aktualnej nie wolno”.
       Front: `offerActions().revise` = autor + Pending (bez `isOutdated`); w wątku „Zmień ofertę” (aktualna) /
       „Zaktualizuj ofertę” (nieaktualna); stopka szczegółów pomocnika: „Twoja oferta: x zł” → wątek jak dotąd,
       nieaktualna → okno od razu (bez zmian).
-- [ ] **Rozpocznij – tylko pomocnik**: `Announcement.Start(actor)` – tylko przyjęty pomocnik (dziś także właściciel).
+- [x] **Rozpocznij – tylko pomocnik**: `Announcement.Start(actor)` – tylko przyjęty pomocnik (dziś także właściciel).
       Front: „Rozpocznij zlecenie” tylko u pomocnika (wątek i szczegóły), zleceniodawca widzi „Przyjęte – pomocnik
       rozpocznie zlecenie”.
-- [ ] **Zakończenie w dwóch krokach**:
+- [x] **Zakończenie w dwóch krokach**:
       1. Pomocnik w `InProgress`: „Zgłoś wykonanie” → `Announcement.ReportDone(helper, at)` – znacznik `DoneReportedAt`
          (nowa kolumna → migracja; status zostaje `InProgress`), drugi raz → 409.
       2. Zleceniodawca: „Potwierdź wykonanie” → `Complete(owner, at)` – dozwolone z `InProgress` **i z `Accepted`**
@@ -335,16 +335,47 @@ Ustalone z autorem 13.11.2026:
          tylko do odczytu, oceny.
       Front: u zleceniodawcy po zgłoszeniu – wyróżniona notka „Pomocnik zgłosił wykonanie” + „Potwierdź wykonanie”;
       u pomocnika po zgłoszeniu – „Czekasz na potwierdzenie zleceniodawcy”. Automatyczne zakończenie po N dniach – nie teraz.
-- [ ] **Powiadomienia o realizacji**: dziś `Start` / `Complete` nie podnoszą zdarzeń – druga strona nic nie wie, dopóki
+- [x] **Powiadomienia o realizacji**: dziś `Start` / `Complete` nie podnoszą zdarzeń – druga strona nic nie wie, dopóki
       sama nie odświeży. Nowe zdarzenia `JobStarted` (→ zleceniodawca), `JobDoneReported` (→ zleceniodawca, „potwierdź”),
       `JobCompleted` (→ pomocnik, „możesz ocenić”) – nowe `NotificationType`, teksty w `NotificationTextFormatter`
       i `notification-texts.ts` (ikony), link do wątku; push jak inne.
-- [ ] **„Zakończone” osobno w „Zleceniach”**: w Zlecam / Pomagam aktywne na górze, zakończone (Completed, Cancelled, od E
+- [x] **„Zakończone” osobno w „Zleceniach”**: w Zlecam / Pomagam aktywne na górze, zakończone (Completed, Cancelled, od E
       także przerwane) w osobnej, domyślnie zwiniętej sekcji „Zakończone (N)”, wyszarzone (tylko do odczytu – wątek
       i tak jest zamknięty).
 - Przy okazji: usunąć `features/profile/my-announcements.page.*` (bez trasy od B), jeśli autor jeszcze tego nie zrobił.
 - Testy: Core (Start/ReportDone/Complete, ReviseOffer), Application (handlery, powiadomienia, teksty), Api (przepływ
   z powiadomieniami, 409), Vitest (wątek, szczegóły, zlecenia, teksty), przykłady w `.http`.
+
+Zrobione D (13.11.2026), decyzje:
+- Odświeżanie: wątek już miał `ion-refresher` i wczytanie przy każdym `ionViewWillEnter`. Przyczyna objawu z testu:
+  otwarty ekran przeładowywał się tylko po powiadomieniu z **huba** – push przy otwartej aplikacji (`showPush`, np.
+  gdy hub nie działa przez tunel albo push był pierwszy) ekranu nie budził, a przy otwartym wątku był wręcz pomijany.
+  Teraz `NotificationsService.activity$` (`{announcementId, conversationId}`) – z huba **i** z pusha (push niesie
+  `announcementId`). Wątek przeładowuje się po zdarzeniu swojego wątku albo ogłoszenia, szczegóły ogłoszenia (nowe) –
+  po zdarzeniu swojego ogłoszenia, „Zlecenia” – po każdym zdarzeniu z wątkiem.
+- Zmiana oferty: z `ReviseOffer` zniknął warunek „tylko nieaktualna”. Front: `offerActions().revise` = autor + Pending;
+  w wątku „Zmień ofertę” (obrys, aktualna) / „Zaktualizuj ofertę” (pełny, nieaktualna), okno z nagłówkiem i notką zależnie
+  od tego; stopka szczegółów bez zmian (aktualna → wątek).
+- Realizacja: `Start(actor, at)` tylko przyjęty pomocnik; `ReportDone(actor, at)` → `DoneReportedAt` (kolumna, migracja
+  `JobDoneReported`), `Complete(actor, at)` z Accepted lub InProgress. Zdarzenia `JobStarted` / `JobDoneReported` (→
+  zleceniodawca), `JobCompleted` (→ pomocnik), typy powiadomień o tych samych nazwach, link do wątku pomocnika. Teksty:
+  „Pomocnik rozpoczął zlecenie”, „Pomocnik zgłosił wykonanie – potwierdź”, „Zlecenie zakończone – możesz ocenić”.
+  API: `POST api/announcements/{id}/report-done` (204, drugi raz 409); `doneReportedAt` w `AnnouncementDto`,
+  `announcementDoneReportedAt` w `ConversationDto`.
+- Front: `features/offers/job-step.ts` – jedna funkcja `jobStep(status, rola, doneReportedAt)` dla wątku i szczegółów:
+  pomocnik „Rozpocznij zlecenie” → „Zgłoś wykonanie” → notka „czekasz na potwierdzenie”; zleceniodawca – notka
+  („Przyjęte – pomocnik rozpocznie zlecenie” / „W realizacji – pomocnik zgłosi wykonanie”) i „Potwierdź wykonanie” jako
+  przycisk awaryjny (obrys), po zgłoszeniu – wyróżniona zielona notka „Pomocnik zgłosił wykonanie – sprawdź i potwierdź”
+  + pełny przycisk. Styl `.job-note` w `global.scss`.
+- Zlecenia: grupa „Zakończone” (Completed, Cancelled, w Pomagam też „wybrano innego”) na dole, domyślnie zwinięta
+  („Zakończone (N)” ze strzałką), elementy wyszarzone (`opacity`). Stan zwinięcia wspólny dla Zlecam i Pomagam, nie
+  zapamiętywany.
+- `features/profile/my-announcements.page.*` – nadal do usunięcia przez autora (sesja nie kasuje plików).
+- 13.11.2026 `verify.cmd`: dotnet 532/532 (Core 223, Application 202, integracyjne 107), `npm run api` (klient zgodny
+  z ręczną edycją), lint + Vitest 295/295 + build. Pierwszy przebieg: test Api z C oczekiwał jednego `OfferRevised`
+  (teraz dwa – zmiana aktualnej + aktualizacja) i kolejność importów – poprawione.
+- Do sprawdzenia ręcznie (Chrome ↔ Brave): pomocnik zmienia aktualną ofertę → u zleceniodawcy wątek odświeża się sam;
+  przyjęcie → pomocnik „Rozpocznij” → „Zgłoś wykonanie” → zleceniodawca dostaje push i potwierdza → oceny.
 
 **E. Rezygnacja i przerwanie zlecenia (reguła domeny)** – po D
 Aplikacja nie obsługuje pieniędzy – nie rozstrzyga sporów; daje każdej stronie legalne wyjście, zapisuje co i dlaczego,

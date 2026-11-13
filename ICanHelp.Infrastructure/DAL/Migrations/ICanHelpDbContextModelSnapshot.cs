@@ -121,6 +121,9 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<DateTime?>("DoneReportedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<Point>("GeoPoint")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("geography")

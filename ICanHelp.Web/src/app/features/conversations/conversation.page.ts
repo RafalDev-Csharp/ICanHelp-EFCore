@@ -27,7 +27,9 @@ import {
   checkmarkDoneOutline,
   cloudOfflineOutline,
   createOutline,
+  flagOutline,
   helpCircleOutline,
+  hourglassOutline,
   imageOutline,
   lockClosedOutline,
   playOutline,
@@ -48,6 +50,8 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { PricePipe } from '../../shared/pipes/price.pipe';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
 import { statusColor, statusLabel } from '../announcements/announcement-labels';
+import type { JobAction, JobStep } from '../offers/job-step';
+import { JOB_ACTION_ICONS, JOB_ACTION_LABELS, jobStep } from '../offers/job-step';
 import { OFFER_RULES } from '../offers/offer-form';
 import { formatOfferTerm, offerStatusColor, offerStatusLabel, partyLabel, pendingOffer } from '../offers/offer-labels';
 import { OffersService } from '../offers/offers.service';
@@ -60,9 +64,10 @@ type LoadState = 'loading' | 'ready' | 'not-found' | 'failed';
  * Wątek negocjacji (`/conversations/:conversationId`, tylko uczestnicy): wiadomości, oferty z akcjami (przyjmij /
  * odrzuć / kontroferta / wycofaj – zgodnie z rolą) i zmiany ogłoszenia, od najstarszych. Wejście oznacza wątek jako
  * przeczytany (razem z jego powiadomieniami). Pisać można, dopóki API pozwala (`canWrite`) – potem wątek jest tylko
- * do odczytu. Nowa wiadomość / oferta w tym wątku (powiadomienie z huba SignalR) – wątek przeładowany od razu.
- * U góry karta ogłoszenia (miniatura, tytuł, status, „Zobacz ogłoszenie”); w wątku przyjętego pomocnika – akcje
- * zlecenia „Rozpocznij” / „Zakończ”.
+ * do odczytu. Nowa wiadomość / oferta / zmiana ogłoszenia (powiadomienie z huba albo pusha – `activity$`) – wątek
+ * przeładowany od razu; także przy każdym wejściu i po przeciągnięciu w dół.
+ * U góry karta ogłoszenia (miniatura, tytuł, status, „Zobacz ogłoszenie”); w wątku przyjętego pomocnika – krok
+ * zlecenia (`jobStep`): „Rozpocznij” / „Zgłoś wykonanie” (pomocnik), „Potwierdź wykonanie” (zleceniodawca).
  */
 @Component({
   selector: 'app-conversation',
@@ -119,6 +124,8 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
   protected readonly offerStatusColor = offerStatusColor;
   protected readonly partyLabel = partyLabel;
   protected readonly formatOfferTerm = formatOfferTerm;
+  protected readonly jobLabels = JOB_ACTION_LABELS;
+  protected readonly jobIcons = JOB_ACTION_ICONS;
 
   readonly items = computed(() => {
     const conversation = this.conversation();
@@ -143,17 +150,19 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
     const conversation = this.conversation();
     return !!conversation && offersOf(conversation).some((offer) => offer.status === 'Accepted');
   });
-  /** „Rozpocznij” – obie strony przyjętego wątku (Accepted); „Zakończ” – tylko zleceniodawca (InProgress). */
-  readonly jobAction = computed<'start' | 'complete' | null>(() => {
+  /**
+   * Krok realizacji w przyjętym wątku (F11 D, `jobStep`): pomocnik – „Rozpocznij” / „Zgłoś wykonanie”, zleceniodawca –
+   * „Potwierdź wykonanie” (wyróżnione po zgłoszeniu) i notka, na co czeka.
+   */
+  readonly job = computed<JobStep | null>(() => {
     const conversation = this.conversation();
     if (!conversation || !this.isAcceptedThread()) {
       return null;
     }
-    if (conversation.announcementStatus === 'Accepted') {
-      return 'start';
-    }
-    return conversation.announcementStatus === 'InProgress' && conversation.myRole === 'Client' ? 'complete' : null;
+    const step = jobStep(conversation.announcementStatus, conversation.myRole, conversation.announcementDoneReportedAt);
+    return step.action || step.note ? step : null;
   });
+  readonly jobAction = computed<JobAction | null>(() => this.job()?.action ?? null);
 
   /** Pomocnik w otwartym ogłoszeniu bez oczekującej oferty może złożyć nową (np. po odrzuceniu). */
   readonly canMakeOffer = computed(() => {
@@ -187,7 +196,9 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
       checkmarkDoneOutline,
       cloudOfflineOutline,
       createOutline,
+      flagOutline,
       helpCircleOutline,
+      hourglassOutline,
       imageOutline,
       lockClosedOutline,
       playOutline,
@@ -196,9 +207,15 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
       warningOutline,
     });
 
-    this.notifications.received$
+    // Powiadomienie (hub albo push) o tym wątku albo jego ogłoszeniu – np. druga strona zmieniła ofertę, pomocnik
+    // zgłosił wykonanie, ogłoszenie edytowano – wątek przeładowany od razu.
+    this.notifications.activity$
       .pipe(
-        filter((notification) => notification.conversationId === this.conversationId()),
+        filter(
+          (activity) =>
+            activity.conversationId === this.conversationId() ||
+            (!!activity.announcementId && activity.announcementId === this.conversation()?.announcementId),
+        ),
         takeUntilDestroyed(),
       )
       .subscribe(() => this.load());
@@ -294,7 +311,7 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
     await this.act(() => this.offers.withdraw(offer));
   }
 
-  /** Autor nieaktualnej oferty: nowe warunki do aktualnej wersji ogłoszenia. */
+  /** Autor oczekującej oferty: nowe warunki (nieaktualna – do aktualnej wersji ogłoszenia). */
   async revise(offer: OfferDto): Promise<void> {
     await this.act(() => this.offers.revise(offer));
   }
@@ -306,11 +323,13 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
     if (!conversation || !action) {
       return;
     }
-    await this.act(() =>
-      action === 'start'
-        ? this.offers.start(conversation.announcementId)
-        : this.offers.complete(conversation.announcementId),
-    );
+    const id = conversation.announcementId;
+    const run: Record<JobAction, () => Promise<boolean>> = {
+      start: () => this.offers.start(id),
+      report: () => this.offers.reportDone(id),
+      complete: () => this.offers.complete(id),
+    };
+    await this.act(run[action]);
   }
 
   /** Jedna akcja naraz; po zmianie (albo błędzie 409 – stan mógł się zmienić) przeładowanie wątku. */

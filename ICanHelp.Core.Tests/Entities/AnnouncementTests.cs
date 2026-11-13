@@ -85,7 +85,7 @@ public class AnnouncementTests
     {
         var announcement = InStatus(AnnouncementStatus.Accepted);
 
-        announcement.Start(OwnerId);
+        announcement.Start(Helper, Now.AddDays(1));
 
         announcement.Status.ShouldBe(AnnouncementStatus.InProgress);
     }
@@ -99,31 +99,32 @@ public class AnnouncementTests
     {
         var announcement = InStatus(status);
 
-        Should.Throw<DomainRuleException>(() => announcement.Start(OwnerId));
+        Should.Throw<DomainRuleException>(() => announcement.Start(Helper, Now.AddDays(3)));
 
         announcement.Status.ShouldBe(status);
     }
 
-    [Fact]
-    public void Complete_WhenInProgress_ChangesStatusToCompleted()
+    [Theory]
+    [InlineData(AnnouncementStatus.InProgress)]
+    [InlineData(AnnouncementStatus.Accepted)] // pomocnik nie kliknął „Rozpocznij” – zlecenie nie może utknąć
+    public void Complete_WhenInProgressOrAccepted_ChangesStatusToCompleted(AnnouncementStatus status)
     {
-        var announcement = InStatus(AnnouncementStatus.InProgress);
+        var announcement = InStatus(status);
 
-        announcement.Complete(OwnerId);
+        announcement.Complete(OwnerId, Now.AddDays(3));
 
         announcement.Status.ShouldBe(AnnouncementStatus.Completed);
     }
 
     [Theory]
     [InlineData(AnnouncementStatus.Open)]
-    [InlineData(AnnouncementStatus.Accepted)]
     [InlineData(AnnouncementStatus.Completed)]
     [InlineData(AnnouncementStatus.Cancelled)]
-    public void Complete_WhenNotInProgress_Throws(AnnouncementStatus status)
+    public void Complete_WhenNotAcceptedNorInProgress_Throws(AnnouncementStatus status)
     {
         var announcement = InStatus(status);
 
-        Should.Throw<DomainRuleException>(() => announcement.Complete(OwnerId));
+        Should.Throw<DomainRuleException>(() => announcement.Complete(OwnerId, Now.AddDays(3)));
 
         announcement.Status.ShouldBe(status);
     }
@@ -162,10 +163,13 @@ public class AnnouncementTests
         announcement.AcceptOffer(offer.Id, OwnerId, Now);
         announcement.Status.ShouldBe(AnnouncementStatus.Accepted);
 
-        announcement.Start(Helper);
+        announcement.Start(Helper, Now.AddDays(1));
         announcement.Status.ShouldBe(AnnouncementStatus.InProgress);
 
-        announcement.Complete(OwnerId);
+        announcement.ReportDone(Helper, Now.AddDays(1).AddHours(2));
+        announcement.Status.ShouldBe(AnnouncementStatus.InProgress);
+
+        announcement.Complete(OwnerId, Now.AddDays(2));
         announcement.Status.ShouldBe(AnnouncementStatus.Completed);
         announcement.AcceptedOfferId.ShouldBe(offer.Id);
     }

@@ -16,9 +16,19 @@ public class AnnouncementParticipantsTests
     {
         var announcement = InStatus(AnnouncementStatus.Accepted);
 
-        announcement.Start(Helper);
+        announcement.Start(Helper, Now);
 
         announcement.Status.ShouldBe(AnnouncementStatus.InProgress);
+    }
+
+    [Fact]
+    public void Start_ByOwner_Throws()
+    {
+        var announcement = InStatus(AnnouncementStatus.Accepted);
+
+        Should.Throw<DomainRuleException>(() => announcement.Start(OwnerId, Now));
+
+        announcement.Status.ShouldBe(AnnouncementStatus.Accepted);
     }
 
     [Fact]
@@ -26,7 +36,7 @@ public class AnnouncementParticipantsTests
     {
         var announcement = InStatus(AnnouncementStatus.Accepted);
 
-        Should.Throw<DomainRuleException>(() => announcement.Start(Stranger));
+        Should.Throw<DomainRuleException>(() => announcement.Start(Stranger, Now));
 
         announcement.Status.ShouldBe(AnnouncementStatus.Accepted);
     }
@@ -39,7 +49,7 @@ public class AnnouncementParticipantsTests
         announcement.AddHelperOffer(OtherHelper);
         announcement.AcceptOffer(accepted.Id, OwnerId, Now);
 
-        Should.Throw<DomainRuleException>(() => announcement.Start(OtherHelper));
+        Should.Throw<DomainRuleException>(() => announcement.Start(OtherHelper, Now));
     }
 
     [Fact]
@@ -47,7 +57,7 @@ public class AnnouncementParticipantsTests
     {
         var announcement = InStatus(AnnouncementStatus.InProgress);
 
-        Should.Throw<DomainRuleException>(() => announcement.Complete(Helper));
+        Should.Throw<DomainRuleException>(() => announcement.Complete(Helper, Now));
 
         announcement.Status.ShouldBe(AnnouncementStatus.InProgress);
     }

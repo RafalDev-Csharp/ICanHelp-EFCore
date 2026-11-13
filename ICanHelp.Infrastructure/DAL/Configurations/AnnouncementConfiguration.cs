@@ -20,6 +20,7 @@ internal sealed class AnnouncementConfiguration : IEntityTypeConfiguration<Annou
         builder.Property(x => x.Status).IsRequired();
         builder.Property(x => x.CreatedAt).IsRequired();
         builder.Property(x => x.UpdatedAt).IsRequired(false);
+        builder.Property(x => x.DoneReportedAt).IsRequired(false);
 
         // Concurrency token: EF adds "WHERE Revision = <value read>" to every UPDATE of the announcement.
         // An edit and an accept at the same moment → the second one gets DbUpdateConcurrencyException (→ 409).

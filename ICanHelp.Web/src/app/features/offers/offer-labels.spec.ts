@@ -19,13 +19,13 @@ describe('offerActions', () => {
     });
   });
 
-  it('lets only the author withdraw', () => {
+  it('lets only the author withdraw or change a pending offer', () => {
     expect(offerActions(offerFixture('o1'), 'Helper', 'Open')).toEqual({
       accept: false,
       reject: false,
       counter: false,
       withdraw: true,
-      revise: false,
+      revise: true,
     });
   });
 

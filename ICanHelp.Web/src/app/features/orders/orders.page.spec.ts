@@ -3,7 +3,6 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 
-import type { NotificationDto } from '../../core/api/api-client';
 import { AnnouncementsClient, CategoriesClient, ConversationsClient } from '../../core/api/api-client';
 import { AuthService } from '../../core/auth/auth.service';
 import { notificationsStub, provideNotificationsStub } from '../../core/testing/notifications-stub';
@@ -107,9 +106,33 @@ describe('OrdersPage', () => {
     await render();
     expect(announcementsClient.getAll).toHaveBeenCalledTimes(1);
 
-    notifications.received$.next({ id: 'n1', type: 'OfferAccepted', conversationId: 'c1' } as NotificationDto);
+    notifications.activity$.next({ announcementId: 'a9' });
+    expect(announcementsClient.getAll).toHaveBeenCalledTimes(1);
 
+    notifications.activity$.next({ announcementId: 'a1', conversationId: 'c1' });
     expect(announcementsClient.getAll).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps finished orders in a collapsed, greyed-out section at the bottom', async () => {
+    announcementsClient.getAll.mockReturnValue(
+      of([
+        announcement('a1', { status: 'Completed', title: 'Płot' }),
+        announcement('a2', { status: 'Accepted', title: 'Kran' }),
+      ]),
+    );
+    const { page, element, render } = create();
+    await render();
+
+    expect(groupTitles(element)).toEqual(['accepted', 'finished']);
+    const finished = element.querySelector('[data-group="finished"]');
+    expect(finished?.classList).toContain('finished');
+    expect(finished?.textContent).toContain('Zakończone (1)');
+    expect(finished?.querySelector('app-announcement-card')).toBeNull();
+
+    page.toggleFinished();
+    await render();
+
+    expect(element.querySelector('[data-group="finished"] app-announcement-card')?.textContent).toContain('Płot');
   });
 
   it('shows a retry state when loading fails', async () => {

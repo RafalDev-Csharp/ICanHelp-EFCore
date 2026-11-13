@@ -276,6 +276,7 @@ export class PushService {
         title: title ?? 'ICanHelp',
         body,
         url: data['url'],
+        announcementId: data['announcementId'],
         conversationId: data['conversationId'],
       };
       this.notifications.showPush(notice);

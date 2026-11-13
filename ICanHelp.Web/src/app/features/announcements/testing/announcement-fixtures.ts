@@ -17,6 +17,7 @@ export function announcement(id: string, overrides: Partial<AnnouncementDto> = {
     acceptedOfferId: undefined,
     revision: 0,
     updatedAt: undefined,
+    doneReportedAt: undefined,
     thumbnailUrl: undefined,
     distanceKm: undefined,
     helperCount: 0,

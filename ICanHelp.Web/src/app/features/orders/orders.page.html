@@ -47,13 +47,25 @@
   } @else {
   <ion-list>
     @for (group of clientGroups(); track group.key) {
-    <ion-item-group [attr.data-group]="group.key">
+    <ion-item-group [attr.data-group]="group.key" [class.finished]="group.key === 'finished'">
+      @if (group.key === 'finished') {
+      <ion-item-divider
+        class="finished-toggle"
+        sticky="true"
+        button
+        (click)="toggleFinished()"
+        [attr.aria-expanded]="finishedOpen()"
+      >
+        <ion-label>{{ group.label }} ({{ group.items.length }})</ion-label>
+        <ion-icon slot="end" [name]="finishedOpen() ? 'chevron-up' : 'chevron-down'" aria-hidden="true"></ion-icon>
+      </ion-item-divider>
+      } @else {
       <ion-item-divider sticky="true">
         <ion-label>{{ group.label }} ({{ group.items.length }})</ion-label>
       </ion-item-divider>
-      @for (item of group.items; track item.id) {
+      } @if (group.key !== 'finished' || finishedOpen()) { @for (item of group.items; track item.id) {
       <app-announcement-card [announcement]="item" [showStatus]="true"></app-announcement-card>
-      }
+      } }
     </ion-item-group>
     }
   </ion-list>
@@ -68,13 +80,25 @@
   } @else {
   <ion-list>
     @for (group of helperGroups(); track group.key) {
-    <ion-item-group [attr.data-group]="group.key">
+    <ion-item-group [attr.data-group]="group.key" [class.finished]="group.key === 'finished'">
+      @if (group.key === 'finished') {
+      <ion-item-divider
+        class="finished-toggle"
+        sticky="true"
+        button
+        (click)="toggleFinished()"
+        [attr.aria-expanded]="finishedOpen()"
+      >
+        <ion-label>{{ group.label }} ({{ group.items.length }})</ion-label>
+        <ion-icon slot="end" [name]="finishedOpen() ? 'chevron-up' : 'chevron-down'" aria-hidden="true"></ion-icon>
+      </ion-item-divider>
+      } @else {
       <ion-item-divider sticky="true">
         <ion-label>{{ group.label }} ({{ group.items.length }})</ion-label>
       </ion-item-divider>
-      @for (item of group.items; track item.conversationId) {
+      } @if (group.key !== 'finished' || finishedOpen()) { @for (item of group.items; track item.conversationId) {
       <app-conversation-item [conversation]="item"></app-conversation-item>
-      }
+      } }
     </ion-item-group>
     }
   </ion-list>

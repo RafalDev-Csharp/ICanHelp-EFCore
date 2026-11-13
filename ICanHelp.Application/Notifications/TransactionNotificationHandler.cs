@@ -14,6 +14,7 @@ namespace ICanHelp.Application.Notifications;
 /// <item>OfferMade → właściciel; OfferCountered / OfferRevised / OfferWithdrawn → druga strona niż autor oferty</item>
 /// <item>OfferAccepted / OfferRejected → autor oferty; odrzucona automatycznie (wybrano innego) → pomocnik</item>
 /// <item>MessageSent → druga osoba w wątku; AnnouncementEdited → pomocnicy z wątkami (każda oferta zakłada wątek)</item>
+/// <item>F11 D: JobStarted / JobDoneReported → właściciel; JobCompleted → pomocnik (link do wątku)</item>
 /// </list>
 /// Ogłoszenia już nie ma (usunięte) → nic nie wysyłamy.
 /// </summary>
@@ -25,7 +26,10 @@ internal sealed class TransactionNotificationHandler :
     IDomainEventHandler<OfferRejected>,
     IDomainEventHandler<OfferWithdrawn>,
     IDomainEventHandler<MessageSent>,
-    IDomainEventHandler<AnnouncementEdited>
+    IDomainEventHandler<AnnouncementEdited>,
+    IDomainEventHandler<JobStarted>,
+    IDomainEventHandler<JobDoneReported>,
+    IDomainEventHandler<JobCompleted>
 {
     private readonly IAnnouncementRepository _announcements;
     private readonly IConversationRepository _conversations;
@@ -131,6 +135,18 @@ internal sealed class TransactionNotificationHandler :
                 new Id(e.AnnouncementId), p.ConversationId, parameters)),
             cancellationToken);
     }
+
+    public Task HandleAsync(Guid eventId, JobStarted e, CancellationToken cancellationToken = default)
+        => OfferAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.HelperId, recipient: e.OwnerId,
+            NotificationType.JobStarted, e.OccurredAt, new(), cancellationToken);
+
+    public Task HandleAsync(Guid eventId, JobDoneReported e, CancellationToken cancellationToken = default)
+        => OfferAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.HelperId, recipient: e.OwnerId,
+            NotificationType.JobDoneReported, e.OccurredAt, new(), cancellationToken);
+
+    public Task HandleAsync(Guid eventId, JobCompleted e, CancellationToken cancellationToken = default)
+        => OfferAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.OwnerId, recipient: e.HelperId,
+            NotificationType.JobCompleted, e.OccurredAt, new(), cancellationToken);
 
     // ---------- helpers ----------
 

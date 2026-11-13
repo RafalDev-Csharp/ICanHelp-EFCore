@@ -166,6 +166,11 @@
   }
 }
 
+/* F11 D: krok zlecenia w stopce (notka + przycisk); `.job-note` – global.scss (wspólna ze szczegółami). */
+.job {
+  padding: 4px 0;
+}
+
 .footer-note {
   margin: 0;
   padding: 12px 16px;

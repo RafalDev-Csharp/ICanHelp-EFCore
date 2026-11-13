@@ -116,7 +116,7 @@ public class ConversationTests
         announcement.AcceptOffer(offer.Id, OwnerId, Now);
         if (status == AnnouncementStatus.InProgress)
         {
-            announcement.Start(OwnerId);
+            announcement.Start(Helper, Now);
         }
 
         Send(accepted, announcement, OwnerId);
@@ -135,8 +135,8 @@ public class ConversationTests
         var offer = announcement.AddHelperOffer(Helper);
         announcement.AcceptOffer(offer.Id, OwnerId, Now);
         Send(conversation, announcement, Helper);
-        announcement.Start(OwnerId);
-        announcement.Complete(OwnerId);
+        announcement.Start(Helper, Now);
+        announcement.Complete(OwnerId, Now);
 
         Should.Throw<DomainRuleException>(() => Send(conversation, announcement, Helper));
         Should.Throw<DomainRuleException>(() => Send(conversation, announcement, OwnerId));

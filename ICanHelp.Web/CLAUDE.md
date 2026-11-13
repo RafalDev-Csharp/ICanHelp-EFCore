@@ -25,7 +25,8 @@ core/             jedno miejsce na całą aplikację: config/locale.ts (pl-PL, P
                   auth/ – `AuthService` (sygnały `currentUser`, `isAuthenticated`; tokeny w localStorage `icanhelp.auth`, synchronizacja kart,
                   jedno odświeżenie naraz), `authGuard` (+ `loginUrlTree`, `safeReturnUrl`);
                   notifications/ – `NotificationsService` (hub SignalR `/hubs/notifications`, dopóki zalogowany; `unreadCount`,
-                  `received$`, toast „Pokaż”, `openConversation` = wątek na ekranie), `notification-texts` (tekst i link
+                  `received$` (z huba), `activity$` (hub + push: `{announcementId, conversationId}` – otwarte ekrany
+                  przeładowują dane), toast „Pokaż”, `openConversation` = wątek na ekranie), `notification-texts` (tekst i link
                   z `type` + `parameters`), `NOTIFICATION_HUB_FACTORY` (w specs – fałszywe połączenie);
                   pwa/ – `PushService` (FCM: zgoda po akcji – `suggest()` / `enable()`, `api/me/devices`, `unregister()` przed
                   wylogowaniem, push z workera → `NotificationsService.showPush`), `PUSH_MESSAGING` (Firebase SDK, leniwie;
@@ -43,11 +44,12 @@ features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poz
                   `add-announcement.page` (`/add`) i `edit/` (`/announcements/:id/edit`); `likes/` – `LikesService`;
                   `details/announcement-negotiations.ts` – negocjacje per pomocnik i „Historia ogłoszenia” właściciela;
                   `testing/` – dane i zaślepki do specs),
-                  offers (`offer-labels` – teksty i `offerActions` = reguły domeny, `offer-form` – formularz oferty /
+                  offers (`offer-labels` – teksty i `offerActions` = reguły domeny, `job-step` – krok realizacji zlecenia
+                  (Rozpocznij / Zgłoś wykonanie / Potwierdź wykonanie + notka; wątek i szczegóły), `offer-form` – formularz oferty /
                   kontroferty, okna `OfferFormModalComponent` i `RatingModalComponent`, `OffersService` – okno → potwierdzenie
                   → API → toast, wspólny dla wątku i szczegółów; `testing/offer-fixtures`),
                   orders (zakładka „Zlecenia” `/conversations`: Zlecam = moje ogłoszenia, Pomagam = moje wątki pomocnika,
-                  grupy po statusie – `order-groups.ts`),
+                  grupy po statusie – `order-groups.ts`; „Zakończone” zwinięte na dole, wyszarzone),
                   conversations (`/conversations/all` – wszystkie wątki z filtrem roli, `conversation-item` – wiersz wątku,
                   `/conversations/:conversationId` – wątek: wiadomości, oferty z akcjami, zmiany ogłoszenia, bez ofert =
                   „Pytania i odpowiedzi”; `conversation-timeline.ts`),

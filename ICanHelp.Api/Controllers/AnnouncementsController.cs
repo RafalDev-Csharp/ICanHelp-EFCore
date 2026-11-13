@@ -231,7 +231,7 @@ public sealed class AnnouncementsController : ControllerBase
         [FromServices] ICommandHandler<CancelAnnouncement> handler, CancellationToken cancellationToken)
         => Execute(userId => new CancelAnnouncement(announcementId, userId), handler, cancellationToken);
 
-    /// <summary>Rozpoczęcie pracy (właściciel albo pomocnik z zaakceptowanej oferty).</summary>
+    /// <summary>Rozpoczęcie pracy (tylko pomocnik z zaakceptowanej oferty). Zleceniodawca dostaje powiadomienie JobStarted.</summary>
     [HttpPost("{announcementId:guid}/start")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -241,7 +241,23 @@ public sealed class AnnouncementsController : ControllerBase
         [FromServices] ICommandHandler<StartAnnouncement> handler, CancellationToken cancellationToken)
         => Execute(userId => new StartAnnouncement(announcementId, userId), handler, cancellationToken);
 
-    /// <summary>Potwierdzenie wykonania (tylko właściciel). Potem obie strony mogą się ocenić.</summary>
+    /// <summary>
+    /// Pomocnik zgłasza wykonanie (status InProgress, raz – drugi raz 409). Status się nie zmienia, ustawia się
+    /// <c>doneReportedAt</c>; zleceniodawca dostaje powiadomienie JobDoneReported i potwierdza przez <c>complete</c>.
+    /// </summary>
+    [HttpPost("{announcementId:guid}/report-done")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public Task<IActionResult> ReportDone(Guid announcementId,
+        [FromServices] ICommandHandler<ReportAnnouncementDone> handler, CancellationToken cancellationToken)
+        => Execute(userId => new ReportAnnouncementDone(announcementId, userId), handler, cancellationToken);
+
+    /// <summary>
+    /// Potwierdzenie wykonania (tylko właściciel, z InProgress albo Accepted – gdy pomocnik nie kliknął „Rozpocznij”).
+    /// Pomocnik dostaje powiadomienie JobCompleted. Potem obie strony mogą się ocenić.
+    /// </summary>
     [HttpPost("{announcementId:guid}/complete")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

@@ -1379,7 +1379,7 @@ export class AnnouncementsClient {
     }
 
     /**
-     * Rozpoczęcie pracy (właściciel albo pomocnik z zaakceptowanej oferty).
+     * Rozpoczęcie pracy (tylko pomocnik z zaakceptowanej oferty). Zleceniodawca dostaje powiadomienie JobStarted.
      * @return No Content
      */
     start(announcementId: string): Observable<void> {
@@ -1442,7 +1442,72 @@ export class AnnouncementsClient {
     }
 
     /**
-     * Potwierdzenie wykonania (tylko właściciel). Potem obie strony mogą się ocenić.
+     * Pomocnik zgłasza wykonanie (status InProgress, raz – drugi raz 409). Status się nie zmienia, ustawia się
+    `doneReportedAt`; zleceniodawca dostaje powiadomienie JobDoneReported i potwierdza przez `complete`.
+     * @return No Content
+     */
+    reportDone(announcementId: string): Observable<void> {
+        let url_ = this.baseUrl + "/api/announcements/{announcementId}/report-done";
+        if (announcementId === undefined || announcementId === null)
+            throw new globalThis.Error("The parameter 'announcementId' must be defined.");
+        url_ = url_.replace("{announcementId}", encodeURIComponent("" + announcementId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+            })
+        };
+
+        return this.http.request("post", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processReportDone(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processReportDone(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<void>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<void>;
+        }));
+    }
+
+    protected processReportDone(response: HttpResponseBase): Observable<void> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return _observableOf(null as any);
+            }));
+        } else if (status === 404) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Not Found", status, _responseText, _headers, result404);
+            }));
+        } else if (status === 409) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result409: any = null;
+            result409 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Conflict", status, _responseText, _headers, result409);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    /**
+     * Potwierdzenie wykonania (tylko właściciel, z InProgress albo Accepted – gdy pomocnik nie kliknął „Rozpocznij”).
+    Pomocnik dostaje powiadomienie JobCompleted. Potem obie strony mogą się ocenić.
      * @return No Content
      */
     complete(announcementId: string): Observable<void> {
@@ -3759,6 +3824,7 @@ export interface AnnouncementDetailsDto {
     acceptedOfferId: string | undefined;
     revision: number;
     updatedAt: string | undefined;
+    doneReportedAt: string | undefined;
     thumbnailUrl: string | undefined;
     distanceKm: number | undefined;
     helperCount: number;
@@ -3783,6 +3849,7 @@ export interface AnnouncementDto {
     acceptedOfferId: string | undefined;
     revision: number;
     updatedAt: string | undefined;
+    doneReportedAt: string | undefined;
     thumbnailUrl: string | undefined;
     distanceKm: number | undefined;
     helperCount: number;
@@ -3816,6 +3883,7 @@ export interface ConversationDto {
     announcementTitle: string;
     announcementStatus: string;
     announcementRevision: number;
+    announcementDoneReportedAt: string | undefined;
     clientId: string;
     helperId: string;
     myRole: string;

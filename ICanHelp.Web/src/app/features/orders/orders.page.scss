@@ -5,3 +5,14 @@ ion-item-divider {
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
+
+/* F11 D: zakończone (i anulowane) – osobna, domyślnie zwinięta sekcja na dole, wyszarzona (tylko do odczytu). */
+.finished-toggle {
+  cursor: pointer;
+}
+
+.finished app-announcement-card,
+.finished app-conversation-item {
+  display: block;
+  opacity: 0.6;
+}
