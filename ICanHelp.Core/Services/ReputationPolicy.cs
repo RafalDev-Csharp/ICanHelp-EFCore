@@ -6,12 +6,12 @@ namespace ICanHelp.Core.Services;
 public sealed record FinishedJob(Id AnnouncementId, UserId PartnerId, DateTime? AcceptedAt, DateTime? CompletedAt);
 
 /// <summary>A rating the profile owner received for a job.</summary>
-public sealed record ReceivedRating(Id AnnouncementId, UserId RaterId, int Rate, DateTime RatedAt);
+public sealed record ReceivedRating(Id AnnouncementId, UserId RaterId, int Rate);
 
 /// <summary>
 /// The reputation of a user in one role.
-/// <see cref="RatingCount"/> – all received ratings, <see cref="RaterCount"/> – people whose rating is in the average
-/// (one per person), <see cref="PartnerCount"/> – different partners of the completed jobs,
+/// <see cref="RatingCount"/> – all received ratings, <see cref="RaterCount"/> – people whose ratings are in the average
+/// (one vote – their own average – per person), <see cref="PartnerCount"/> – different partners of the completed jobs,
 /// <see cref="MostJobsWithOnePartner"/> – the most completed jobs with the same person.
 /// </summary>
 public sealed record RoleReputation(
@@ -26,7 +26,8 @@ public sealed record RoleReputation(
 /// F11 H: ratings resistant to collusion. Two accounts repeating "announcement → offer → accept → confirm → 5 stars"
 /// should not build a reputation:
 /// <list type="bullet">
-///   <item>one person = one vote – only the newest counted rating from a given person enters the average;</item>
+///   <item>one person = one vote – the counted ratings from a given person are averaged first (2 and 4 → 3) and only
+///         that per-person average enters the average of the role;</item>
 ///   <item>a job confirmed very quickly after the acceptance (&lt; <see cref="MinJobDuration"/>) or a next job with
 ///         the same partner within <see cref="RepeatWindow"/> is suspicious – its rating is kept but not counted.</item>
 /// </list>
@@ -76,10 +77,11 @@ public static class ReputationPolicy
         IReadOnlyCollection<ReceivedRating> roleRatings,
         IReadOnlySet<Id> suspiciousJobs)
     {
+        // Jedna osoba = jeden głos: średnia jej liczonych ocen (2 i 4 → 3), potem średnia z tych głosów.
         var counted = roleRatings
             .Where(r => !suspiciousJobs.Contains(r.AnnouncementId))
             .GroupBy(r => r.RaterId)
-            .Select(g => g.MaxBy(r => r.RatedAt)!.Rate)
+            .Select(g => g.Average(r => r.Rate))
             .ToList();
 
         var perPartner = roleJobs.GroupBy(j => j.PartnerId).Select(g => g.Count()).ToList();

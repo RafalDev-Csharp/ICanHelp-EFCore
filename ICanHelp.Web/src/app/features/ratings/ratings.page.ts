@@ -10,7 +10,6 @@ import {
   IonItem,
   IonLabel,
   IonList,
-  IonNote,
   IonRefresher,
   IonRefresherContent,
   IonSegment,
@@ -44,10 +43,48 @@ const STARS = [1, 2, 3, 4, 5] as const;
 /** „4,5” – średnia z jednym miejscem po przecinku (pl-PL). */
 const averageFormat = new Intl.NumberFormat(APP_LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
+/** F11 H: oceny od jednej osoby – „ocena grupowa” = średnia jej ocen (2 i 4 → 3), jeden głos w średniej. */
+export interface RaterGroup {
+  raterId: string;
+  userName: string;
+  /** Najnowsza pierwsza. */
+  ratings: MyRatingDto[];
+  average: number;
+}
+
+function mean(values: readonly number[]): number {
+  return values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+/** Grupuje oceny po oceniającym; grupy w kolejności najnowszej oceny (lista z API jest od najnowszych). */
+export function groupByRater(ratings: readonly MyRatingDto[]): RaterGroup[] {
+  const groups = new Map<string, RaterGroup>();
+  for (const rating of ratings) {
+    const group = groups.get(rating.rater.id);
+    if (group) {
+      group.ratings.push(rating);
+    } else {
+      groups.set(rating.rater.id, {
+        raterId: rating.rater.id,
+        userName: rating.rater.userName,
+        ratings: [rating],
+        average: 0,
+      });
+    }
+  }
+  return [...groups.values()].map((group) => ({ ...group, average: mean(group.ratings.map((r) => r.rate)) }));
+}
+
+/** Średnia „jedna osoba = jeden głos”: średnia z ocen grupowych (jak na profilu, bez reguł tempa – te liczy API). */
+export function groupedAverage(groups: readonly RaterGroup[]): number {
+  return mean(groups.map((group) => group.average));
+}
+
 /**
  * „Oceny” w Koncie (`/profile/ratings`, F11 F): segment „Do wystawienia” (zakończone zlecenia bez mojej oceny →
  * „Oceń” – `OffersService.rate`, to samo okno co w szczegółach ogłoszenia) · „Jako pomocnik” · „Jako zleceniodawca”
- * (otrzymane oceny ze średnią). Na start – „Do wystawienia”, jeśli coś czeka, inaczej „Jako pomocnik”.
+ * (otrzymane oceny ze średnią; F11 H: oceny od tej samej osoby zgrupowane – „ocena grupowa” = ich średnia, jeden głos
+ * w średniej). Na start – „Do wystawienia”, jeśli coś czeka, inaczej „Jako pomocnik”.
  */
 @Component({
   selector: 'app-ratings',
@@ -71,7 +108,6 @@ const averageFormat = new Intl.NumberFormat(APP_LOCALE, { minimumFractionDigits:
     IonList,
     IonItem,
     IonLabel,
-    IonNote,
     IonIcon,
     IonThumbnail,
     IonButton,
@@ -150,13 +186,22 @@ export class RatingsPage implements ViewWillEnter {
     }
   }
 
-  /** „4,5 · 2 oceny” – podsumowanie listy otrzymanych ocen. */
+  /** „4,0 · 3 oceny od 2 osób” – podsumowanie (jedna osoba = jeden głos; „od N osób”, gdy mniej niż ocen). */
   summary(ratings: readonly MyRatingDto[]): string {
     if (ratings.length === 0) {
       return '';
     }
+    const groups = groupByRater(ratings);
     const count = ratings.length;
-    return `${averageFormat.format(this.average(ratings))} · ${count} ${pluralPl(count, 'ocena', 'oceny', 'ocen')}`;
+    const people =
+      groups.length < count ? ` od ${groups.length} ${pluralPl(groups.length, 'osoby', 'osób', 'osób')}` : '';
+    return `${averageFormat.format(groupedAverage(groups))} · ${count} ${pluralPl(count, 'ocena', 'oceny', 'ocen')}${people}`;
+  }
+
+  /** „Ocena grupowa · 2 oceny, średnio 3,0”. */
+  groupLabel(group: RaterGroup): string {
+    const count = group.ratings.length;
+    return `Ocena grupowa · ${count} ${pluralPl(count, 'ocena', 'oceny', 'ocen')}, średnio ${averageFormat.format(group.average)}`;
   }
 
   /** Ikona gwiazdki `index` (1–5) dla oceny `value` (średnia może mieć połówkę). */
@@ -167,7 +212,10 @@ export class RatingsPage implements ViewWillEnter {
     return value >= index - 0.5 ? 'star-half' : 'star-outline';
   }
 
+  /** Średnia do gwiazdek podsumowania – ta sama co w `summary` (jeden głos na osobę). */
   average(ratings: readonly MyRatingDto[]): number {
-    return ratings.length === 0 ? 0 : ratings.reduce((sum, rating) => sum + rating.rate, 0) / ratings.length;
+    return groupedAverage(groupByRater(ratings));
   }
+
+  protected readonly groupByRater = groupByRater;
 }

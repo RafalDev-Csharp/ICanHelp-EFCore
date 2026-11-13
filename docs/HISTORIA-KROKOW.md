@@ -376,14 +376,15 @@
   Core – `Announcement.AcceptedAt` / `CompletedAt` (AcceptOffer / Complete, czyszczone przy Abandon; migracja
   `AnnouncementJobTimes`), nowa czysta funkcja `Services/ReputationPolicy` (`FindSuspiciousJobs`: potwierdzone < 30 min
   po przyjęciu albo kolejne z tym samym partnerem w ciągu 7 dni, obie role; `Summarize`: bez podejrzanych, potem
-  najnowsza ocena od każdej osoby). Application: `RoleStatsDto` + `RaterCount`, `PartnerCount`, `MostJobsWithOnePartner`.
+  jeden głos na osobę = średnia jej ocen – propozycja autora zamiast „najnowszej”). Application: `RoleStatsDto` + `RaterCount`, `PartnerCount`, `MostJobsWithOnePartner`.
   Infrastructure: `GetUserProfileHandler` liczy przez politykę (jedno zapytanie o zakończone zlecenia obu ról).
   Front: `user-profile.page` – „4,8 / 5 · 12 ocen od 9 osób”, „Średnia jeszcze niepoliczona”, „14 · z 9 osobami”,
-  „Zlecenia z tą samą osobą”; notka na ekranie „Oceny”. Klient API – `RoleStatsDto` (ręcznie, potem `npm run api` zgodny).
+  „Zlecenia z tą samą osobą”; ekran „Oceny” – oceny zgrupowane po osobie („Ocena grupowa”, `groupByRater`). Klient API – `RoleStatsDto` (ręcznie, potem `npm run api` zgodny).
   Testy: Core `ReputationPolicyTests` (9) + czasy w `AnnouncementJobTests`, Api `JobExitTests` (profil: powtórka i szybkie
   zlecenie nie budują średniej; helper `TestApi.BackdateAcceptanceAsync` cofa `AcceptedAt` w bazie), Vitest
   `user-profile.page.spec`. Decyzja: osobne „oceny od nowych kont” – nie teraz.
   13.11.2026 lokalnie (`verify.cmd`, Docker): dotnet 593/593 (Core 261, Application 218, integracyjne 114), `npm run api`,
-  lint + Vitest 354/354 + build zielone. Profil w przeglądarce – do sprawdzenia ręcznie.
+  lint + Vitest 354/354 + build zielone; po zmianie na średnią per osoba: dotnet 594/594 (Core 262), Vitest 356/356.
+  Profil i „Oceny” w przeglądarce – do sprawdzenia ręcznie.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

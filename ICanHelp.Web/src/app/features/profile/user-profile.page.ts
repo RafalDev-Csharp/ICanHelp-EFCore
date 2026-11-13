@@ -89,8 +89,8 @@ export function statRows(stats: RoleStatsDto, role: ProfileRole): StatRow[] {
 }
 
 /**
- * „4,65 / 5 · 12 ocen od 9 osób” albo „Jeszcze bez ocen”. Średnia tylko z zakończonych zleceń, F11 H: jedna (najnowsza)
- * ocena od osoby, bez podejrzanie szybkich i powtórek – „od N osób” tylko, gdy to mniej niż wszystkich ocen.
+ * „4,65 / 5 · 12 ocen od 9 osób” albo „Jeszcze bez ocen”. Średnia tylko z zakończonych zleceń, F11 H: jeden głos na
+ * osobę (średnia jej ocen), bez podejrzanie szybkich i powtórek – „od N osób” tylko, gdy to mniej niż wszystkich ocen.
  * Oceny są, ale żadna się nie liczy → „Średnia jeszcze niepoliczona” (bez sugerowania oszustwa).
  */
 export function ratingLabel(stats: RoleStatsDto): string {

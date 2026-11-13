@@ -37,7 +37,7 @@
 - `UserDevice` (agregat, `Entities/Users`) – sekcja „Push i urządzenia”.
 - `Rating`: AnnouncementId, RaterId, RateeId, Rate (1–5), Comment?; unikalne (AnnouncementId, RaterId). Ocenianego (druga strona)
   wybiera domena; „raz na ogłoszenie” – handler (`AlreadyRatedException`) + unikalny indeks.
-- `Services/ReputationPolicy` (F11 H, czysta funkcja w Core): średnia na profilu – jedna (najnowsza) liczona ocena od osoby;
+- `Services/ReputationPolicy` (F11 H, czysta funkcja w Core): średnia na profilu – jeden głos na osobę = średnia jej liczonych ocen;
   zlecenie potwierdzone < 30 min po przyjęciu (`MinJobDuration`) albo kolejne z tym samym partnerem w ciągu 7 dni
   (`RepeatWindow`, obie role) – ocena zostaje, ale nie wchodzi do średniej. Używa jej `GetUserProfileHandler`
   (`RoleStatsDto`: `ratingCount` wszystkie, `raterCount` osoby w średniej, `partnerCount`, `mostJobsWithOnePartner`).

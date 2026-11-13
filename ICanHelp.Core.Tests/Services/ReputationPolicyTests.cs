@@ -3,7 +3,7 @@ using ICanHelp.Core.ValueObjects;
 
 namespace ICanHelp.Core.Tests.Services;
 
-/// <summary>F11 H: jedna osoba = jeden głos, podejrzane tempo (szybkie potwierdzenie, powtórka z tym samym partnerem).</summary>
+/// <summary>F11 H: jedna osoba = jeden głos (średnia jej ocen), podejrzane tempo (szybkie potwierdzenie, powtórka z tym samym partnerem).</summary>
 public class ReputationPolicyTests
 {
     private static readonly DateTime Day0 = new(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
@@ -12,7 +12,7 @@ public class ReputationPolicyTests
         => new(Id.New(), partner, completedAt - (duration ?? TimeSpan.FromHours(3)), completedAt);
 
     private static ReceivedRating Rated(FinishedJob job, int rate)
-        => new(job.AnnouncementId, job.PartnerId, rate, job.CompletedAt!.Value.AddHours(1));
+        => new(job.AnnouncementId, job.PartnerId, rate);
 
     private static RoleReputation Summarize(IReadOnlyCollection<FinishedJob> jobs, params ReceivedRating[] ratings)
         => ReputationPolicy.Summarize(jobs, ratings, ReputationPolicy.FindSuspiciousJobs(jobs));
@@ -33,19 +33,35 @@ public class ReputationPolicyTests
     }
 
     [Fact]
-    public void SamePartnerManyTimes_OnlyNewestRatingCounts()
+    public void SamePartnerManyTimes_CountsAsOneVote_TheAverageOfHisRatings()
     {
         var friend = UserId.New();
         var other = UserId.New();
-        var jobs = new[] { Job(friend, Day0), Job(friend, Day0.AddDays(10)), Job(friend, Day0.AddDays(20)), Job(other, Day0) };
+        var jobs = new[] { Job(friend, Day0), Job(friend, Day0.AddDays(10)), Job(other, Day0) };
 
-        var result = Summarize(jobs, Rated(jobs[0], 1), Rated(jobs[1], 1), Rated(jobs[2], 5), Rated(jobs[3], 3));
+        // Przyjaciel: 2 i 4 → jeden głos 3; drugi: 5 → (3 + 5) / 2 = 4 (a nie (2 + 4 + 5) / 3).
+        var result = Summarize(jobs, Rated(jobs[0], 2), Rated(jobs[1], 4), Rated(jobs[2], 5));
 
         result.AverageRating.ShouldBe(4);
-        result.RatingCount.ShouldBe(4);
+        result.RatingCount.ShouldBe(3);
         result.RaterCount.ShouldBe(2);
         result.PartnerCount.ShouldBe(2);
-        result.MostJobsWithOnePartner.ShouldBe(3);
+        result.MostJobsWithOnePartner.ShouldBe(2);
+    }
+
+    [Fact]
+    public void ManyJobsFromOnePerson_WeighAsMuchAsOneJobFromAnother()
+    {
+        var friend = UserId.New();
+        var other = UserId.New();
+        var jobs = Enumerable.Range(0, 10).Select(i => Job(friend, Day0.AddDays(i * 10))).Append(Job(other, Day0)).ToList();
+
+        var ratings = jobs.Take(10).Select(j => Rated(j, 5)).Append(Rated(jobs[10], 1)).ToArray();
+        var result = Summarize(jobs, ratings);
+
+        result.AverageRating.ShouldBe(3);
+        result.RatingCount.ShouldBe(11);
+        result.RaterCount.ShouldBe(2);
     }
 
     [Fact]
@@ -80,7 +96,7 @@ public class ReputationPolicyTests
         var result = ReputationPolicy.Summarize(jobs, [Rated(jobs[0], 3), Rated(jobs[1], 5)], suspicious);
 
         suspicious.ShouldBe([jobs[1].AnnouncementId]);
-        // Nowsza ocena jest podejrzana – liczy się wcześniejsza, a nie żadna.
+        // Nowsza ocena jest podejrzana – głos przyjaciela to tylko wcześniejsza ocena.
         result.AverageRating.ShouldBe(3);
         result.RaterCount.ShouldBe(1);
     }

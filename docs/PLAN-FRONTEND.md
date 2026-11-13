@@ -563,19 +563,23 @@ Zrobione H (13.11.2026), decyzje (do oceny autora):
   `Abandon`; migracja `AnnouncementJobTimes` – 2 kolumny, czysta). Stare zlecenia bez czasów nie są podejrzane.
 - Reguła – czysta funkcja `Core/Services/ReputationPolicy` (nie encja: liczy po wielu agregatach): najpierw odrzuca
   oceny z podejrzanych zleceń (szybkie potwierdzenie albo kolejne zlecenie z tą samą osobą w ciągu 7 dni od
-  poprzedniego – w **obu rolach**, para mogłaby się zamieniać), potem bierze najnowszą ocenę od każdej osoby. Dzięki
-  tej kolejności podejrzana powtórka nie wypiera wcześniejszej, uczciwej oceny. Ocena zostaje zapisana i widoczna na
+  poprzedniego – w **obu rolach**, para mogłaby się zamieniać), potem **jedna osoba = jeden głos = średnia jej ocen**
+  (propozycja autora zamiast „najnowszej”: 2 i 4 → 3; dziesięć piątek od kolegi waży tyle, co jedna ocena obcego).
+  Dzięki tej kolejności podejrzana powtórka nie zmienia głosu z wcześniejszego, uczciwego zlecenia. Ocena zostaje zapisana i widoczna na
   listach – tylko nie wchodzi do średniej.
 - API: `RoleStatsDto` + `raterCount` (osoby w średniej), `partnerCount` (różni partnerzy), `mostJobsWithOnePartner`;
   `ratingCount` = wszystkie oceny. Liczy `GetUserProfileHandler`. `api/users/{id}/ratings` bez zmian (pełna lista).
 - Front (`/users/:id`): „4,8 / 5 · 12 ocen od 9 osób” („od N osób” tylko, gdy mniej niż ocen), same nieliczone –
   „Średnia jeszcze niepoliczona · 2 oceny” (bez „oszukujesz”); „Zakończone zlecenia: 14 · z 9 osobami”; wiersz
   „Zlecenia z tą samą osobą: 3” tylko, gdy > 1 (informacja, nie ostrzeżenie). Ekran „Oceny” – średnia nadal ze wszystkich
-  ocen + notka, że na profilu liczy się jedna ocena od osoby.
+  ocen → po zmianie: oceny zgrupowane po osobie („@jan · Ocena grupowa · 2 oceny, średnio 3,0” i pod spodem
+  pojedyncze oceny), podsumowanie „4,0 · 3 oceny od 2 osób” liczone tak samo (`groupByRater`, `groupedAverage`; reguł
+  tempa front nie zna – te liczy tylko profil).
 - Test integracyjny cofa `AcceptedAt` w bazie (`TestApi.BackdateAcceptanceAsync`) – zegar API jest prawdziwy, przesunięcie
   go zepsułoby tokeny JWT.
 - 13.11.2026 `verify.cmd`: dotnet 593/593 (Core 261, Application 218, integracyjne 114), `npm run api`, lint + Vitest
-  354/354 + build.
+  354/354 + build. Po zmianie na średnią per osoba: dotnet 594/594 (Core 262, Application 218, integracyjne 114),
+  lint + Vitest 356/356 + build.
 - Do sprawdzenia ręcznie: dwa zlecenia tej samej pary w krótkim odstępie → na profilu „2 oceny od 1 osoby”, „Zlecenia
   z tą samą osobą: 2”; zlecenie potwierdzone od razu → „Średnia jeszcze niepoliczona”.
 

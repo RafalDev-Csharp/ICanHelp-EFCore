@@ -11,7 +11,7 @@ namespace ICanHelp.Infrastructure.DAL.Handlers;
 /// <summary>
 /// F11 G: statystyki profilu. Rola w zleceniu: właściciel ogłoszenia = Client, autor przyjętej oferty = Helper.
 /// Kilka małych zapytań (oceny, zakończone, wyjścia) – przy tej skali prościej niż jedno złożone.
-/// F11 H: średnia i liczniki z <see cref="ReputationPolicy"/> (jeden głos na osobę, bez podejrzanych zleceń).
+/// F11 H: średnia i liczniki z <see cref="ReputationPolicy"/> (jeden głos na osobę = średnia jej ocen, bez podejrzanych zleceń).
 /// </summary>
 internal sealed class GetUserProfileHandler : IQueryHandler<GetUserProfile, UserProfileDto?>
 {
@@ -37,7 +37,7 @@ internal sealed class GetUserProfileHandler : IQueryHandler<GetUserProfile, User
                 from r in _db.Ratings.AsNoTracking()
                 where r.RateeId == userId
                 join a in _db.Announcements.AsNoTracking() on r.AnnouncementId equals a.Id
-                select new { r.AnnouncementId, r.RaterId, r.Rate, r.CreatedAt, a.OwnerId })
+                select new { r.AnnouncementId, r.RaterId, r.Rate, a.OwnerId })
             .ToListAsync(cancellationToken);
 
         // Zakończone zlecenia w obu rolach: jako zleceniodawca – moje ogłoszenia; jako pomocnik – przyjęta oferta moja.
@@ -75,7 +75,7 @@ internal sealed class GetUserProfileHandler : IQueryHandler<GetUserProfile, User
                 jobs.Where(j => j.AsHelper == asHelper).Select(j => j.Job).ToList(),
                 ratings
                     .Where(r => (r.OwnerId != userId) == asHelper)
-                    .Select(r => new ReceivedRating(r.AnnouncementId, r.RaterId, r.Rate.Value, r.CreatedAt))
+                    .Select(r => new ReceivedRating(r.AnnouncementId, r.RaterId, r.Rate.Value))
                     .ToList(),
                 suspicious);
             var mine = exits.Where(x => asHelper ? x.Exit.HelperId == userId : x.OwnerId == userId).ToList();

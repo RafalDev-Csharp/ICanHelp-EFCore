@@ -50,7 +50,7 @@ public sealed record UserProfileDto
 
 /// <summary>
 /// F11 G: statistics of a user in one role. Ratings only from completed jobs.
-/// F11 H: the average counts one (newest) rating per person and skips suspicious jobs (ReputationPolicy).
+/// F11 H: one vote per person – the average of his ratings – and no suspicious jobs (ReputationPolicy).
 /// </summary>
 public sealed record RoleStatsDto
 {

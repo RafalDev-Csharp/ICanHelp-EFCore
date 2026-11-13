@@ -86,26 +86,39 @@
     <strong>{{ summary(ratings) }}</strong>
   </div>
   <p class="summary-hint ion-padding-horizontal" data-testid="ratings-hint">
-    Tu widzisz wszystkie oceny. Na Twoim profilu średnia liczy jedną (najnowszą) ocenę od każdej osoby.
+    Kilka ocen od tej samej osoby liczy się jako jedna – ich średnia (ocena grupowa).
   </p>
   <ion-list inset="true">
-    @for (rating of ratings; track rating.id; let last = $last) {
-    <ion-item data-testid="received-rating" [lines]="last ? 'none' : 'inset'">
+    @for (group of groupByRater(ratings); track group.raterId; let last = $last) {
+    <ion-item data-testid="rater-group" [lines]="last ? 'none' : 'inset'">
       <ion-label class="ion-text-wrap">
-        <p class="stars" [attr.aria-label]="rating.rate + ' na 5'">
-          @for (index of stars; track index) {
-          <ion-icon color="warning" [name]="starIcon(index, rating.rate)" aria-hidden="true"></ion-icon>
+        @if (group.ratings.length > 1) {
+        <p class="group-head" data-testid="rater-group-head">
+          <span class="stars" aria-hidden="true">
+            @for (index of stars; track index) {
+            <ion-icon color="warning" [name]="starIcon(index, group.average)"></ion-icon>
+            }
+          </span>
+          <strong>&#64;{{ group.userName }}</strong> · {{ groupLabel(group) }}
+        </p>
+        } @for (rating of group.ratings; track rating.id) {
+        <div class="rating" [class.in-group]="group.ratings.length > 1" data-testid="received-rating">
+          <p class="stars" [attr.aria-label]="rating.rate + ' na 5'">
+            @for (index of stars; track index) {
+            <ion-icon color="warning" [name]="starIcon(index, rating.rate)" aria-hidden="true"></ion-icon>
+            }
+            <span class="when">{{ rating.createdAt | timeAgo }}</span>
+          </p>
+          @if (rating.comment) {
+          <h3 class="comment">„{{ rating.comment }}”</h3>
           }
-        </p>
-        @if (rating.comment) {
-        <h3 class="comment">„{{ rating.comment }}”</h3>
+          <p>
+            @if (group.ratings.length === 1) { &#64;{{ rating.rater.userName }} · }
+            <a [routerLink]="['/announcements', rating.announcementId]">{{ rating.announcementTitle }}</a>
+          </p>
+        </div>
         }
-        <p>
-          &#64;{{ rating.rater.userName }} ·
-          <a [routerLink]="['/announcements', rating.announcementId]">{{ rating.announcementTitle }}</a>
-        </p>
       </ion-label>
-      <ion-note slot="end">{{ rating.createdAt | timeAgo }}</ion-note>
     </ion-item>
     }
   </ion-list>
