@@ -5,13 +5,16 @@ import { of, throwError } from 'rxjs';
 import type { RoleStatsDto, UserProfileDto } from '../../core/api/api-client';
 import { UsersClient } from '../../core/api/api-client';
 
-import { UserProfilePage, ratingLabel, statRows } from './user-profile.page';
+import { UserProfilePage, completedValue, ratingLabel, statRows } from './user-profile.page';
 
 function stats(overrides: Partial<RoleStatsDto> = {}): RoleStatsDto {
   return {
     averageRating: undefined,
     ratingCount: 0,
+    raterCount: 0,
     completedCount: 0,
+    partnerCount: 0,
+    mostJobsWithOnePartner: 0,
     interruptedByUser: 0,
     interruptedByOther: 0,
     abandonedByUser: 0,
@@ -30,7 +33,15 @@ function profile(overrides: Partial<UserProfileDto> = {}): UserProfileDto {
       city: 'Augustów',
       createdAt: '2026-01-10T00:00:00Z',
     },
-    asHelper: stats({ averageRating: 4.65, ratingCount: 12, completedCount: 14, interruptedByUser: 1 }),
+    asHelper: stats({
+      averageRating: 4.65,
+      ratingCount: 12,
+      raterCount: 9,
+      completedCount: 14,
+      partnerCount: 9,
+      mostJobsWithOnePartner: 3,
+      interruptedByUser: 1,
+    }),
     asClient: stats({ completedCount: 2 }),
     interruptions: [
       {
@@ -89,9 +100,10 @@ describe('UserProfilePage', () => {
     expect(users.getProfile).toHaveBeenCalledWith('u1');
     expect(element.querySelector('h1')?.textContent).toContain('Jan Kowalski');
     const statsText = element.querySelector('[data-testid="profile-stats"]')?.textContent ?? '';
-    expect(statsText).toContain('4,65 / 5 · 12 ocen');
+    expect(statsText).toContain('4,65 / 5 · 12 ocen od 9 osób');
     expect(statsText).toContain('Zakończone zlecenia');
-    expect(statsText).toContain('14');
+    expect(statsText).toContain('14 · z 9 osobami');
+    expect(statsText).toContain('Zlecenia z tą samą osobą');
     const entry = element.querySelector('[data-testid="profile-interruption"]')?.textContent ?? '';
     expect(entry).toContain('Malowanie płotu');
     expect(entry).toContain('Pomagał · przerwał sam');
@@ -127,6 +139,24 @@ describe('UserProfilePage', () => {
       warn: true,
     });
     expect(rows.map((row) => row.label)).toContain('Przerwane przez pomocnika');
-    expect(ratingLabel(stats({ averageRating: 5, ratingCount: 1 }))).toBe('5,0 / 5 · 1 ocena');
+    expect(rows.map((row) => row.label)).not.toContain('Zlecenia z tą samą osobą');
+    expect(rows[0].value).toBe('0');
+  });
+
+  it('counts one rating per person in the label (F11 H)', () => {
+    expect(ratingLabel(stats())).toBe('Jeszcze bez ocen');
+    expect(ratingLabel(stats({ averageRating: 5, ratingCount: 1, raterCount: 1 }))).toBe('5,0 / 5 · 1 ocena');
+    expect(ratingLabel(stats({ averageRating: 4.8, ratingCount: 3, raterCount: 1 }))).toBe(
+      '4,8 / 5 · 3 oceny od 1 osoby',
+    );
+    // Oceny są, ale żadna nie weszła do średniej (np. szybkie potwierdzenie) – bez sugerowania oszustwa.
+    expect(ratingLabel(stats({ ratingCount: 2 }))).toBe('Średnia jeszcze niepoliczona · 2 oceny');
+  });
+
+  it('shows the completed jobs with the number of different partners', () => {
+    expect(completedValue(stats({ completedCount: 1, partnerCount: 1 }))).toBe('1 · z 1 osobą');
+    expect(completedValue(stats({ completedCount: 5, partnerCount: 2 }))).toBe('5 · z 2 osobami');
+    const rows = statRows(stats({ completedCount: 3, partnerCount: 1, mostJobsWithOnePartner: 3 }), 'Helper');
+    expect(rows[1]).toEqual({ label: 'Zlecenia z tą samą osobą', value: '3', warn: false });
   });
 });

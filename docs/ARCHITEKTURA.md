@@ -10,7 +10,8 @@
 - `Announcement` (agregat): OwnerId, CategoryId, SubcategoryId, Difficulty (enum), Title, Description, Budget (Price),
   Location (VO lat/lon), Status, CreatedAt, AcceptedOfferId?, **Offers**, **Images** (max 5),
   **Revision** (0 = opublikowane, +1 przy realnej edycji; token współbieżności), UpdatedAt?, **Changes** (`AnnouncementChange`:
-  rewizja, czas, `AnnouncementFields` [Flags]), DoneReportedAt? (F11 D: pomocnik zgłosił wykonanie), **JobExits**
+  rewizja, czas, `AnnouncementFields` [Flags]), DoneReportedAt? (F11 D: pomocnik zgłosił wykonanie), AcceptedAt? /
+  CompletedAt? (F11 H: przyjęcie oferty – czyszczone przy `Abandon` – i potwierdzenie wykonania), **JobExits**
   (F11 E, `JobExit`: numer, Kind Abandoned/Interrupted, OfferId, HelperId, ActorId + ActorParty, Reason
   (`JobExitReason`), Note?, OccurredAt; tabela `JobExits`, klucz (AnnouncementId, Number), indeks ActorId).
   - F11 E: `Abandon(actor, reason, note?, at)` – Accepted, właściciel albo przyjęty pomocnik → Open, `AcceptedOfferId` = null,
@@ -36,6 +37,10 @@
 - `UserDevice` (agregat, `Entities/Users`) – sekcja „Push i urządzenia”.
 - `Rating`: AnnouncementId, RaterId, RateeId, Rate (1–5), Comment?; unikalne (AnnouncementId, RaterId). Ocenianego (druga strona)
   wybiera domena; „raz na ogłoszenie” – handler (`AlreadyRatedException`) + unikalny indeks.
+- `Services/ReputationPolicy` (F11 H, czysta funkcja w Core): średnia na profilu – jedna (najnowsza) liczona ocena od osoby;
+  zlecenie potwierdzone < 30 min po przyjęciu (`MinJobDuration`) albo kolejne z tym samym partnerem w ciągu 7 dni
+  (`RepeatWindow`, obie role) – ocena zostaje, ale nie wchodzi do średniej. Używa jej `GetUserProfileHandler`
+  (`RoleStatsDto`: `ratingCount` wszystkie, `raterCount` osoby w średniej, `partnerCount`, `mostJobsWithOnePartner`).
 - `LikedAnnouncement` (UserId, AnnouncementId) i `LikedUser` (LikerId, LikedId) – klucze złożone, istnienie wiersza = polubione.
 - `Conversation` (agregat, `Entities/Negotiations`): AnnouncementId, ClientId (= właściciel), HelperId, CreatedAt,
   `Client/HelperLastReadAt`, **Messages** (`ConversationMessage`: SenderId, Text (Description ≤ 500), SentAt, AnnouncementRevision).

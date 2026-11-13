@@ -344,7 +344,10 @@ Content-Type: application/json
 
 ###
 # F11 G: publiczny profil (bez logowania): statystyki asHelper / asClient (średnia ocen tylko z zakończonych,
-# zakończone, przerwane i rezygnacje – przez niego / przez drugą stronę) i przerwane zlecenia z obiema wersjami
+# zakończone, przerwane i rezygnacje – przez niego / przez drugą stronę) i przerwane zlecenia z obiema wersjami.
+# F11 H: averageRating = jedna (najnowsza) ocena na osobę, bez zleceń potwierdzonych < 30 min po przyjęciu i powtórek
+# z tym samym partnerem w ciągu 7 dni; ratingCount = wszystkie oceny, raterCount = osoby w średniej,
+# partnerCount = różni partnerzy, mostJobsWithOnePartner = najwięcej zleceń z jedną osobą
 @profileUserId = 3fa85f64-5717-4562-b3fc-2c963f66afa6
 GET {{baseUrl}}/api/users/{{profileUserId}}/profile
 

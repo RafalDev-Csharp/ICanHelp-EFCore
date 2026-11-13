@@ -101,4 +101,27 @@ public class AnnouncementJobTests
         announcement.DoneReportedAt.ShouldBe(Now.AddDays(1));
         announcement.AllowsConversationWith(Helper).ShouldBeFalse();
     }
+
+    [Fact]
+    public void AcceptAndComplete_RecordTimes()
+    {
+        var announcement = InStatus(AnnouncementStatus.Accepted);
+        announcement.AcceptedAt.ShouldBe(Now);
+        announcement.CompletedAt.ShouldBeNull();
+
+        announcement.Complete(OwnerId, Now.AddHours(5));
+
+        announcement.CompletedAt.ShouldBe(Now.AddHours(5));
+    }
+
+    [Fact]
+    public void Abandon_ClearsAcceptedAt()
+    {
+        var announcement = InStatus(AnnouncementStatus.Accepted);
+
+        announcement.Abandon(Helper, JobExitReason.CannotMakeIt, null, Now.AddHours(1));
+
+        announcement.AcceptedAt.ShouldBeNull();
+        announcement.CompletedAt.ShouldBeNull();
+    }
 }

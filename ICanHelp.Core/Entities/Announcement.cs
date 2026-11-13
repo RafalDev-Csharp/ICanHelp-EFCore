@@ -55,6 +55,12 @@ public class Announcement : AggregateRoot
     /// <summary>When the accepted helper reported the work as done (null until then) – the owner confirms it.</summary>
     public DateTime? DoneReportedAt { get; private set; }
 
+    /// <summary>F11 H: when the current offer was accepted (null while open; cleared when the job is abandoned).</summary>
+    public DateTime? AcceptedAt { get; private set; }
+
+    /// <summary>F11 H: when the owner confirmed the work (null until <see cref="Complete"/>).</summary>
+    public DateTime? CompletedAt { get; private set; }
+
     public IReadOnlyCollection<Offer> Offers => _offers.AsReadOnly();
     public IReadOnlyCollection<Image> Images => _images.AsReadOnly();
 
@@ -339,6 +345,7 @@ public class Announcement : AggregateRoot
         }
 
         AcceptedOfferId = offer.Id;
+        AcceptedAt = acceptedAtUtc;
         Status = AnnouncementStatus.Accepted;
     }
 
@@ -471,6 +478,7 @@ public class Announcement : AggregateRoot
         EnsureOwner(actorId, "complete");
 
         Status = AnnouncementStatus.Completed;
+        CompletedAt = completedAtUtc;
         AddDomainEvent(new JobCompleted(Id, OwnerId, GetAcceptedHelperId()!, completedAtUtc));
     }
 
@@ -490,6 +498,7 @@ public class Announcement : AggregateRoot
 
         offer.MarkAsAbandoned();
         AcceptedOfferId = null;
+        AcceptedAt = null;
         DoneReportedAt = null;
         Status = AnnouncementStatus.Open;
 

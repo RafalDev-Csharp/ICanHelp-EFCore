@@ -4653,7 +4653,10 @@ export interface ReviseOffer {
 export interface RoleStatsDto {
     averageRating: number | undefined;
     ratingCount: number;
+    raterCount: number;
     completedCount: number;
+    partnerCount: number;
+    mostJobsWithOnePartner: number;
     interruptedByUser: number;
     interruptedByOther: number;
     abandonedByUser: number;

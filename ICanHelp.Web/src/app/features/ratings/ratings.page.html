@@ -85,6 +85,9 @@
     </span>
     <strong>{{ summary(ratings) }}</strong>
   </div>
+  <p class="summary-hint ion-padding-horizontal" data-testid="ratings-hint">
+    Tu widzisz wszystkie oceny. Na Twoim profilu średnia liczy jedną (najnowszą) ocenę od każdej osoby.
+  </p>
   <ion-list inset="true">
     @for (rating of ratings; track rating.id; let last = $last) {
     <ion-item data-testid="received-rating" [lines]="last ? 'none' : 'inset'">

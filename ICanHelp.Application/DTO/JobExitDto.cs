@@ -48,13 +48,28 @@ public sealed record UserProfileDto
     public IReadOnlyList<ProfileInterruptionDto> Interruptions { get; init; } = [];
 }
 
-/// <summary>F11 G: statistics of a user in one role. Ratings only from completed jobs.</summary>
+/// <summary>
+/// F11 G: statistics of a user in one role. Ratings only from completed jobs.
+/// F11 H: the average counts one (newest) rating per person and skips suspicious jobs (ReputationPolicy).
+/// </summary>
 public sealed record RoleStatsDto
 {
-    /// <summary>Average of received ratings (null without ratings).</summary>
+    /// <summary>Average of the counted ratings (null without them).</summary>
     public double? AverageRating { get; init; }
+
+    /// <summary>All received ratings.</summary>
     public int RatingCount { get; init; }
+
+    /// <summary>F11 H: people whose rating is in the average („12 ocen od 9 osób”).</summary>
+    public int RaterCount { get; init; }
+
     public int CompletedCount { get; init; }
+
+    /// <summary>F11 H: different partners of the completed jobs.</summary>
+    public int PartnerCount { get; init; }
+
+    /// <summary>F11 H: the most completed jobs with the same person („3 zlecenia z tą samą osobą”).</summary>
+    public int MostJobsWithOnePartner { get; init; }
 
     /// <summary>Interrupted by this user himself / by the other side.</summary>
     public int InterruptedByUser { get; init; }

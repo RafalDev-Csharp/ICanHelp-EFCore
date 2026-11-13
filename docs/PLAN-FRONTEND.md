@@ -542,18 +542,42 @@ Zrobione G (13.11.2026), decyzje:
 - Do sprawdzenia ręcznie: przerwanie → druga strona „Dodaj swoje stanowisko” → profil obu stron (statystyki, wpis z obiema
   wersjami); ocena tylko po zakończonym zleceniu.
 
-**H. Oceny odporne na zmowę (uwaga autora po G, 13.11.2026)** – do zrobienia
+**H. Oceny odporne na zmowę (uwaga autora po G, 13.11.2026)** – zrobione 13.11.2026 (opis niżej)
 Problem: dwa konta (kolega „Zlecam” + kolega „Pomagam”) mogą w kółko: ogłoszenie → oferta → przyjęcie → „Potwierdź
 wykonanie” → 5 gwiazdek, i po tygodniu mieć „5,0 · 250 ocen”, nie pomagając nikomu. Jak na Allegro: ocena tylko po
 udanej transakcji – to już jest (G), ale trzeba, żeby powtórki z tą samą osobą nie budowały reputacji.
-- [ ] **Jedna osoba = jeden głos w średniej**: do średniej i liczby ocen w roli liczy się tylko najnowsza ocena od danej
+- [x] **Jedna osoba = jeden głos w średniej**: do średniej i liczby ocen w roli liczy się tylko najnowsza ocena od danej
       osoby (kolejne zlecenia z tym samym partnerem nie podbijają wyniku); profil pokazuje „4,8 · 12 ocen od 9 osób”
       i liczbę **różnych** partnerów obok liczby zakończonych zleceń.
-- [ ] **Ślad podejrzanego tempa**: zlecenie potwierdzone bardzo szybko po przyjęciu (np. < 30 min) albo kolejne zlecenie
+- [x] **Ślad podejrzanego tempa**: zlecenie potwierdzone bardzo szybko po przyjęciu (np. < 30 min) albo kolejne zlecenie
       z tym samym partnerem w ciągu 7 dni – ocena zapisuje się, ale nie wchodzi do średniej (bez komunikatu „oszukujesz” –
       po prostu się nie liczy); na profilu np. „3 zlecenia z tą samą osobą”.
-- [ ] Do decyzji przy realizacji: progi (30 min, 7 dni), czy pokazywać na profilu „oceny od nowych kont (< 7 dni)” osobno.
+- [x] Do decyzji przy realizacji: progi (30 min, 7 dni), czy pokazywać na profilu „oceny od nowych kont (< 7 dni)” osobno.
 - Później (z moderacją): zgłoszenie podejrzanej pary, ręczne wyzerowanie ocen.
+
+Zrobione H (13.11.2026), decyzje (do oceny autora):
+- Progi zgodnie z planem: 30 min (`ReputationPolicy.MinJobDuration`) i 7 dni (`RepeatWindow`) – stałe w Core, łatwo zmienić.
+  „Oceny od nowych kont” – **nie teraz**: w teście z ludźmi wszystkie konta są nowe, a jeden głos na osobę i tak tnie
+  zysk z fałszywych kont do jednej oceny na konto; wrócić przy moderacji.
+- Domena: `Announcement.AcceptedAt` / `CompletedAt` (ustawiane w `AcceptOffer` / `Complete`, `AcceptedAt` czyszczone przy
+  `Abandon`; migracja `AnnouncementJobTimes` – 2 kolumny, czysta). Stare zlecenia bez czasów nie są podejrzane.
+- Reguła – czysta funkcja `Core/Services/ReputationPolicy` (nie encja: liczy po wielu agregatach): najpierw odrzuca
+  oceny z podejrzanych zleceń (szybkie potwierdzenie albo kolejne zlecenie z tą samą osobą w ciągu 7 dni od
+  poprzedniego – w **obu rolach**, para mogłaby się zamieniać), potem bierze najnowszą ocenę od każdej osoby. Dzięki
+  tej kolejności podejrzana powtórka nie wypiera wcześniejszej, uczciwej oceny. Ocena zostaje zapisana i widoczna na
+  listach – tylko nie wchodzi do średniej.
+- API: `RoleStatsDto` + `raterCount` (osoby w średniej), `partnerCount` (różni partnerzy), `mostJobsWithOnePartner`;
+  `ratingCount` = wszystkie oceny. Liczy `GetUserProfileHandler`. `api/users/{id}/ratings` bez zmian (pełna lista).
+- Front (`/users/:id`): „4,8 / 5 · 12 ocen od 9 osób” („od N osób” tylko, gdy mniej niż ocen), same nieliczone –
+  „Średnia jeszcze niepoliczona · 2 oceny” (bez „oszukujesz”); „Zakończone zlecenia: 14 · z 9 osobami”; wiersz
+  „Zlecenia z tą samą osobą: 3” tylko, gdy > 1 (informacja, nie ostrzeżenie). Ekran „Oceny” – średnia nadal ze wszystkich
+  ocen + notka, że na profilu liczy się jedna ocena od osoby.
+- Test integracyjny cofa `AcceptedAt` w bazie (`TestApi.BackdateAcceptanceAsync`) – zegar API jest prawdziwy, przesunięcie
+  go zepsułoby tokeny JWT.
+- 13.11.2026 `verify.cmd`: dotnet 593/593 (Core 261, Application 218, integracyjne 114), `npm run api`, lint + Vitest
+  354/354 + build.
+- Do sprawdzenia ręcznie: dwa zlecenia tej samej pary w krótkim odstępie → na profilu „2 oceny od 1 osoby”, „Zlecenia
+  z tą samą osobą: 2”; zlecenie potwierdzone od razu → „Średnia jeszcze niepoliczona”.
 
 ## Krok F10 – wdrożenie i wymagania przed testem z ludźmi
 

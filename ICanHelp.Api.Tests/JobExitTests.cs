@@ -170,15 +170,13 @@ public sealed class JobExitTests
     {
         var owner = await _factory.CreateUserAsync();
         var helper = await _factory.CreateUserAsync();
-        var (announcementId, _) = await AcceptedAsync(owner, helper);
-        var url = $"/api/announcements/{announcementId}";
-        (await owner.Client.PostEmptyAsync($"{url}/complete")).StatusCode.ShouldBe(HttpStatusCode.NoContent);
-        (await owner.Client.PostAsJsonAsync($"{url}/ratings", new { rate = 4 })).StatusCode.ShouldBe(HttpStatusCode.Created);
-        (await helper.Client.PostAsJsonAsync($"{url}/ratings", new { rate = 5 })).StatusCode.ShouldBe(HttpStatusCode.Created);
+        await CompletedAndRatedAsync(owner, helper, ownerRate: 4, helperRate: 5);
 
         var helperProfile = await helper.Client.GetFromJsonAsync<UserProfileDto>($"/api/users/{helper.Id}/profile");
         helperProfile!.AsHelper.CompletedCount.ShouldBe(1);
         helperProfile.AsHelper.RatingCount.ShouldBe(1);
+        helperProfile.AsHelper.RaterCount.ShouldBe(1);
+        helperProfile.AsHelper.PartnerCount.ShouldBe(1);
         helperProfile.AsHelper.AverageRating.ShouldBe(4);
         helperProfile.AsClient.CompletedCount.ShouldBe(0);
         helperProfile.AsClient.AverageRating.ShouldBeNull();
@@ -189,6 +187,32 @@ public sealed class JobExitTests
         ownerProfile.Interruptions.ShouldBeEmpty();
 
         (await helper.Client.GetAsync($"/api/users/{Guid.NewGuid()}/profile")).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Profile_RepeatedAndQuickJobs_DoNotBuildReputation()
+    {
+        var helper = await _factory.CreateUserAsync();
+        var friend = await _factory.CreateUserAsync();
+        var stranger = await _factory.CreateUserAsync();
+
+        // Dwa zlecenia z tym samym partnerem w ciągu 7 dni: druga ocena zapisana, ale się nie liczy.
+        await CompletedAndRatedAsync(friend, helper, ownerRate: 3, helperRate: 5);
+        await CompletedAndRatedAsync(friend, helper, ownerRate: 5, helperRate: 5);
+        // Zlecenie potwierdzone od razu po przyjęciu (< 30 min) – ocena się nie liczy.
+        await CompletedAndRatedAsync(stranger, helper, ownerRate: 5, helperRate: 5, backdate: false);
+
+        var profile = await _factory.CreateClient().GetFromJsonAsync<UserProfileDto>($"/api/users/{helper.Id}/profile");
+        var asHelper = profile!.AsHelper;
+        asHelper.CompletedCount.ShouldBe(3);
+        asHelper.RatingCount.ShouldBe(3);
+        asHelper.RaterCount.ShouldBe(1);
+        asHelper.AverageRating.ShouldBe(3);
+        asHelper.PartnerCount.ShouldBe(2);
+        asHelper.MostJobsWithOnePartner.ShouldBe(2);
+
+        // Oceny dalej widać na liście – nie znikają, tylko nie wchodzą do średniej.
+        (await helper.Client.GetFromJsonAsync<List<RatingDto>>($"/api/users/{helper.Id}/ratings"))!.Count.ShouldBe(3);
     }
 
     [Fact]
@@ -203,5 +227,24 @@ public sealed class JobExitTests
         (await owner.Client.PostEmptyAsync($"/api/announcements/{announcementId}/offers/{offerId}/accept"))
             .StatusCode.ShouldBe(HttpStatusCode.NoContent);
         return (announcementId, offerId);
+    }
+
+    /// <summary>Przyjęcie → (cofnięcie przyjęcia o 2 h) → zakończenie → wzajemne oceny.</summary>
+    private async Task<Guid> CompletedAndRatedAsync(TestUser owner, TestUser helper, int ownerRate, int helperRate,
+        bool backdate = true)
+    {
+        var (announcementId, _) = await AcceptedAsync(owner, helper);
+        if (backdate)
+        {
+            await _factory.BackdateAcceptanceAsync(announcementId, TimeSpan.FromHours(2));
+        }
+
+        var url = $"/api/announcements/{announcementId}";
+        (await owner.Client.PostEmptyAsync($"{url}/complete")).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await owner.Client.PostAsJsonAsync($"{url}/ratings", new { rate = ownerRate }))
+            .StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await helper.Client.PostAsJsonAsync($"{url}/ratings", new { rate = helperRate }))
+            .StatusCode.ShouldBe(HttpStatusCode.Created);
+        return announcementId;
     }
 }

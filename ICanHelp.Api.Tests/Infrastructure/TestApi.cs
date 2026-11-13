@@ -1,6 +1,8 @@
 using System.Net.Http.Headers;
 using ICanHelp.Application.DTO;
+using ICanHelp.Infrastructure.DAL;
 using ICanHelp.Infrastructure.Outbox;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ICanHelp.Api.Tests.Infrastructure;
@@ -113,6 +115,21 @@ public static class TestApi
     /// </summary>
     public static Task<int> ProcessOutboxAsync(this ApiFactory factory)
         => factory.Services.GetRequiredService<IOutboxProcessor>().ProcessPendingAsync();
+
+    /// <summary>
+    /// F11 H – jedyny wyjątek od „bez zaglądania do bazy”: cofa moment przyjęcia oferty, żeby zlecenie potwierdzone
+    /// w teście od razu nie wyglądało na podejrzanie szybkie (ReputationPolicy: &lt; 30 min). Zegar API jest prawdziwy
+    /// (przesunięcie go zepsułoby tokeny JWT).
+    /// </summary>
+    public static async Task BackdateAcceptanceAsync(this ApiFactory factory, Guid announcementId, TimeSpan by)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ICanHelpDbContext>();
+        var seconds = -(int)by.TotalSeconds;
+        var updated = await db.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE Announcements SET AcceptedAt = DATEADD(second, {seconds}, AcceptedAt) WHERE Id = {announcementId}");
+        updated.ShouldBe(1);
+    }
 
     public static async Task<List<NotificationDto>> GetNotificationsAsync(this TestUser user, bool unreadOnly = false)
     {

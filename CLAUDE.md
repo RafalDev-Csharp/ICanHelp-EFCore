@@ -123,8 +123,10 @@ cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /ap
   `verify.cmd`: dotnet 536/536, Vitest 322/322). **E zrobione 13.11.2026** (Zrezygnuj → Open / Przerwij → `Interrupted`
   z powodem, `JobExits`, oceny po przerwaniu, „Wystaw ponownie”, liczniki `api/users/{id}/reliability`; `verify.cmd`:
   dotnet 574/574, Vitest 342/342). **G zrobione 13.11.2026** (bez ocen po przerwaniu, stanowisko drugiej strony,
-  publiczny profil `/users/:id` – Pomagam / Zlecam, `api/users/{id}/profile`; `verify.cmd`: dotnet 581/581, Vitest 352/352).
-  Zostało: test ręczny E + G, potem test z ludźmi; hosting (F10) na koniec.
+  publiczny profil `/users/:id` – Pomagam / Zlecam, `api/users/{id}/profile`; `verify.cmd`: dotnet 581/581, Vitest 352/352). **H zrobione 13.11.2026** (oceny odporne na zmowę: jeden głos na osobę,
+  bez zleceń < 30 min i powtórek z tą samą osobą w 7 dni – `Core/Services/ReputationPolicy`, „12 ocen od 9 osób”;
+  `verify.cmd`: dotnet 593/593, Vitest 354/354).
+  Zostało: test ręczny E + G + H, potem test z ludźmi; hosting (F10) na koniec.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)
