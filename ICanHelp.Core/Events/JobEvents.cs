@@ -36,7 +36,18 @@ public sealed record JobAbandoned(
     string? Note,
     DateTime OccurredAt) : IDomainEvent;
 
-/// <summary>F11 E: one side interrupted the work (InProgress → Interrupted). Both sides can rate each other.</summary>
+/// <summary>F11 G: the other side added its statement to an abandonment / interruption – the one who left is told.</summary>
+public sealed record JobExitResponded(
+    Guid AnnouncementId,
+    Guid OwnerId,
+    Guid HelperId,
+    int Number,
+    Guid ExitActorId,
+    Guid ResponderId,
+    string Preview,
+    DateTime OccurredAt) : IDomainEvent;
+
+/// <summary>F11 E: one side interrupted the work (InProgress → Interrupted). No ratings (F11 G) – statements instead.</summary>
 public sealed record JobInterrupted(
     Guid AnnouncementId,
     Guid OwnerId,

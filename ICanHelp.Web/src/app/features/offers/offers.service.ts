@@ -222,11 +222,56 @@ export class OffersService {
     const success =
       action === 'abandon'
         ? 'Zrezygnowałeś ze zlecenia – druga strona dostała powiadomienie.'
-        : 'Zlecenie przerwane. Możecie się teraz ocenić.';
+        : 'Zlecenie przerwane – druga strona może dodać swoje stanowisko.';
     return (await this.run(request, success)) !== null;
   }
 
-  /** Ocena drugiej strony po zakończeniu albo przerwaniu (raz na ogłoszenie – backend pilnuje, 409 `AlreadyRated`). */
+  /**
+   * F11 G: stanowisko drugiej strony do rezygnacji / przerwania (raz) – okno z polem tekstowym (2–500 znaków; za krótkie
+   * – okno zostaje otwarte z komunikatem) → `POST …/job-exits/{number}/response`.
+   */
+  async respondToExit(announcementId: string, number: number): Promise<boolean> {
+    const alert = await this.alerts.create({
+      header: 'Twoje stanowisko',
+      message: 'Opisz, jak to wyglądało z Twojej strony. Będzie widoczne na profilach obu stron – raz, bez edycji.',
+      inputs: [
+        {
+          name: 'text',
+          type: 'textarea',
+          placeholder: 'Np. zakres prac był inny niż w ogłoszeniu…',
+          attributes: { maxlength: 500 },
+        },
+      ],
+      buttons: [
+        { text: 'Anuluj', role: 'cancel' },
+        {
+          text: 'Wyślij',
+          role: 'confirm',
+          handler: (values: { text?: string }) => {
+            if ((values.text ?? '').trim().length < 2) {
+              void this.toast.error('Stanowisko: co najmniej 2 znaki.');
+              return false;
+            }
+            return true;
+          },
+        },
+      ],
+    });
+    await alert.present();
+    const { data, role } = await alert.onDidDismiss<{ values?: { text?: string } }>();
+    const text = data?.values?.text?.trim() ?? '';
+    if (role !== 'confirm' || text.length < 2) {
+      return false;
+    }
+    return (
+      (await this.run(
+        this.client.respondToJobExit(announcementId, number, { text }),
+        'Stanowisko zapisane – widać je na profilach.',
+      )) !== null
+    );
+  }
+
+  /** Ocena drugiej strony po zakończeniu (raz na ogłoszenie – backend pilnuje, 409 `AlreadyRated`; nie po przerwaniu). */
   async rate(announcementId: string, otherParty: string): Promise<boolean> {
     const modal = await this.modals.create({ component: RatingModalComponent, componentProps: { otherParty } });
     await modal.present();

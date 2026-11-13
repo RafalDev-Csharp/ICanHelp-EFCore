@@ -29,6 +29,7 @@ describe('OffersService', () => {
     postRating: vi.fn(),
     abandon: vi.fn(),
     interrupt: vi.fn(),
+    respondToJobExit: vi.fn(),
   };
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
   const push = { suggest: vi.fn(() => Promise.resolve()) };
@@ -304,6 +305,33 @@ describe('OffersService', () => {
     modalResult = { data: { reason: 'Disagreement', note: 'Inny zakres.' }, role: 'confirm' };
     await expect(service.exitJob('a1', 'interrupt', 'Pomocnik')).resolves.toBe(true);
     expect(client.interrupt).toHaveBeenCalledWith('a1', { reason: 'Disagreement', note: 'Inny zakres.' });
+  });
+
+  it('sends the statement from the text window', async () => {
+    client.respondToJobExit.mockReturnValue(of(undefined));
+    alerts.create.mockImplementationOnce(() =>
+      Promise.resolve({
+        present: () => Promise.resolve(),
+        onDidDismiss: () => Promise.resolve({ role: 'confirm', data: { values: { text: '  Inny zakres.  ' } } }),
+      }),
+    );
+    const service = create();
+
+    await expect(service.respondToExit('a1', 2)).resolves.toBe(true);
+    expect(client.respondToJobExit).toHaveBeenCalledWith('a1', 2, { text: 'Inny zakres.' });
+  });
+
+  it('does not send an empty statement', async () => {
+    alerts.create.mockImplementationOnce(() =>
+      Promise.resolve({
+        present: () => Promise.resolve(),
+        onDidDismiss: () => Promise.resolve({ role: 'confirm', data: { values: { text: ' ' } } }),
+      }),
+    );
+    const service = create();
+
+    await expect(service.respondToExit('a1', 1)).resolves.toBe(false);
+    expect(client.respondToJobExit).not.toHaveBeenCalled();
   });
 
   it('does not abandon when the reason window is closed', async () => {

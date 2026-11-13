@@ -121,7 +121,7 @@
       <ion-label>Zleceniodawca</ion-label>
     </ion-list-header>
     @if (owner(); as person) {
-    <ion-item>
+    <ion-item class="owner-profile" [routerLink]="['/users', person.id]" [detail]="true">
       <ion-icon name="person-circle-outline" slot="start" aria-hidden="true"></ion-icon>
       <ion-label>
         <h3>{{ person.fullName }}</h3>
@@ -247,31 +247,39 @@
 @if (state() === 'ready') {
 <ion-footer>
   <ion-toolbar>
-    @if (isParticipant() && rateable()) { @if (interruption(); as exit) {
+    @if (isParticipant() && interruption(); as exit) {
     <p class="job-note page-column interrupted-note">
       <ion-icon name="stop-circle-outline" aria-hidden="true"></ion-icon>
-      {{ exit.title }} – {{ exit.reason }}. {{ interruptedNote }}
+      {{ exit.title }} – {{ exit.reason }}. {{ interruptedNote }} @if (exit.response) {<br />
+      <span class="exit-response">{{ exit.responseAuthor }}: {{ exit.response }}</span>
+      }
     </p>
-    } @if (rated() && !(isOwner() && interruption())) {
-    <p class="footer-note">
-      <ion-icon name="checkmark-done-outline" aria-hidden="true"></ion-icon>
-      {{ interruption() ? 'Zlecenie przerwane' : 'Zlecenie zakończone' }} · dziękujemy za ocenę.
-    </p>
-    } @else {
     <div class="actions page-column">
-      @if (isOwner() && interruption()) {
+      @if (isOwner()) {
       <ion-button fill="outline" class="republish-action" (click)="republish()">
         <ion-icon name="copy-outline" slot="start" aria-hidden="true"></ion-icon>
         Wystaw ponownie
       </ion-button>
-      } @if (!rated()) {
+      } @if (exit.canRespond) {
+      <ion-button class="primary-action respond-action" (click)="respondToExit(exit.number)" [disabled]="busy()">
+        <ion-icon name="chatbubble-ellipses-outline" slot="start" aria-hidden="true"></ion-icon>
+        Dodaj swoje stanowisko
+      </ion-button>
+      } @else if (!isOwner()) {
+      <p class="footer-note primary-action">Zlecenie przerwane · bez ocen.</p>
+      }
+    </div>
+    } @else if (isParticipant() && status() === 'Completed') { @if (rated()) {
+    <p class="footer-note">
+      <ion-icon name="checkmark-done-outline" aria-hidden="true"></ion-icon>
+      Zlecenie zakończone · dziękujemy za ocenę.
+    </p>
+    } @else {
+    <div class="actions page-column">
       <ion-button class="primary-action" (click)="rate()" [disabled]="busy()">
         <ion-icon name="star-outline" slot="start" aria-hidden="true"></ion-icon>
         {{ isOwner() ? 'Oceń pomocnika' : 'Oceń zleceniodawcę' }}
       </ion-button>
-      } @else {
-      <p class="footer-note primary-action">Dziękujemy za ocenę.</p>
-      }
     </div>
     } } @else if (isParticipant() && (status() === 'Accepted' || status() === 'InProgress')) { @if (job().note; as note)
     {

@@ -70,7 +70,7 @@ export class JobExitModalComponent {
   protected get intro(): string {
     return this.action === 'abandon'
       ? `Ogłoszenie wróci do ofert, a ${this.otherSide.toLowerCase()} dostanie powiadomienie z powodem. Rezygnacja jest widoczna w Twoim profilu. Bez ocen.`
-      : `Zlecenie zostanie zakończone jako przerwane, rozmowa – zamknięta. Możecie się wzajemnie ocenić. Ustalcie między sobą rozliczenie za wykonaną część. Przerwanie jest widoczne w Twoim profilu.`;
+      : `Zlecenie zostanie zakończone jako przerwane, rozmowa – zamknięta. Bez ocen – ${this.otherSide.toLowerCase()} może dodać swoje stanowisko. Ustalcie między sobą rozliczenie za wykonaną część. Przerwanie jest widoczne w Twoim profilu.`;
   }
 
   protected get submitLabel(): string {

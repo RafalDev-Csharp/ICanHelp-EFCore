@@ -456,7 +456,7 @@ pokazuje to innym (historia, licznik, oceny). Ustalone z autorem 13.11.2026:
       terminie”, „warunki inne niż w ogłoszeniu”, „brak kontaktu”, „inny” + opis). Ogłoszenie **wraca do `Open`**
       (`AcceptedOfferId` = null), przyjęta oferta → nowy status „Zerwana” (np. `OfferStatus.Abandoned`). **Bez ocen.**
       Druga strona dostaje powiadomienie z powodem.
-- [x] **W trakcie (`InProgress`) – „Przerwij zlecenie”** (każda strona): obowiązkowy powód (lista jw. + „konflikt / nie
+- [x] **W trakcie (`InProgress`) – „Przerwij zlecenie”** (F11 G: bez ocen – stanowisko drugiej strony) (każda strona): obowiązkowy powód (lista jw. + „konflikt / nie
       dogadaliśmy się”). Ogłoszenie → nowy status końcowy **`Interrupted`** („Przerwane”), nie wraca do `Open`.
       **Obie strony mogą się ocenić** (`CreateRating` z `Completed` lub `Interrupted`), przy ocenie widać, że zlecenie
       przerwano i dlaczego. Rozmowa tylko do odczytu. Notka: „Ustalcie między sobą rozliczenie za wykonaną część.”
@@ -507,6 +507,53 @@ Zrobione E (13.11.2026), decyzje:
 - Do sprawdzenia ręcznie (Chrome ↔ Brave): przyjęcie → pomocnik „Zrezygnuj” (powód) → zleceniodawca dostaje push,
   ogłoszenie znów w „Szukaj”, pomocnik nie może złożyć oferty; drugi pomocnik → „Rozpocznij” → zleceniodawca „Przerwij
   zlecenie” → obie strony oceniają, „Wystaw ponownie”.
+
+**G. Uczciwy profil – bez ocen po przerwaniu (uwaga autora po E, 13.11.2026)** – zrobione 13.11.2026 (opis niżej)
+Problem: po przerwaniu obie strony mogły się ocenić – dwa konta mogłyby „rozpocząć i przerwać” fikcyjne zlecenie i nabijać
+oceny. Przerwanie ma zostać faktem w historii, nie źródłem opinii; częste przerwania / wypraszanie pomocników ma być widać.
+- [x] Ocena tylko po `Completed` (z przerwanego znika „Do wystawienia” i „Oceń”; średnia – tylko z zakończonych).
+- [x] Stanowisko drugiej strony: ta, która nie wyszła, może raz dopisać swoją wersję (do 500 znaków, bez edycji) –
+      do przerwania i do rezygnacji; powiadomienie dla tego, kto wyszedł.
+- [x] Publiczny profil (`/users/:id`): statystyki osobno Pomagam / Zlecam – średnia i liczba ocen, zakończone zlecenia,
+      przerwane przez niego / przez drugą stronę, rezygnacje przez niego / przez drugą stronę; sekcja „Zlecenia przerwane”
+      (rola, kto przerwał, powód, stanowisko drugiej strony). Wejście z karty zleceniodawcy i z nagłówka wątku.
+- Później: moderacja / „Zgłoś problem” (dwa konta jednej osoby „kończące” fikcyjne zlecenia – tego profil nie zatrzyma).
+
+Zrobione G (13.11.2026), decyzje:
+- Domena: `CreateRating` znowu tylko z `Completed`. `JobExit.Response` / `RespondedAt` + `Announcement.RespondToJobExit(
+  number, actor, text, at)` – tylko druga strona (`JobExit.OtherSideOf`: właściciel, gdy wyszedł pomocnik; pomocnik z wpisu,
+  gdy wyszedł właściciel), raz, w każdym statusie (także po powrocie do Open); zdarzenie `JobExitResponded` → powiadomienie
+  `JobExitResponded` („Pomocnik dodał swoje stanowisko”) dla tego, kto wyszedł. Migracja `JobExitResponse` (2 kolumny).
+  Teksty `JobAbandoned` / `JobInterrupted` kończą się „Możesz dodać swoje stanowisko.”
+- API: `POST api/announcements/{id}/job-exits/{number}/response` (`{ text }`, 204; nie ta strona / drugi raz → 409, < 2
+  znaków → 400), `response` / `respondedAt` w `JobExitDto`; `GET api/users/{id}/profile` (`UserProfileDto`: `user`,
+  `asHelper` / `asClient` – `RoleStatsDto`, `interruptions` – `ProfileInterruptionDto` z rolą, `byUser` i całym wpisem;
+  publiczny, nieznany → 404; handler `GetUserProfileHandler`). Z `MyRatingDto` / `PendingRatingDto` zniknęło `interruption`
+  z E. `api/users/{id}/reliability` zostaje (krótkie liczniki przy szczegółach i wątku).
+- Front: `features/profile/user-profile.page` (`/users/:userId`, publiczna, w stosie bieżącej zakładki): segment Pomagam /
+  Zlecam (na start rola z większą liczbą zleceń), „★ 4,65 / 5 · 12 ocen”, wiersze statystyk (własne przerwania /
+  rezygnacje na czerwono), „Zlecenia przerwane (N)” z powodem i „Stanowisko pomocnika / zleceniodawcy: … / jeszcze brak”.
+  Karta zleceniodawcy w szczegółach i link „Profil: pomocnik / zleceniodawca” w nagłówku wątku prowadzą do profilu.
+  „Dodaj swoje stanowisko”: przy wpisie w wątku i w stopce szczegółów po przerwaniu (`OffersService.respondToExit` – okno
+  z polem tekstowym, `canRespondToExit`); po dodaniu – tekst stanowiska zamiast przycisku. Stopka po przerwaniu: notka
+  z powodem i rozliczeniem, „Wystaw ponownie” (właściciel), bez „Oceń”. „Oceny” – bez przerwanych.
+- 13.11.2026 `verify.cmd`: dotnet 581/581 (Core 250, Application 218, integracyjne 113), `npm run api`, lint + Vitest
+  352/352 + build.
+- Do sprawdzenia ręcznie: przerwanie → druga strona „Dodaj swoje stanowisko” → profil obu stron (statystyki, wpis z obiema
+  wersjami); ocena tylko po zakończonym zleceniu.
+
+**H. Oceny odporne na zmowę (uwaga autora po G, 13.11.2026)** – do zrobienia
+Problem: dwa konta (kolega „Zlecam” + kolega „Pomagam”) mogą w kółko: ogłoszenie → oferta → przyjęcie → „Potwierdź
+wykonanie” → 5 gwiazdek, i po tygodniu mieć „5,0 · 250 ocen”, nie pomagając nikomu. Jak na Allegro: ocena tylko po
+udanej transakcji – to już jest (G), ale trzeba, żeby powtórki z tą samą osobą nie budowały reputacji.
+- [ ] **Jedna osoba = jeden głos w średniej**: do średniej i liczby ocen w roli liczy się tylko najnowsza ocena od danej
+      osoby (kolejne zlecenia z tym samym partnerem nie podbijają wyniku); profil pokazuje „4,8 · 12 ocen od 9 osób”
+      i liczbę **różnych** partnerów obok liczby zakończonych zleceń.
+- [ ] **Ślad podejrzanego tempa**: zlecenie potwierdzone bardzo szybko po przyjęciu (np. < 30 min) albo kolejne zlecenie
+      z tym samym partnerem w ciągu 7 dni – ocena zapisuje się, ale nie wchodzi do średniej (bez komunikatu „oszukujesz” –
+      po prostu się nie liczy); na profilu np. „3 zlecenia z tą samą osobą”.
+- [ ] Do decyzji przy realizacji: progi (30 min, 7 dni), czy pokazywać na profilu „oceny od nowych kont (< 7 dni)” osobno.
+- Później (z moderacją): zgłoszenie podejrzanej pary, ręczne wyzerowanie ocen.
 
 ## Krok F10 – wdrożenie i wymagania przed testem z ludźmi
 

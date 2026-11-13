@@ -2,14 +2,11 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 
-import type { JobExitDto, MyRatingDto, PendingRatingDto } from '../../core/api/api-client';
+import type { MyRatingDto, PendingRatingDto } from '../../core/api/api-client';
 import { MyRatingsClient } from '../../core/api/api-client';
 import { OffersService } from '../offers/offers.service';
 
 import { RatingsPage } from './ratings.page';
-
-/** Zakończone (nie przerwane) zlecenie – API zwraca `interruption: null`, choć typ NSwag tego nie mówi. */
-const NO_INTERRUPTION = null as unknown as JobExitDto;
 
 function received(id: string, overrides: Partial<MyRatingDto> = {}): MyRatingDto {
   return {
@@ -21,7 +18,6 @@ function received(id: string, overrides: Partial<MyRatingDto> = {}): MyRatingDto
     rate: 5,
     comment: undefined,
     createdAt: '2026-11-12T10:00:00Z',
-    interruption: NO_INTERRUPTION,
     ...overrides,
   };
 }
@@ -34,7 +30,6 @@ function pendingItem(id: string, overrides: Partial<PendingRatingDto> = {}): Pen
     myRole: 'Client',
     otherParty: { id: 'u3', userName: 'pomocnik1' },
     createdAt: '2026-11-10T10:00:00Z',
-    interruption: NO_INTERRUPTION,
     ...overrides,
   };
 }

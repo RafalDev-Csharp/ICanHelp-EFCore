@@ -16,6 +16,7 @@ namespace ICanHelp.Application.Notifications;
 /// <item>MessageSent → druga osoba w wątku; AnnouncementEdited → pomocnicy z wątkami (każda oferta zakłada wątek)</item>
 /// <item>F11 D: JobStarted / JobDoneReported → właściciel; JobCompleted → pomocnik (link do wątku)</item>
 /// <item>F11 E: JobAbandoned / JobInterrupted → druga strona niż ta, która wyszła (powód i opis w parametrach)</item>
+/// <item>F11 G: JobExitResponded → ten, kto wyszedł (stanowisko drugiej strony)</item>
 /// </list>
 /// Ogłoszenia już nie ma (usunięte) → nic nie wysyłamy.
 /// </summary>
@@ -32,7 +33,8 @@ internal sealed class TransactionNotificationHandler :
     IDomainEventHandler<JobDoneReported>,
     IDomainEventHandler<JobCompleted>,
     IDomainEventHandler<JobAbandoned>,
-    IDomainEventHandler<JobInterrupted>
+    IDomainEventHandler<JobInterrupted>,
+    IDomainEventHandler<JobExitResponded>
 {
     private readonly IAnnouncementRepository _announcements;
     private readonly IConversationRepository _conversations;
@@ -162,6 +164,15 @@ internal sealed class TransactionNotificationHandler :
             recipient: OtherSideOf(e.ActorParty, e.OwnerId, e.HelperId),
             NotificationType.JobInterrupted, e.OccurredAt, ExitParameters(e.ActorParty, e.Reason, e.Note),
             cancellationToken);
+
+    public Task HandleAsync(Guid eventId, JobExitResponded e, CancellationToken cancellationToken = default)
+        => OfferAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.ResponderId, recipient: e.ExitActorId,
+            NotificationType.JobExitResponded, e.OccurredAt, new()
+            {
+                [NotificationPayload.ActorRole] =
+                    (e.ResponderId == e.OwnerId ? OfferParty.Client : OfferParty.Helper).ToString(),
+                [NotificationPayload.MessagePreview] = e.Preview
+            }, cancellationToken);
 
     // ---------- helpers ----------
 

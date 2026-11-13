@@ -35,6 +35,11 @@
           {{ partyLabel(thread.myRole === 'Client' ? 'Helper' : 'Client') }}: {{ reliability }}
         </p>
         }
+        <a
+          class="profile-link"
+          [routerLink]="['/users', thread.myRole === 'Client' ? thread.helperId : thread.clientId]"
+          >Profil: {{ partyLabel(thread.myRole === 'Client' ? 'Helper' : 'Client').toLowerCase() }}</a
+        >
       </div>
       <ion-button
         class="subject-link"
@@ -171,7 +176,18 @@
         aria-hidden="true"
       ></ion-icon>
       {{ item.title }} · {{ formatDateTime(item.at) }}<br />
-      Powód: {{ item.reason }}
+      Powód: {{ item.reason }} @if (item.exit.response) {<br />
+      <span class="exit-response">{{ item.responseAuthor }}: {{ item.exit.response }}</span>
+      } @if (item.canRespond) {
+      <ion-button
+        size="small"
+        fill="clear"
+        class="change-link respond-action"
+        (click)="respondToExit(item.exit.number)"
+        [disabled]="busy()"
+        >Dodaj swoje stanowisko</ion-button
+      >
+      }
     </p>
     } @else {
     <p class="change" [class.mine]="item.mine">

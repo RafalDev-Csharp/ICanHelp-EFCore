@@ -286,7 +286,7 @@ public sealed class AnnouncementsController : ControllerBase
 
     /// <summary>
     /// F11 E: „Przerwij zlecenie” w trakcie (status InProgress, każda strona). Powód obowiązkowy. Status końcowy
-    /// Interrupted – rozmowa tylko do odczytu, obie strony mogą się ocenić. Druga strona dostaje JobInterrupted.
+    /// Interrupted – rozmowa tylko do odczytu, bez ocen (F11 G); druga strona dostaje JobInterrupted i może dodać stanowisko.
     /// </summary>
     [HttpPost("{announcementId:guid}/interrupt")]
     [Authorize]
@@ -299,7 +299,23 @@ public sealed class AnnouncementsController : ControllerBase
         => Execute(userId => command with { AnnouncementId = announcementId, ActorId = userId }, handler,
             cancellationToken);
 
-    /// <summary>Ocena drugiej strony po zakończeniu albo przerwaniu (raz na ogłoszenie; ocenianego wybiera domena).</summary>
+    /// <summary>
+    /// F11 G: stanowisko drugiej strony do rezygnacji / przerwania numer <paramref name="number"/> (<c>jobExits[].number</c>)
+    /// – raz, tylko strona, która nie wyszła (inaczej / drugi raz → 409). Ten, kto wyszedł, dostaje JobExitResponded.
+    /// Widoczne w szczegółach, wątku i na profilach (<c>GET api/users/{id}/profile</c>).
+    /// </summary>
+    [HttpPost("{announcementId:guid}/job-exits/{number:int}/response")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public Task<IActionResult> RespondToJobExit(Guid announcementId, int number, [FromBody] RespondToJobExit command,
+        [FromServices] ICommandHandler<RespondToJobExit> handler, CancellationToken cancellationToken)
+        => Execute(userId => command with { AnnouncementId = announcementId, Number = number, ActorId = userId },
+            handler, cancellationToken);
+
+    /// <summary>Ocena drugiej strony po zakończeniu (raz na ogłoszenie; ocenianego wybiera domena; nie po przerwaniu).</summary>
     [HttpPost("{announcementId:guid}/ratings")]
     [Authorize]
     [ProducesResponseType<CreatedDto>(StatusCodes.Status201Created)]

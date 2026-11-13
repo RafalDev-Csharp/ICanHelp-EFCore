@@ -25,7 +25,7 @@ import { addIcons } from 'ionicons';
 import { cloudOfflineOutline, imageOutline, star, starHalf, starOutline } from 'ionicons/icons';
 import { forkJoin } from 'rxjs';
 
-import type { JobExitDto, MyRatingDto, PendingRatingDto } from '../../core/api/api-client';
+import type { MyRatingDto, PendingRatingDto } from '../../core/api/api-client';
 import { MyRatingsClient } from '../../core/api/api-client';
 import { apiResourceUrl } from '../../core/api/api.providers';
 import { APP_LOCALE } from '../../core/config/locale';
@@ -33,8 +33,6 @@ import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
 import { pluralPl } from '../../shared/text/plural';
-import { jobExitReasonText } from '../offers/job-exit';
-import { partyLabel } from '../offers/offer-labels';
 import { OffersService } from '../offers/offers.service';
 
 type LoadState = 'loading' | 'ready' | 'failed';
@@ -94,11 +92,6 @@ export class RatingsPage implements ViewWillEnter {
 
   protected readonly stars = STARS;
   protected readonly thumbnail = apiResourceUrl;
-
-  /** F11 E: kto przerwał i dlaczego – „Pomocnik: Brak kontaktu” (przy ocenie przerwanego zlecenia). */
-  protected exitText(exit: JobExitDto): string {
-    return `${partyLabel(exit.actorRole)}: ${jobExitReasonText(exit)}`;
-  }
 
   readonly asHelper = computed(() => this.received().filter((rating) => rating.myRole === 'Helper'));
   readonly asClient = computed(() => this.received().filter((rating) => rating.myRole === 'Client'));

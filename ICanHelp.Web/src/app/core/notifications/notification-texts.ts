@@ -75,6 +75,14 @@ function describeFromParameters(notification: NotificationDto): NotificationText
         body: exitBody(title, p['exitReason'], p['note']),
         icon: 'stop-circle-outline',
       };
+    case 'JobExitResponded': {
+      const preview = p['messagePreview'] ?? '';
+      return {
+        title: `${actorLabel(p['actorRole'])} dodał swoje stanowisko`,
+        body: title && preview ? `${title} – ${preview}` : title + preview,
+        icon: 'chatbubble-ellipses-outline',
+      };
+    }
     case 'MessageReceived':
       return {
         title: title ? `Nowa wiadomość: ${title}` : 'Nowa wiadomość',
@@ -168,10 +176,13 @@ function exitBody(title: string, reason: string | undefined, note: string | unde
     reason === 'Other' && note
       ? note
       : `${JOB_EXIT_REASON_LABELS[reason ?? ''] ?? reason ?? ''}${note ? ` (${note})` : ''}`;
+  // F11 G: druga strona może dodać stanowisko (te same teksty co `NotificationTextFormatter`).
+  const invite = ' Możesz dodać swoje stanowisko.';
   if (!label) {
-    return title;
+    return title + invite;
   }
-  return title ? `${title} – powód: ${label}` : `Powód: ${label}`;
+  const reasonText = label.replace(/\.+$/, '');
+  return (title ? `${title} – powód: ${reasonText}.` : `Powód: ${reasonText}.`) + invite;
 }
 
 function changedFields(value: string | undefined): string {

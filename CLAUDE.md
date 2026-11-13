@@ -40,15 +40,16 @@ porada). **Pomocnik (Helper)**, który zna się na rzeczy i najlepiej przejeżd�
 
 ## Przepływ statusów
 Announcement: `Open` → (AcceptOffer) `Accepted` → (Start) `InProgress` → (Complete) `Completed`; `Open`/`Accepted` → `Cancelled`;
-F11 E: `Accepted` → (Abandon, każda strona, z powodem) `Open`; `InProgress` → (Interrupt) `Interrupted` (końcowy, z ocenami).
+F11 E: `Accepted` → (Abandon, każda strona, z powodem) `Open`; `InProgress` → (Interrupt) `Interrupted` (końcowy, bez ocen;
+F11 G: druga strona dopisuje raz stanowisko – `RespondToJobExit`).
 Offer: `Pending` → `Accepted` | `Rejected` | `Withdrawn` | `Countered` (zastąpiona kontrofertą) | `Revised` (autor zaktualizował nieaktualną);
 `Accepted` → `Abandoned` (zlecenie zerwane przed startem – ten pomocnik nie złoży już oferty, jego wątek tylko do odczytu).
 Akceptuje/odrzuca/kontruje **druga strona** niż autor oferty; wycofuje tylko autor. Oferty tylko w `Open`; po akceptacji pozostałe
 `Pending` → `Rejected`. Oferta sprzed ostatniej edycji jest nieaktualna (`IsOutdated`) – nie da się jej przyjąć; druga strona może kontrować,
 autor – zmienić każdą swoją oczekującą (`ReviseOffer`, `POST …/offers/{id}/revise`).
 `Start` – tylko zaakceptowany pomocnik; `ReportDone` (InProgress, raz, `DoneReportedAt`) – pomocnik; `Complete` (z Accepted lub
-InProgress) i `Cancel` – właściciel; Start / ReportDone / Complete / Abandon / Interrupt → powiadomienia `Job*`. Ocena po `Completed`
-albo `Interrupted`, przez uczestnika. Publiczne liczniki rezygnacji / przerwań: `GET api/users/{id}/reliability`.
+InProgress) i `Cancel` – właściciel; Start / ReportDone / Complete / Abandon / Interrupt → powiadomienia `Job*`. Ocena tylko po `Completed`, przez
+uczestnika. Publiczny profil (statystyki Pomagam / Zlecam, przerwane z obiema wersjami): `GET api/users/{id}/profile`.
 
 ## Gdzie co leży
 `docs/`: `ARCHITEKTURA.md` (szczegóły obszarów), `PLAN-NEGOCJACJE.md` (Kroki 9–12), `PLAN-POWIADOMIENIA.md` (Kroki 13–17),
@@ -121,7 +122,9 @@ cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /ap
   „Podtrzymuję ofertę”, ekran „Oceny” + `api/me/ratings`, filtry i układ „Szukaj”, dzwonek w `/conversations/all`;
   `verify.cmd`: dotnet 536/536, Vitest 322/322). **E zrobione 13.11.2026** (Zrezygnuj → Open / Przerwij → `Interrupted`
   z powodem, `JobExits`, oceny po przerwaniu, „Wystaw ponownie”, liczniki `api/users/{id}/reliability`; `verify.cmd`:
-  dotnet 574/574, Vitest 342/342). Zostało: test ręczny E, potem test z ludźmi.
+  dotnet 574/574, Vitest 342/342). **G zrobione 13.11.2026** (bez ocen po przerwaniu, stanowisko drugiej strony,
+  publiczny profil `/users/:id` – Pomagam / Zlecam, `api/users/{id}/profile`; `verify.cmd`: dotnet 581/581, Vitest 352/352).
+  Zostało: test ręczny E + G, potem test z ludźmi; hosting (F10) na koniec.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)

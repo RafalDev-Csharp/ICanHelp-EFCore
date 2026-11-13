@@ -1,4 +1,11 @@
-import { jobExitReasonLabel, jobExitReasonText, jobExitReasons, jobExitTitle, reliabilityLabel } from './job-exit';
+import {
+  canRespondToExit,
+  jobExitReasonLabel,
+  jobExitReasonText,
+  jobExitReasons,
+  jobExitTitle,
+  reliabilityLabel,
+} from './job-exit';
 
 describe('job-exit', () => {
   it('offers "conflict" only when interrupting the work', () => {
@@ -26,6 +33,16 @@ describe('job-exit', () => {
     expect(jobExitTitle({ kind: 'Interrupted', actorId: 'o1', actorRole: 'Client' }, 'h1')).toBe(
       'Zleceniodawca przerwał zlecenie',
     );
+  });
+
+  it('lets only the other side respond, once', () => {
+    const byHelper = { actorRole: 'Helper', helperId: 'h1', response: undefined };
+    expect(canRespondToExit(byHelper, 'o1', 'o1')).toBe(true);
+    expect(canRespondToExit(byHelper, 'h1', 'o1')).toBe(false);
+    expect(canRespondToExit({ ...byHelper, response: 'Już jest.' }, 'o1', 'o1')).toBe(false);
+    const byOwner = { actorRole: 'Client', helperId: 'h1', response: undefined };
+    expect(canRespondToExit(byOwner, 'h1', 'o1')).toBe(true);
+    expect(canRespondToExit(byOwner, 'x', 'o1')).toBe(false);
   });
 
   it('counts abandonments and interruptions with Polish plurals', () => {

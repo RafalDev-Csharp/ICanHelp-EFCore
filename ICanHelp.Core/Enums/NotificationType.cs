@@ -45,6 +45,9 @@ public enum NotificationType
     /// <summary>F11 E: the other side abandoned the job before the start (with the reason).</summary>
     JobAbandoned,
 
-    /// <summary>F11 E: the other side interrupted the work (with the reason) – I can rate.</summary>
-    JobInterrupted
+    /// <summary>F11 E: the other side interrupted the work (with the reason) – I can add my statement.</summary>
+    JobInterrupted,
+
+    /// <summary>F11 G: the other side added its statement to my abandonment / interruption.</summary>
+    JobExitResponded
 }

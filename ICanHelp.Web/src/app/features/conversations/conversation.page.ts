@@ -220,7 +220,7 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
       case 'Cancelled':
         return 'Ogłoszenie anulowane – rozmowa jest tylko do odczytu.';
       case 'Interrupted':
-        return 'Zlecenie przerwane – rozmowa jest tylko do odczytu. Ocenę wystawisz w Koncie → Oceny.';
+        return 'Zlecenie przerwane – rozmowa jest tylko do odczytu. Bez ocen – stanowiska obu stron widać na profilach.';
       default:
         return 'Rozmowa jest tylko do odczytu.';
     }
@@ -395,6 +395,14 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
       complete: () => this.offers.complete(id),
     };
     await this.act(run[action]);
+  }
+
+  /** F11 G: „Dodaj swoje stanowisko” przy wpisie rezygnacji / przerwania (druga strona, raz). */
+  async respondToExit(number: number): Promise<void> {
+    const conversation = this.conversation();
+    if (conversation) {
+      await this.act(() => this.offers.respondToExit(conversation.announcementId, number));
+    }
   }
 
   /** F11 E: „Zrezygnuj” / „Przerwij zlecenie” – okno z powodem (`OffersService.exitJob`). */

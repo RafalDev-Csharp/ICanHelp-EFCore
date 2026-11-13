@@ -86,7 +86,9 @@ internal static class Extensions
             ActorRole = entity.ActorParty.ToString(),
             Reason = entity.Reason.ToString(),
             Note = entity.Note?.Value,
-            OccurredAt = entity.OccurredAt
+            OccurredAt = entity.OccurredAt,
+            Response = entity.Response?.Value,
+            RespondedAt = entity.RespondedAt
         };
 
     /// <summary>The announcement is needed to tell whether it changed after the offer (warning in the UI).</summary>

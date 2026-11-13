@@ -54,6 +54,21 @@ export function jobExitTitle(exit: Pick<JobExitDto, 'kind' | 'actorId' | 'actorR
   return abandoned ? `${who} zrezygnował ze zlecenia` : `${who} przerwał zlecenie`;
 }
 
+/**
+ * F11 G: czy `myUserId` może dodać stanowisko – jest drugą stroną (nie tym, kto wyszedł) i jeszcze go nie dodał.
+ * Druga strona: zleceniodawca, gdy wyszedł pomocnik; pomocnik z wpisu, gdy wyszedł zleceniodawca.
+ */
+export function canRespondToExit(
+  exit: Pick<JobExitDto, 'actorRole' | 'helperId' | 'response'>,
+  myUserId: string,
+  ownerId: string,
+): boolean {
+  if (exit.response || !myUserId) {
+    return false;
+  }
+  return exit.actorRole === 'Client' ? myUserId === exit.helperId : myUserId === ownerId;
+}
+
 /** Notka po przerwaniu – aplikacja nie obsługuje pieniędzy. */
 export const INTERRUPTED_NOTE = 'Ustalcie między sobą rozliczenie za wykonaną część.';
 

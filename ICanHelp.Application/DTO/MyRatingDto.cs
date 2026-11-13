@@ -19,15 +19,12 @@ public sealed record MyRatingDto
     public string? Comment { get; init; }
     public DateTime CreatedAt { get; init; }
 
-    /// <summary>F11 E: set when the job was interrupted (who and why) – null for a completed one.</summary>
-    public JobExitDto? Interruption { get; init; }
-
     /// <summary>Client when the reader owns the announcement, otherwise Helper (only participants are rated).</summary>
     public static string RoleOf(Guid ownerId, Guid readerId)
         => (ownerId == readerId ? OfferParty.Client : OfferParty.Helper).ToString();
 }
 
-/// <summary>A completed (or interrupted – F11 E) announcement in which the reader has not rated the other side yet.</summary>
+/// <summary>A completed announcement in which the reader has not rated the other side yet (F11 G: not an interrupted one).</summary>
 public sealed record PendingRatingDto
 {
     public Guid AnnouncementId { get; init; }
@@ -41,7 +38,4 @@ public sealed record PendingRatingDto
     public ConversationPartyDto OtherParty { get; init; } = new();
 
     public DateTime CreatedAt { get; init; }
-
-    /// <summary>F11 E: set when the job was interrupted – the rating should take it into account.</summary>
-    public JobExitDto? Interruption { get; init; }
 }

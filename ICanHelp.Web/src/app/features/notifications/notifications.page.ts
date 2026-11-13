@@ -24,6 +24,7 @@ import { addIcons } from 'ionicons';
 import {
   albumsOutline,
   arrowUndoOutline,
+  chatbubbleEllipsesOutline,
   chatbubbleOutline,
   checkmarkCircleOutline,
   checkmarkDoneOutline,
@@ -105,6 +106,7 @@ export class NotificationsPage implements ViewWillEnter {
     addIcons({
       albumsOutline,
       arrowUndoOutline,
+      chatbubbleEllipsesOutline,
       chatbubbleOutline,
       checkmarkCircleOutline,
       checkmarkDoneOutline,

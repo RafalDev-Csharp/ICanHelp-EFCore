@@ -1,0 +1,108 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/announcements"></ion-back-button>
+      <app-brand></app-brand>
+    </ion-buttons>
+    <ion-title>Profil</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="page-column">
+  @switch (state()) { @case ('loading') {
+  <div class="ion-text-center ion-padding" aria-busy="true">
+    <ion-spinner name="crescent"></ion-spinner>
+  </div>
+  } @case ('not-found') {
+  <app-empty-state
+    icon="alert-circle-outline"
+    heading="Nie ma takiego użytkownika"
+    message="Konto mogło zostać usunięte albo link jest niepoprawny."
+  ></app-empty-state>
+  } @case ('failed') {
+  <app-empty-state
+    icon="cloud-offline-outline"
+    heading="Nie udało się wczytać profilu"
+    message="Sprawdź połączenie z internetem i spróbuj ponownie."
+  >
+    <ion-button (click)="load()">Spróbuj ponownie</ion-button>
+  </app-empty-state>
+  } @case ('ready') { @if (profile(); as item) {
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <section class="ion-padding person">
+    <ion-icon name="person-circle-outline" aria-hidden="true"></ion-icon>
+    <div>
+      <h1>{{ item.user.fullName }}</h1>
+      <p>
+        &#64;{{ item.user.userName }} · {{ item.user.city }} · w serwisie od {{ parseApiDate(item.user.createdAt) |
+        date: 'MMMM yyyy' }}
+      </p>
+      @if (item.user.description) {
+      <p class="description">{{ item.user.description }}</p>
+      }
+    </div>
+  </section>
+
+  <ion-segment class="roles" [value]="role()" (ionChange)="selectRole($event.detail.value)" aria-label="Rola">
+    <ion-segment-button value="Helper">
+      <ion-label>Pomagam</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="Client">
+      <ion-label>Zlecam</ion-label>
+    </ion-segment-button>
+  </ion-segment>
+
+  <ion-list inset="true" class="stats" data-testid="profile-stats">
+    <ion-item>
+      <ion-icon name="star" slot="start" color="warning" aria-hidden="true"></ion-icon>
+      <ion-label class="rating">{{ rating() }}</ion-label>
+    </ion-item>
+    @for (row of rows(); track row.label; let last = $last) {
+    <ion-item [lines]="last ? 'none' : 'inset'">
+      <ion-label>{{ row.label }}</ion-label>
+      <ion-note slot="end" [color]="row.warn ? 'danger' : 'medium'" class="stat-value">{{ row.value }}</ion-note>
+    </ion-item>
+    }
+  </ion-list>
+  <p class="hint ion-padding-horizontal">Ocena – tylko z zakończonych zleceń. Przy przerwanych widać obie wersje.</p>
+
+  <ion-list inset="true" class="interruptions">
+    <ion-list-header>
+      <ion-label>Zlecenia przerwane ({{ item.interruptions.length }})</ion-label>
+    </ion-list-header>
+    @for (entry of item.interruptions; track entry.announcementId + '-' + entry.exit.number; let last = $last) {
+    <ion-item data-testid="profile-interruption" [lines]="last ? 'none' : 'inset'">
+      <ion-icon
+        name="stop-circle-outline"
+        slot="start"
+        [color]="entry.byUser ? 'danger' : 'medium'"
+        aria-hidden="true"
+      ></ion-icon>
+      <ion-label class="ion-text-wrap">
+        <h3>
+          <a [routerLink]="['/announcements', entry.announcementId]">{{ entry.announcementTitle }}</a>
+        </h3>
+        <p>{{ interruptionMeta(entry) }} · {{ formatDateTime(entry.exit.occurredAt) }}</p>
+        <p class="reason">Powód: {{ reasonText(entry.exit) }}</p>
+        @if (entry.exit.response) {
+        <p class="response">
+          <ion-icon name="chatbubble-ellipses-outline" aria-hidden="true"></ion-icon>
+          {{ responseAuthor(entry) }}: {{ entry.exit.response }}
+        </p>
+        } @else {
+        <p class="response none">{{ responseAuthor(entry) }}: jeszcze brak.</p>
+        }
+      </ion-label>
+    </ion-item>
+    } @empty {
+    <ion-item lines="none">
+      <ion-icon name="checkmark-done-outline" slot="start" color="success" aria-hidden="true"></ion-icon>
+      <ion-label>Brak przerwanych zleceń.</ion-label>
+    </ion-item>
+    }
+  </ion-list>
+  } } }
+</ion-content>

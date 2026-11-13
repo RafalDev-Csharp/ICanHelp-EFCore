@@ -60,14 +60,22 @@ describe('notification texts', () => {
     );
     expect(abandoned).toEqual({
       title: 'Pomocnik zrezygnował ze zlecenia',
-      body: 'Cieknący kran – powód: nie mogę w tym terminie',
+      body: 'Cieknący kran – powód: nie mogę w tym terminie. Możesz dodać swoje stanowisko.',
       icon: 'exit-outline',
     });
     const interrupted = describeNotification(
       notification('JobInterrupted', { ...title, actorRole: 'Client', exitReason: 'Other', note: 'Zalał łazienkę.' }),
     );
     expect(interrupted.title).toBe('Zleceniodawca przerwał zlecenie');
-    expect(interrupted.body).toBe('Cieknący kran – powód: Zalał łazienkę.');
+    expect(interrupted.body).toBe('Cieknący kran – powód: Zalał łazienkę. Możesz dodać swoje stanowisko.');
+    const responded = describeNotification(
+      notification('JobExitResponded', { ...title, actorRole: 'Helper', messagePreview: 'Zakres był inny.' }),
+    );
+    expect(responded).toEqual({
+      title: 'Pomocnik dodał swoje stanowisko',
+      body: 'Cieknący kran – Zakres był inny.',
+      icon: 'chatbubble-ellipses-outline',
+    });
     expect(interrupted.icon).toBe('stop-circle-outline');
     expect(notificationLink(notification('JobInterrupted', title))).toEqual(['/conversations', 'c1']);
   });

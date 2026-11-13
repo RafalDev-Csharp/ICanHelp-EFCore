@@ -30,6 +30,7 @@ import { addIcons } from 'ionicons';
 import {
   alertCircleOutline,
   callOutline,
+  chatbubbleEllipsesOutline,
   chatbubbleOutline,
   chatbubblesOutline,
   checkmarkDoneOutline,
@@ -82,7 +83,13 @@ import { MapComponent } from '../../../shared/components/map/map.component';
 import { PricePipe } from '../../../shared/pipes/price.pipe';
 import { TimeAgoPipe, parseApiDate } from '../../../shared/pipes/time-ago.pipe';
 import { pluralPl } from '../../../shared/text/plural';
-import { INTERRUPTED_NOTE, jobExitReasonText, jobExitTitle, reliabilityLabel } from '../../offers/job-exit';
+import {
+  INTERRUPTED_NOTE,
+  canRespondToExit,
+  jobExitReasonText,
+  jobExitTitle,
+  reliabilityLabel,
+} from '../../offers/job-exit';
 import type { JobAction, JobStep } from '../../offers/job-step';
 import { JOB_ACTION_ICONS, JOB_ACTION_LABELS, JOB_EXIT_LABELS, jobStep } from '../../offers/job-step';
 import { formatOfferTerm, offerStateColor, offerStateLabel, pendingOffer } from '../../offers/offer-labels';
@@ -104,9 +111,6 @@ const CONVERSATIONS_LIMIT = 50;
 /** Statusy po akceptacji oferty – wtedy uczestnicy widzą swoje dane kontaktowe (po przerwaniu też – rozliczenie). */
 const AFTER_ACCEPTANCE = ['Accepted', 'InProgress', 'Completed', 'Interrupted'];
 
-/** Statusy końcowe z oceną (F11 E: także przerwane zlecenie). */
-const RATEABLE = ['Completed', 'Interrupted'];
-
 /**
  * Szczegóły ogłoszenia (publiczne): zdjęcia, opis, mapa, właściciel z ocenami, serduszko. Akcje zależą od roli:
  * - gość: „Złóż ofertę” / „Zapytaj” → logowanie i powrót tutaj;
@@ -114,8 +118,8 @@ const RATEABLE = ['Completed', 'Interrupted'];
  *   kontakt, „Rozpocznij” → „Zgłoś wykonanie” (F11 D), ocena po zakończeniu;
  * - właściciel: „Edytuj” (Open), „Anuluj” (Open/Accepted), lista negocjacji i historia ogłoszenia (oferty,
  *   kontroferty, edycje), po akceptacji – kontakt, „Potwierdź wykonanie” (wyróżnione po zgłoszeniu), ocena po zakończeniu.
- * - F11 E: obie strony – „Zrezygnuj” (Accepted) / „Przerwij zlecenie” (InProgress) z powodem; po przerwaniu ocena,
- *   notka o rozliczeniu i u właściciela „Wystaw ponownie” (`/add?copyOf=`). Liczniki rezygnacji / przerwań właściciela
+ * - F11 E/G: obie strony – „Zrezygnuj” (Accepted) / „Przerwij zlecenie” (InProgress) z powodem; po przerwaniu bez ocen –
+ *   druga strona „Dodaj swoje stanowisko”, notka o rozliczeniu i u właściciela „Wystaw ponownie” (`/add?copyOf=`). Liczniki rezygnacji / przerwań właściciela
  *   i (u właściciela) każdego pomocnika – `GET api/users/{id}/reliability`.
  * Powiadomienie o tym ogłoszeniu (`activity$`) przeładowuje ekran.
  * Akcje na samych ofertach (przyjmij, odrzuć, kontroferta, wycofaj) są w wątku – tam widać całą negocjację.
@@ -247,13 +251,22 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     );
   });
   protected readonly isParticipant = computed(() => this.isOwner() || this.isAcceptedHelper());
-  /** Zakończone albo przerwane – uczestnicy mogą się ocenić. */
-  protected readonly rateable = computed(() => RATEABLE.includes(this.status()));
-  /** F11 E: przerwanie zlecenia (kto, powód) – do notki w stopce. */
+  /**
+   * F11 E/G: przerwanie zlecenia – kto, powód, stanowisko drugiej strony i czy czytający może je dodać (bez ocen).
+   */
   protected readonly interruption = computed(() => {
-    const exit = this.announcement()?.jobExits?.find((e) => e.kind === 'Interrupted');
-    return exit
-      ? { title: jobExitTitle(exit, this.auth.currentUser()?.id ?? ''), reason: jobExitReasonText(exit) }
+    const announcement = this.announcement();
+    const exit = announcement?.jobExits?.find((e) => e.kind === 'Interrupted');
+    const userId = this.auth.currentUser()?.id ?? '';
+    return announcement && exit
+      ? {
+          number: exit.number,
+          title: jobExitTitle(exit, userId),
+          reason: jobExitReasonText(exit).replace(/\.$/, ''),
+          response: exit.response,
+          responseAuthor: exit.actorRole === 'Client' ? 'Stanowisko pomocnika' : 'Stanowisko zleceniodawcy',
+          canRespond: canRespondToExit(exit, userId, announcement.ownerId),
+        }
       : null;
   });
   /**
@@ -325,6 +338,7 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     addIcons({
       alertCircleOutline,
       callOutline,
+      chatbubbleEllipsesOutline,
       chatbubbleOutline,
       chatbubblesOutline,
       checkmarkDoneOutline,
@@ -515,7 +529,12 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     void this.router.navigate(['/add'], { queryParams: { copyOf: this.announcementId() } });
   }
 
-  /** Ocena drugiej strony po zakończeniu albo przerwaniu. */
+  /** F11 G: „Dodaj swoje stanowisko” po przerwaniu (druga strona, raz). */
+  async respondToExit(number: number): Promise<void> {
+    await this.lifecycle((id) => this.offers.respondToExit(id, number));
+  }
+
+  /** Ocena drugiej strony po zakończeniu (po przerwaniu – bez ocen, F11 G). */
   async rate(): Promise<void> {
     const announcement = this.announcement();
     if (!announcement || this.busy()) {
@@ -646,7 +665,7 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
       .getContact(announcement.id)
       .pipe(catchError(() => of(null)))
       .subscribe((contact) => this.contact.set(contact));
-    if (RATEABLE.includes(announcement.status)) {
+    if (announcement.status === 'Completed') {
       this.announcements
         .getRatings(announcement.id)
         .pipe(catchError(() => of<RatingDto[]>([])))

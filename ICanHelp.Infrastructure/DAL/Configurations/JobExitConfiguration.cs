@@ -21,6 +21,8 @@ internal sealed class JobExitConfiguration : IEntityTypeConfiguration<JobExit>
         builder.Property(x => x.Reason).IsRequired();
         builder.Property(x => x.Note).IsRequired(false);
         builder.Property(x => x.OccurredAt).IsRequired();
+        builder.Property(x => x.Response).IsRequired(false);
+        builder.Property(x => x.RespondedAt).IsRequired(false);
 
         // Who left – a reference to another aggregate (FK only). The helper id is a copy from the offer (no FK needed).
         builder.HasOne<User>()

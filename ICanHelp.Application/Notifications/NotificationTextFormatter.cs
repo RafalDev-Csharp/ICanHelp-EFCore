@@ -59,6 +59,12 @@ public static class NotificationTextFormatter
                 return new($"{ActorLabel(parameters)} zrezygnował ze zlecenia", ExitBody(title, parameters));
             case NotificationType.JobInterrupted:
                 return new($"{ActorLabel(parameters)} przerwał zlecenie", ExitBody(title, parameters));
+            case NotificationType.JobExitResponded:
+            {
+                var preview = Get(parameters, NotificationPayload.MessagePreview);
+                return new($"{ActorLabel(parameters)} dodał swoje stanowisko",
+                    title.Length > 0 && preview.Length > 0 ? $"{title} – {preview}" : title + preview);
+            }
             case NotificationType.MessageReceived:
                 return new(title.Length > 0 ? $"Nowa wiadomość: {title}" : "Nowa wiadomość",
                     Get(parameters, NotificationPayload.MessagePreview));
@@ -205,12 +211,15 @@ public static class NotificationTextFormatter
             label = $"{label} ({note})";
         }
 
+        // F11 G: druga strona może dodać swoje stanowisko (widoczne na profilach obu stron).
+        const string invite = " Możesz dodać swoje stanowisko.";
         if (label.Length == 0)
         {
-            return title;
+            return title + invite;
         }
 
-        return title.Length > 0 ? $"{title} – powód: {label}" : $"Powód: {label}";
+        label = label.TrimEnd('.');
+        return (title.Length > 0 ? $"{title} – powód: {label}." : $"Powód: {label}.") + invite;
     }
 
     private static string ChangedFields(string value)

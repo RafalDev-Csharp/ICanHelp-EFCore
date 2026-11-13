@@ -32,6 +32,12 @@ export const routes: Routes = [
           import('../features/announcements/edit/edit-announcement.page').then((m) => m.EditAnnouncementPage),
       },
       {
+        // F11 G: publiczny profil (statystyki Pomagam / Zlecam, przerwane zlecenia) – w stosie zakładki, z której
+        // weszliśmy (szczegóły ogłoszenia, wątek). Publiczny, jak szczegóły.
+        path: 'users/:userId',
+        loadComponent: () => import('../features/profile/user-profile.page').then((m) => m.UserProfilePage),
+      },
+      {
         path: 'liked',
         canActivate: [authGuard],
         loadComponent: () =>

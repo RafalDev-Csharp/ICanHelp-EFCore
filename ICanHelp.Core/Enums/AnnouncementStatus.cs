@@ -12,6 +12,6 @@ public enum AnnouncementStatus
     Completed = 4,
     Cancelled = 5,
 
-    /// <summary>F11 E: one side interrupted the work (final, like Completed – both sides can rate each other).</summary>
+    /// <summary>F11 E: one side interrupted the work (final; no ratings – F11 G, statements of both sides instead).</summary>
     Interrupted = 6
 }

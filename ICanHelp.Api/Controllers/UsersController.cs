@@ -153,6 +153,24 @@ public sealed class UsersController : ControllerBase
         return reliability is null ? NotFound() : Ok(reliability);
     }
 
+    /// <summary>
+    /// F11 G: publiczny profil – dane publiczne, statystyki „Pomagam” / „Zlecam” (średnia ocen tylko z zakończonych
+    /// zleceń, zakończone, przerwane i rezygnacje – przez niego / przez drugą stronę) i przerwane zlecenia z powodem
+    /// i stanowiskiem drugiej strony.
+    /// </summary>
+    [HttpGet("{userId:guid}/profile")]
+    [ProducesResponseType<UserProfileDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<UserProfileDto>> GetProfile(
+        Guid userId,
+        [FromServices] IQueryHandler<GetUserProfile, UserProfileDto?> handler,
+        CancellationToken cancellationToken)
+    {
+        var profile = await handler.HandleAsync(new GetUserProfile { UserId = userId }, cancellationToken);
+
+        return profile is null ? NotFound() : Ok(profile);
+    }
+
     /// <summary>Oceny, które użytkownik otrzymał – podstawa jego reputacji.</summary>
     [HttpGet("{userId:guid}/ratings")]
     [ProducesResponseType<IReadOnlyList<RatingDto>>(StatusCodes.Status200OK)]

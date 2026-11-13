@@ -61,13 +61,14 @@ features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poz
                   notifications (`/notifications` – lista, „Oznacz wszystkie”, nowe z huba na górze),
                   profile (zakładka „Konto”, bez logowania: „Zaloguj się”; `liked-announcements` = zakładka „Ulubione” `/liked`;
                   `my-announcements` – bez trasy od F11 B, do usunięcia),
+                  profile/user-profile (`/users/:userId`, publiczny profil F11 G: Pomagam / Zlecam, przerwane zlecenia),
                   ratings (`/profile/ratings` – „Do wystawienia” · „Jako pomocnik” · „Jako zleceniodawca”, `api/me/ratings`),
                   alerts (`/profile/alerts` – lista, `/profile/alerts/new?kind=Area|Route`, `/profile/alerts/:alertId` – edycja
                   + „Pasujące teraz”; `alert-form.ts` – stan, walidacja, `WeekDays` ↔ maska; `route-picker` – start/cel → trasa)
 tabs/             TabsPage – dolny pasek zakładek, rejestruje ikony zakładek (`addIcons`), uruchamia `NotificationsService`
                   i push; stuknięcie zakładki = jej korzeń (`openTabRoot`, nie ostatni ekran). Strony używające `NotificationsService` – w specs obiekt z `received$` (Subject)
 ```
-Trasy `/add`, `/liked`, `/announcements/:id/edit`, `/conversations` (+ `/all`, `/:conversationId`), `/notifications`, `/profile/ratings`, `/profile/alerts` (+ `/new`, `/:alertId`) mają `authGuard`; ogłoszenia (lista, szczegóły) i konto są publiczne –
+Trasy `/add`, `/liked`, `/announcements/:id/edit`, `/conversations` (+ `/all`, `/:conversationId`), `/notifications`, `/profile/ratings`, `/profile/alerts` (+ `/new`, `/:alertId`) mają `authGuard`; ogłoszenia (lista, szczegóły), profil `/users/:userId` i konto są publiczne –
 akcje wymagające konta same prowadzą na `/login?returnUrl=…`.
 Szeroki ekran: nowa strona dostaje `class="page-column"` na `ion-content` (i na treści stopki) – kolumna 720 px (`global.scss`);
 w nagłówku `<app-brand>` w `ion-buttons slot="start"` (po `ion-back-button`); korzeń zakładki dostaje też

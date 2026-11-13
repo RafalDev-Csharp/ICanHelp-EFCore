@@ -31,6 +31,13 @@ public class JobExit
     public Description? Note { get; private set; }
     public DateTime OccurredAt { get; private set; }
 
+    /// <summary>F11 G: the statement of the other side (the one who did not leave) – once, null until given.</summary>
+    public Description? Response { get; private set; }
+    public DateTime? RespondedAt { get; private set; }
+
+    /// <summary>The user who may answer: the owner when the helper left, the helper when the owner left.</summary>
+    public UserId OtherSideOf(UserId ownerId) => ActorParty == OfferParty.Client ? HelperId : ownerId;
+
     // Required by EF Core.
     private JobExit()
     {
@@ -49,5 +56,11 @@ public class JobExit
         Reason = reason;
         Note = note;
         OccurredAt = occurredAtUtc;
+    }
+
+    internal void Respond(Description response, DateTime respondedAtUtc)
+    {
+        Response = response;
+        RespondedAt = respondedAtUtc;
     }
 }

@@ -501,7 +501,7 @@ public class Announcement : AggregateRoot
     /// <summary>
     /// F11 E: one side (owner or accepted helper) stops the work in progress. Final status
     /// <see cref="AnnouncementStatus.Interrupted"/> – it does not go back to Open; the conversation becomes read-only
-    /// and both sides can rate each other (the settlement for the part done is up to them – the app has no money).
+    /// and – F11 G – no ratings: the other side can add its statement instead (settlement for the part done is up to them).
     /// </summary>
     public JobExit Interrupt(UserId actorId, JobExitReason reason, Description? note, DateTime interruptedAtUtc)
     {
@@ -517,6 +517,35 @@ public class Announcement : AggregateRoot
             interruptedAtUtc));
         return exit;
     }
+
+    /// <summary>
+    /// F11 G: the other side of an abandonment / interruption gives its own account – once, in any status (the entry is
+    /// shown on both users' public profiles). The app does not judge; both versions are visible.
+    /// </summary>
+    public JobExit RespondToJobExit(int number, UserId actorId, Description response, DateTime respondedAtUtc)
+    {
+        var exit = _jobExits.FirstOrDefault(e => e.Number == number)
+                   ?? throw new DomainRuleException($"There is no job exit number {number} in this announcement.");
+
+        if (actorId != exit.OtherSideOf(OwnerId))
+        {
+            throw new DomainRuleException("Only the other side of the job can respond to this.");
+        }
+
+        if (exit.Response is not null)
+        {
+            throw new DomainRuleException("The response has already been given.");
+        }
+
+        exit.Respond(response, respondedAtUtc);
+        AddDomainEvent(new JobExitResponded(Id, OwnerId, exit.HelperId, exit.Number, exit.ActorId, actorId,
+            MyConversationPreview(response.Value), respondedAtUtc));
+        return exit;
+    }
+
+    // Short preview for the notification (like a message preview).
+    private static string MyConversationPreview(string text)
+        => text.Length <= 120 ? text : string.Concat(text.AsSpan(0, 119), "…");
 
     /// <summary>F11 E: true if a job of this helper on the announcement was abandoned (by either side).</summary>
     public bool HasLeftJob(UserId helperId)
@@ -549,17 +578,14 @@ public class Announcement : AggregateRoot
     // ---------- rating ----------
 
     /// <summary>
-    /// After completion (or an interruption – F11 E: part of the work was done) each participant can rate the other one:
-    /// the owner rates the helper and the other way round.
+    /// After completion each participant can rate the other one: the owner rates the helper and the other way round.
+    /// Only a completed job (F11 G): after an interruption there are no stars – otherwise two accounts could start and
+    /// interrupt fake jobs to collect ratings; the interruption with both statements is shown on the profiles instead.
     /// Rating is a separate aggregate; the "only once" rule is checked by the application layer (and a unique index).
     /// </summary>
     public Rating CreateRating(Id ratingId, UserId raterId, Rate rate, Description? comment, DateTime createdAtUtc)
     {
-        if (Status is not (AnnouncementStatus.Completed or AnnouncementStatus.Interrupted))
-        {
-            throw new DomainRuleException($"Announcement in status {Status} cannot be rated.");
-        }
-
+        EnsureStatus(AnnouncementStatus.Completed, "be rated");
         EnsureParticipant(raterId);
 
         var rateeId = raterId == OwnerId ? GetAcceptedHelperId()! : OwnerId;

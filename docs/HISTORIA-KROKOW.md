@@ -358,5 +358,19 @@
   13.11.2026 lokalnie (`verify.cmd`, Docker; działające `ICanHelp.Api` zatrzymane za zgodą autora): dotnet 574/574
   (Core 247, Application 215, integracyjne 112), `npm run api` (klient zgodny), lint + Vitest 342/342 + build zielone.
   Przepływ w przeglądarce – do sprawdzenia ręcznie.
+  Część G (13.11.2026, uwaga autora po E: oceny po przerwaniu pozwalałyby nabijać opinie): `CreateRating` znów tylko
+  z Completed; `JobExit.Response/RespondedAt`, `Announcement.RespondToJobExit` (druga strona, raz), zdarzenie i
+  powiadomienie `JobExitResponded`, zaproszenie „Możesz dodać swoje stanowisko.” w tekstach Job*; migracja
+  `JobExitResponse`. Application: komenda `RespondToJobExit` + handler, `UserProfileDto` / `RoleStatsDto` /
+  `ProfileInterruptionDto`, query `GetUserProfile`; z ocen usunięte `interruption`. Infrastructure: `GetUserProfileHandler`
+  (oceny i zakończone per rola, wyjścia przez niego / drugą stronę). Api: `POST …/job-exits/{number}/response`,
+  `GET api/users/{id}/profile`, przykłady w `.http`. Front: `features/profile/user-profile.page` (`/users/:userId`),
+  `OffersService.respondToExit`, `canRespondToExit`, „Dodaj swoje stanowisko” w wątku i szczegółach, linki do profilu,
+  stopka po przerwaniu bez ocen, „Oceny” bez przerwanych, teksty powiadomień. Testy: Core (bez ocen po przerwaniu,
+  stanowisko), Application (handler, powiadomienie, teksty), Api `JobExitTests` (stanowisko 400/409, profil obu stron,
+  profil z ocenami per rola, 404), Vitest – nowe `user-profile.page.spec`, dopisane `job-exit`, `offers.service`,
+  `conversation.page`, `announcement-details.page`, `notification-texts`.
+  13.11.2026 lokalnie (`verify.cmd`, Docker): dotnet 581/581 (Core 250, Application 218, integracyjne 113), `npm run api`
+  (klient wygenerowany zgodny), lint + Vitest 352/352 + build zielone. Przepływ w przeglądarce – do sprawdzenia ręcznie.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

@@ -963,7 +963,7 @@ export class AnnouncementsClient {
     }
 
     /**
-     * Ocena drugiej strony po zakończeniu albo przerwaniu (raz na ogłoszenie; ocenianego wybiera domena).
+     * Ocena drugiej strony po zakończeniu (raz na ogłoszenie; ocenianego wybiera domena; nie po przerwaniu).
      * @param body (optional) 
      * @return Created
      */
@@ -1648,7 +1648,7 @@ export class AnnouncementsClient {
 
     /**
      * F11 E: „Przerwij zlecenie” w trakcie (status InProgress, każda strona). Powód obowiązkowy. Status końcowy
-    Interrupted – rozmowa tylko do odczytu, obie strony mogą się ocenić. Druga strona dostaje JobInterrupted.
+    Interrupted – rozmowa tylko do odczytu, bez ocen (F11 G); druga strona dostaje JobInterrupted i może dodać stanowisko.
      * @param body (optional) 
      * @return No Content
      */
@@ -1685,6 +1685,85 @@ export class AnnouncementsClient {
     }
 
     protected processInterrupt(response: HttpResponseBase): Observable<void> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return _observableOf(null as any);
+            }));
+        } else if (status === 400) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result400: any = null;
+            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Bad Request", status, _responseText, _headers, result400);
+            }));
+        } else if (status === 404) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Not Found", status, _responseText, _headers, result404);
+            }));
+        } else if (status === 409) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result409: any = null;
+            result409 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Conflict", status, _responseText, _headers, result409);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    /**
+     * F11 G: stanowisko drugiej strony do rezygnacji / przerwania numer number (`jobExits[].number`)
+    – raz, tylko strona, która nie wyszła (inaczej / drugi raz → 409). Ten, kto wyszedł, dostaje JobExitResponded.
+    Widoczne w szczegółach, wątku i na profilach (`GET api/users/{id}/profile`).
+     * @param body (optional) 
+     * @return No Content
+     */
+    respondToJobExit(announcementId: string, number: number, body?: RespondToJobExit | undefined): Observable<void> {
+        let url_ = this.baseUrl + "/api/announcements/{announcementId}/job-exits/{number}/response";
+        if (announcementId === undefined || announcementId === null)
+            throw new globalThis.Error("The parameter 'announcementId' must be defined.");
+        url_ = url_.replace("{announcementId}", encodeURIComponent("" + announcementId));
+        if (number === undefined || number === null)
+            throw new globalThis.Error("The parameter 'number' must be defined.");
+        url_ = url_.replace("{number}", encodeURIComponent("" + number));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(body);
+
+        let options_ : any = {
+            body: content_,
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Content-Type": "application/json",
+            })
+        };
+
+        return this.http.request("post", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processRespondToJobExit(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processRespondToJobExit(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<void>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<void>;
+        }));
+    }
+
+    protected processRespondToJobExit(response: HttpResponseBase): Observable<void> {
         const status = response.status;
         const responseBlob =
             response instanceof HttpResponse ? response.body :
@@ -3928,6 +4007,68 @@ export class UsersClient {
     }
 
     /**
+     * F11 G: publiczny profil – dane publiczne, statystyki „Pomagam” / „Zlecam” (średnia ocen tylko z zakończonych
+    zleceń, zakończone, przerwane i rezygnacje – przez niego / przez drugą stronę) i przerwane zlecenia z powodem
+    i stanowiskiem drugiej strony.
+     * @return OK
+     */
+    getProfile(userId: string): Observable<UserProfileDto> {
+        let url_ = this.baseUrl + "/api/users/{userId}/profile";
+        if (userId === undefined || userId === null)
+            throw new globalThis.Error("The parameter 'userId' must be defined.");
+        url_ = url_.replace("{userId}", encodeURIComponent("" + userId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetProfile(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetProfile(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<UserProfileDto>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<UserProfileDto>;
+        }));
+    }
+
+    protected processGetProfile(response: HttpResponseBase): Observable<UserProfileDto> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as UserProfileDto;
+            return _observableOf(result200);
+            }));
+        } else if (status === 404) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Not Found", status, _responseText, _headers, result404);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    /**
      * Oceny, które użytkownik otrzymał – podstawa jego reputacji.
      * @return OK
      */
@@ -4327,6 +4468,8 @@ export interface JobExitDto {
     reason: string;
     note: string | undefined;
     occurredAt: string;
+    response: string | undefined;
+    respondedAt: string | undefined;
 }
 
 export type JobExitReason = "CannotMakeIt" | "TermsDiffer" | "NoContact" | "Disagreement" | "Other";
@@ -4404,7 +4547,6 @@ export interface MyRatingDto {
     rate: number;
     comment: string | undefined;
     createdAt: string;
-    interruption: JobExitDto;
 }
 
 export interface NotificationDto {
@@ -4448,7 +4590,6 @@ export interface PendingRatingDto {
     myRole: string;
     otherParty: ConversationPartyDto;
     createdAt: string;
-    interruption: JobExitDto;
 }
 
 export interface PriceDto {
@@ -4464,6 +4605,14 @@ export interface ProblemDetails {
     instance: string | undefined;
 
     [key: string]: any;
+}
+
+export interface ProfileInterruptionDto {
+    announcementId: string;
+    announcementTitle: string;
+    role: string;
+    byUser: boolean;
+    exit: JobExitDto;
 }
 
 export interface RateAnnouncement {
@@ -4490,11 +4639,25 @@ export interface RegisterDevice {
     platform: DevicePlatform;
 }
 
+export interface RespondToJobExit {
+    text: string;
+}
+
 export interface ReviseOffer {
     price: PriceDto;
     proposedStart: string;
     proposedEnd: string;
     message: string | undefined;
+}
+
+export interface RoleStatsDto {
+    averageRating: number | undefined;
+    ratingCount: number;
+    completedCount: number;
+    interruptedByUser: number;
+    interruptedByOther: number;
+    abandonedByUser: number;
+    abandonedByOther: number;
 }
 
 export interface SendMessage {
@@ -4558,6 +4721,13 @@ export interface UserDto {
     isLocked: boolean;
     description: string | undefined;
     contactData: ContactDataDto;
+}
+
+export interface UserProfileDto {
+    user: UserPublicDto;
+    asHelper: RoleStatsDto;
+    asClient: RoleStatsDto;
+    interruptions: ProfileInterruptionDto[];
 }
 
 export interface UserPublicDto {

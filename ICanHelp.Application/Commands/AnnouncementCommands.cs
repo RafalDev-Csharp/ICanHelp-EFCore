@@ -79,10 +79,24 @@ public abstract record JobExitCommand : ICommand
 /// <summary>Rezygnacja przed rozpoczęciem (Accepted): ogłoszenie wraca do Open, przyjęta oferta → Abandoned. Bez ocen.</summary>
 public sealed record AbandonJob : JobExitCommand;
 
-/// <summary>Przerwanie w trakcie (InProgress → Interrupted). Rozmowa tylko do odczytu, obie strony mogą się ocenić.</summary>
+/// <summary>Przerwanie w trakcie (InProgress → Interrupted). Rozmowa tylko do odczytu, bez ocen – druga strona dodaje stanowisko.</summary>
 public sealed record InterruptJob : JobExitCommand;
 
-/// <summary>Ocena drugiej strony po zakończeniu ogłoszenia (raz na ogłoszenie).</summary>
+/// <summary>
+/// F11 G: stanowisko drugiej strony do rezygnacji / przerwania (numer wpisu z <c>JobExitDto.Number</c>) – raz,
+/// tylko ta strona, która nie wyszła ze zlecenia.
+/// </summary>
+public sealed record RespondToJobExit : ICommand
+{
+    [JsonIgnore] public Guid AnnouncementId { get; init; }
+    [JsonIgnore] public int Number { get; init; }
+    [JsonIgnore] public Guid ActorId { get; init; }
+
+    /// <summary>2–500 znaków.</summary>
+    public string Text { get; init; } = string.Empty;
+}
+
+/// <summary>Ocena drugiej strony po zakończeniu ogłoszenia (raz na ogłoszenie; F11 G: nie po przerwaniu).</summary>
 public sealed record RateAnnouncement : ICommand
 {
     [JsonIgnore] public Guid AnnouncementId { get; init; }

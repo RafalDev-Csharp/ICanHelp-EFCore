@@ -320,8 +320,8 @@ Content-Type: application/json
 }
 
 ###
-# F11 E: przerwanie w trakcie (status InProgress, każda strona) -> 204, status Interrupted (końcowy). Obie strony
-# mogą się ocenić (POST …/ratings), druga strona dostaje JobInterrupted. Powód jak wyżej + Disagreement.
+# F11 E: przerwanie w trakcie (status InProgress, każda strona) -> 204, status Interrupted (końcowy). F11 G: bez ocen
+# (POST …/ratings -> 409); druga strona dostaje JobInterrupted i może dodać stanowisko. Powód jak wyżej + Disagreement.
 POST {{baseUrl}}/api/announcements/{{announcementId}}/interrupt
 Authorization: Bearer {{signIn.response.body.$.accessToken}}
 Content-Type: application/json
@@ -330,6 +330,23 @@ Content-Type: application/json
   "reason": "Disagreement",
   "note": "Inny zakres prac niż ustaliliśmy."
 }
+
+###
+# F11 G: stanowisko drugiej strony do wpisu nr 1 (jobExits[].number) – tylko strona, która nie wyszła, raz (drugi raz /
+# autor wyjścia -> 409, tekst < 2 znaków -> 400) -> 204. Ten, kto wyszedł, dostaje JobExitResponded.
+POST {{baseUrl}}/api/announcements/{{announcementId}}/job-exits/1/response
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "text": "Zakres prac był inny niż w ogłoszeniu."
+}
+
+###
+# F11 G: publiczny profil (bez logowania): statystyki asHelper / asClient (średnia ocen tylko z zakończonych,
+# zakończone, przerwane i rezygnacje – przez niego / przez drugą stronę) i przerwane zlecenia z obiema wersjami
+@profileUserId = 3fa85f64-5717-4562-b3fc-2c963f66afa6
+GET {{baseUrl}}/api/users/{{profileUserId}}/profile
 
 ###
 # F11 E: publiczne liczniki – ile zleceń użytkownik sam zerwał (abandonedCount) i przerwał (interruptedCount);

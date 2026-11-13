@@ -46,6 +46,7 @@ describe('AnnouncementDetailsPage', () => {
     reportDone: vi.fn(),
     complete: vi.fn(),
     exitJob: vi.fn(),
+    respondToExit: vi.fn(),
   };
   let notifications = notificationsStub();
   const likes = { load: vi.fn(() => of([])), isLiked: vi.fn(() => false), sync: vi.fn(), toggle: vi.fn() };
@@ -444,7 +445,7 @@ describe('AnnouncementDetailsPage', () => {
     expect(offers.exitJob).toHaveBeenCalledWith('a1', 'interrupt', 'Pomocnik');
   });
 
-  it('after an interruption shows the reason, lets the owner rate and republish', async () => {
+  it('after an interruption shows the reason, no rating, lets the owner respond and republish', async () => {
     auth.isAuthenticated.set(true);
     auth.currentUser.set({ id: 'owner-1' } as UserDto);
     announcements.getById.mockReturnValue(
@@ -464,6 +465,8 @@ describe('AnnouncementDetailsPage', () => {
               reason: 'NoContact',
               note: undefined,
               occurredAt: '2026-11-13T10:00:00Z',
+              response: undefined,
+              respondedAt: undefined,
             },
           ],
         }),
@@ -475,9 +478,14 @@ describe('AnnouncementDetailsPage', () => {
     const footer = element.querySelector('ion-footer')?.textContent ?? '';
     expect(footer).toContain('Pomocnik przerwał zlecenie – Brak kontaktu');
     expect(footer).toContain('Ustalcie między sobą rozliczenie');
-    expect(footer).toContain('Oceń pomocnika');
+    expect(footer).not.toContain('Oceń');
+    expect(footer).toContain('Dodaj swoje stanowisko');
     expect(announcements.getContact).toHaveBeenCalledWith('a1');
-    expect(announcements.getRatings).toHaveBeenCalledWith('a1');
+    expect(announcements.getRatings).not.toHaveBeenCalled();
+
+    offers.respondToExit.mockResolvedValue(true);
+    await page.respondToExit(1);
+    expect(offers.respondToExit).toHaveBeenCalledWith('a1', 1);
     expect(element.querySelector('.history')?.textContent).toContain('Przerwanie (pomocnik): Brak kontaktu');
 
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
@@ -504,6 +512,8 @@ describe('AnnouncementDetailsPage', () => {
               reason: 'NoContact',
               note: undefined,
               occurredAt: '2026-11-13T10:00:00Z',
+              response: undefined,
+              respondedAt: undefined,
             },
           ],
         }),
@@ -515,6 +525,43 @@ describe('AnnouncementDetailsPage', () => {
     const footer = element.querySelector('ion-footer')?.textContent ?? '';
     expect(footer).toContain('Zlecenie zerwane');
     expect(footer).not.toContain('Złóż ofertę');
+  });
+
+  it('shows the statement of the other side and links the owner card to the public profile', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'helper-1' } as UserDto);
+    announcements.getById.mockReturnValue(
+      of(
+        announcementDetails('a1', {
+          status: 'Interrupted',
+          acceptedOfferId: 'o1',
+          offers: [offerFixture('o1', { status: 'Accepted' })],
+          jobExits: [
+            {
+              number: 1,
+              kind: 'Interrupted',
+              offerId: 'o1',
+              helperId: 'helper-1',
+              actorId: 'helper-1',
+              actorRole: 'Helper',
+              reason: 'NoContact',
+              note: undefined,
+              occurredAt: '2026-11-13T10:00:00Z',
+              response: 'Nie odbierał telefonu.',
+              respondedAt: '2026-11-13T12:00:00Z',
+            },
+          ],
+        }),
+      ),
+    );
+    const { element, render } = create();
+    await render();
+
+    const footer = element.querySelector('ion-footer')?.textContent ?? '';
+    expect(footer).toContain('Przerwałeś zlecenie – Brak kontaktu');
+    expect(footer).toContain('Stanowisko zleceniodawcy: Nie odbierał telefonu.');
+    expect(footer).not.toContain('Dodaj swoje stanowisko');
+    expect(element.querySelector('.owner-profile')).not.toBeNull();
   });
 
   it('shows the public abandonment counters of the owner and (for the owner) of helpers', async () => {

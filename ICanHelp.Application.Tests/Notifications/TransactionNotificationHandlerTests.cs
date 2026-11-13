@@ -223,6 +223,21 @@ public class TransactionNotificationHandlerTests
     }
 
     [Fact]
+    public async Task JobExitResponded_NotifiesTheOneWhoLeft()
+    {
+        await _handler.HandleAsync(Guid.NewGuid(), new JobExitResponded(_announcement.Id, _owner, _helper, 1,
+            ExitActorId: _owner, ResponderId: _helper, "Zakres był inny.", Now));
+
+        var notification = _notifications.Notifications.ShouldHaveSingleItem();
+        notification.UserId.ShouldBe(_owner);
+        notification.Type.ShouldBe(NotificationType.JobExitResponded);
+        notification.ConversationId.ShouldBe(_conversation.Id);
+        var parameters = NotificationPayload.Deserialize(notification.Payload);
+        parameters[NotificationPayload.ActorRole].ShouldBe("Helper");
+        parameters[NotificationPayload.MessagePreview].ShouldBe("Zakres był inny.");
+    }
+
+    [Fact]
     public async Task SameEventTwice_GivesOneNotification_AndOneDelivery()
     {
         var eventId = Guid.NewGuid();

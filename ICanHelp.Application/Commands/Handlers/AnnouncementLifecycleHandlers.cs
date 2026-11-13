@@ -120,6 +120,32 @@ internal sealed class InterruptJobHandler : ICommandHandler<InterruptJob>
     }
 }
 
+/// <summary>F11 G: stanowisko drugiej strony (reguły – <c>Announcement.RespondToJobExit</c>).</summary>
+internal sealed class RespondToJobExitHandler : ICommandHandler<RespondToJobExit>
+{
+    private readonly IAnnouncementRepository _announcements;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IClock _clock;
+
+    public RespondToJobExitHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
+    {
+        _announcements = announcements;
+        _unitOfWork = unitOfWork;
+        _clock = clock;
+    }
+
+    public Task HandleAsync(RespondToJobExit command, CancellationToken cancellationToken = default)
+    {
+        var text = new Description(command.Text.Trim());
+
+        return _unitOfWork.ExecuteAsync(async () =>
+        {
+            var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
+            announcement.RespondToJobExit(command.Number, new UserId(command.ActorId), text, _clock.UtcNow);
+        }, cancellationToken);
+    }
+}
+
 internal static class JobExitNote
 {
     /// <summary>Puste / same spacje = brak opisu; inaczej przycięty tekst (walidacja długości – <see cref="Description"/>).</summary>

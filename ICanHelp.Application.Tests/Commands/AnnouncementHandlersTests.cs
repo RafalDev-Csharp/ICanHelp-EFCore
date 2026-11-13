@@ -369,7 +369,7 @@ public class AnnouncementHandlersTests
     }
 
     [Fact]
-    public async Task InterruptJob_ByOwner_WithNote_EndsAsInterrupted_AndBothCanRate()
+    public async Task InterruptJob_ByOwner_WithNote_EndsAsInterrupted_WithoutRatings_HelperResponds()
     {
         var announcement = await AcceptedAnnouncementAsync();
         announcement.Start(_helper.Id, _clock.UtcNow);
@@ -382,9 +382,18 @@ public class AnnouncementHandlersTests
         announcement.Status.ShouldBe(AnnouncementStatus.Interrupted);
         announcement.GetInterruption()!.Note!.Value.ShouldBe("Zalał łazienkę.");
 
-        await RateHandler().HandleAsync(RateCommand(announcement.Id, _owner.Id, 2));
-        await RateHandler().HandleAsync(RateCommand(announcement.Id, _helper.Id, 3));
-        _ratings.Ratings.Count.ShouldBe(2);
+        // F11 G: bez ocen po przerwaniu – stanowisko drugiej strony zamiast gwiazdek.
+        await Should.ThrowAsync<DomainRuleException>(
+            () => RateHandler().HandleAsync(RateCommand(announcement.Id, _helper.Id, 5)));
+        _ratings.Ratings.ShouldBeEmpty();
+
+        await new RespondToJobExitHandler(_announcements, _unitOfWork, _clock).HandleAsync(new RespondToJobExit
+        {
+            AnnouncementId = announcement.Id, Number = 1, ActorId = _helper.Id, Text = "  Łazienkę zalał wąż, nie ja. "
+        });
+        var exit = announcement.GetInterruption()!;
+        exit.Response!.Value.ShouldBe("Łazienkę zalał wąż, nie ja.");
+        exit.RespondedAt.ShouldBe(_clock.UtcNow);
     }
 
     [Fact]

@@ -5,7 +5,7 @@ import type {
   MessageDto,
   OfferDto,
 } from '../../core/api/api-client';
-import { jobExitReasonText, jobExitTitle } from '../offers/job-exit';
+import { canRespondToExit, jobExitReasonText, jobExitTitle } from '../offers/job-exit';
 import type { OfferActions } from '../offers/offer-labels';
 import {
   changedFieldsLabel,
@@ -64,6 +64,10 @@ export type TimelineItem =
       /** Powód z opisem (`jobExitReasonText`). */
       reason: string;
       mine: boolean;
+      /** F11 G: czytający jest drugą stroną i jeszcze nie dodał stanowiska. */
+      canRespond: boolean;
+      /** „Stanowisko pomocnika / zleceniodawcy” – druga strona niż ta, która wyszła. */
+      responseAuthor: string;
     };
 
 /**
@@ -120,6 +124,8 @@ export function toTimelineItems(conversation: ConversationDto, myId: string | un
         title: jobExitTitle(exit, myId ?? ''),
         reason: jobExitReasonText(exit),
         mine: exit.actorId === myId,
+        canRespond: canRespondToExit(exit, myId ?? '', conversation.clientId),
+        responseAuthor: exit.actorRole === 'Client' ? 'Stanowisko pomocnika' : 'Stanowisko zleceniodawcy',
       });
     }
   }

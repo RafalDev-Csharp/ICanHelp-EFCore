@@ -174,19 +174,65 @@ public class AnnouncementJobExitTests
     }
 
     [Fact]
-    public void Interrupt_ConversationIsReadOnlyAndBothSidesCanRate()
+    public void Interrupt_ConversationIsReadOnlyAndNobodyCanRate()
     {
         var announcement = InStatus(AnnouncementStatus.Interrupted);
 
         announcement.AllowsConversationWith(Helper).ShouldBeFalse();
 
-        var byOwner = announcement.CreateRating(Id.New(), OwnerId, new Rate(2), null, Now.AddDays(3));
-        byOwner.RateeId.ShouldBe(Helper);
-        var byHelper = announcement.CreateRating(Id.New(), Helper, new Rate(4), null, Now.AddDays(3));
-        byHelper.RateeId.ShouldBe(OwnerId);
+        // F11 G: bez gwiazdek po przerwaniu – inaczej dwa konta mogłyby nabijać sobie oceny.
+        Should.Throw<DomainRuleException>(
+            () => announcement.CreateRating(Id.New(), OwnerId, new Rate(5), null, Now.AddDays(3)));
+        Should.Throw<DomainRuleException>(
+            () => announcement.CreateRating(Id.New(), Helper, new Rate(5), null, Now.AddDays(3)));
+    }
+
+    // ---------- F11 G: stanowisko drugiej strony ----------
+
+    [Fact]
+    public void RespondToJobExit_ByOtherSide_SavesStatementOnceAndRaisesEvent()
+    {
+        var announcement = InStatus(AnnouncementStatus.Interrupted); // przerwał pomocnik
+        announcement.ClearDomainEvents();
+
+        var exit = announcement.RespondToJobExit(1, OwnerId, new Description("Pomocnik nie przyszedł drugi dzień."),
+            Now.AddDays(3));
+
+        exit.Response!.Value.ShouldBe("Pomocnik nie przyszedł drugi dzień.");
+        exit.RespondedAt.ShouldBe(Now.AddDays(3));
+        var e = announcement.DomainEvents.ShouldHaveSingleItem().ShouldBeOfType<JobExitResponded>();
+        e.ExitActorId.ShouldBe(Helper.Value);
+        e.ResponderId.ShouldBe(OwnerId.Value);
+        e.Number.ShouldBe(1);
 
         Should.Throw<DomainRuleException>(
-            () => announcement.CreateRating(Id.New(), Stranger, new Rate(1), null, Now.AddDays(3)));
+            () => announcement.RespondToJobExit(1, OwnerId, new Description("Jeszcze raz."), Now.AddDays(4)));
+    }
+
+    [Fact]
+    public void RespondToJobExit_ByTheOneWhoLeftOrStranger_Throws()
+    {
+        var announcement = InStatus(AnnouncementStatus.Interrupted);
+
+        Should.Throw<DomainRuleException>(
+            () => announcement.RespondToJobExit(1, Helper, new Description("Moje zdanie."), Now));
+        Should.Throw<DomainRuleException>(
+            () => announcement.RespondToJobExit(1, Stranger, new Description("Moje zdanie."), Now));
+        Should.Throw<DomainRuleException>(
+            () => announcement.RespondToJobExit(2, OwnerId, new Description("Moje zdanie."), Now));
+        announcement.GetInterruption()!.Response.ShouldBeNull();
+    }
+
+    [Fact]
+    public void RespondToJobExit_HelperAnswersOwnersAbandonment_EvenWhenReopened()
+    {
+        var announcement = InStatus(AnnouncementStatus.Accepted);
+        announcement.Abandon(OwnerId, JobExitReason.TermsDiffer, null, Now);
+
+        var exit = announcement.RespondToJobExit(1, Helper, new Description("Warunki były jasne."), Now.AddHours(1));
+
+        exit.Response!.Value.ShouldBe("Warunki były jasne.");
+        announcement.Status.ShouldBe(AnnouncementStatus.Open);
     }
 
     [Theory]

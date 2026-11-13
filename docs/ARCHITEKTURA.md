@@ -16,7 +16,8 @@
   - F11 E: `Abandon(actor, reason, note?, at)` – Accepted, właściciel albo przyjęty pomocnik → Open, `AcceptedOfferId` = null,
     oferta → `Abandoned`, zdarzenie `JobAbandoned`; ten pomocnik (`HasLeftJob`) nie złoży już oferty ani wątku, jego
     wątek – tylko do odczytu. `Interrupt(...)` – InProgress, każda strona → status końcowy `Interrupted` (oferta zostaje
-    `Accepted`), `JobInterrupted`; `CreateRating` z Completed **lub** Interrupted. Powód obowiązkowy: `Other` wymaga opisu,
+    `Accepted`), `JobInterrupted`; F11 G: `CreateRating` tylko z Completed, druga strona dopisuje raz
+    stanowisko – `RespondToJobExit(number, actor, text, at)` → `JobExitResponded` (kolumny `Response`, `RespondedAt`). Powód obowiązkowy: `Other` wymaga opisu,
     `Disagreement` tylko przy przerwaniu (inaczej `InvalidJobExitException` → 400).
   - metody: `Update(actor, ..., at)` (tylko właściciel, `Open`), `GetChangesSince(rev)`, `AddOffer`, `CounterOffer`, `ReviseOffer`, `AcceptOffer`,
     `RejectOffer`, `WithdrawOffer`, `AddImage(actor,…,at)`, `RemoveImage(actor, id, at)`, `GetThumbnail()`, `Start(actor, at)`
@@ -146,7 +147,11 @@
   otrzymane oceny (`MyRatingDto`: ogłoszenie + tytuł, `myRole` = Client/Helper wg właściciela ogłoszenia – `MyRatingDto.RoleOf`,
   `rater`, ocena, komentarz), `GET pending` – „do wystawienia” (`PendingRatingDto`: zakończone ogłoszenia, gdzie czytający jest
   właścicielem albo autorem przyjętej oferty, bez jego oceny; `otherParty`, miniatura). Publiczne `api/users/{id}/ratings` bez zmian.
-  F11 E: także przerwane zlecenia (`Interrupted`); oba DTO mają `interruption` (`JobExitDto` – kto i dlaczego) albo null.
+  F11 G: tylko zakończone zlecenia (przerwanych nie oceniamy).
+- F11 G – publiczny profil `GET api/users/{id}/profile` (`UserProfileDto`, `GetUserProfileHandler`): `user`, `asHelper` /
+  `asClient` (`RoleStatsDto`: średnia i liczba ocen z zakończonych, zakończone, przerwane / rezygnacje – przez niego i przez
+  drugą stronę), `interruptions` (rola, `byUser`, wpis z powodem i stanowiskiem). Stanowisko: `POST
+  api/announcements/{id}/job-exits/{number}/response` (`{ text }`, 204; nie ta strona / drugi raz → 409).
 - F11 E – wyjście ze zlecenia: `POST api/announcements/{id}/abandon` i `…/interrupt` (body `{ reason, note? }`, 204; zły powód →
   400 `InvalidJobExit`, zły status / obcy → 409), powiadomienia `JobAbandoned` / `JobInterrupted` dla drugiej strony (parametry
   `actorRole`, `exitReason`, `note`). `AnnouncementDetailsDto.jobExits` – jak oferty: właściciel wszystkie, pomocnik swoje, inni

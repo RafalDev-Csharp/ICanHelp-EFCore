@@ -52,25 +52,33 @@ public class NotificationTextFormatterTests
         => Format(NotificationType.JobAbandoned, (NotificationPayload.AnnouncementTitle, Title),
                 (NotificationPayload.ActorRole, "Helper"), (NotificationPayload.ExitReason, "CannotMakeIt"))
             .ShouldBe(new NotificationText("Pomocnik zrezygnował ze zlecenia",
-                $"{Title} – powód: nie mogę w tym terminie"));
+                $"{Title} – powód: nie mogę w tym terminie. Możesz dodać swoje stanowisko."));
 
     [Fact]
     public void JobInterrupted_ByOwner_OtherReason_ShowsNote()
         => Format(NotificationType.JobInterrupted, (NotificationPayload.AnnouncementTitle, Title),
                 (NotificationPayload.ActorRole, "Client"), (NotificationPayload.ExitReason, "Other"),
                 (NotificationPayload.Note, "Zalał łazienkę."))
-            .ShouldBe(new NotificationText("Zleceniodawca przerwał zlecenie", $"{Title} – powód: Zalał łazienkę."));
+            .ShouldBe(new NotificationText("Zleceniodawca przerwał zlecenie",
+                $"{Title} – powód: Zalał łazienkę. Możesz dodać swoje stanowisko."));
 
     [Fact]
     public void JobInterrupted_ReasonWithNote_ShowsBoth()
         => Format(NotificationType.JobInterrupted, (NotificationPayload.AnnouncementTitle, Title),
                 (NotificationPayload.ActorRole, "Helper"), (NotificationPayload.ExitReason, "Disagreement"),
                 (NotificationPayload.Note, "Inny zakres."))
-            .Body.ShouldBe($"{Title} – powód: konflikt / nie dogadaliśmy się (Inny zakres.)");
+            .Body.ShouldBe($"{Title} – powód: konflikt / nie dogadaliśmy się (Inny zakres.). Możesz dodać swoje stanowisko.");
+
+    [Fact]
+    public void JobExitResponded_TitleAndPreview()
+        => Format(NotificationType.JobExitResponded, (NotificationPayload.AnnouncementTitle, Title),
+                (NotificationPayload.ActorRole, "Helper"), (NotificationPayload.MessagePreview, "Zakres był inny."))
+            .ShouldBe(new NotificationText("Pomocnik dodał swoje stanowisko", $"{Title} – Zakres był inny."));
 
     [Theory]
     [InlineData(NotificationType.JobAbandoned)]
     [InlineData(NotificationType.JobInterrupted)]
+    [InlineData(NotificationType.JobExitResponded)]
     public void JobExit_LinkToConversation(NotificationType type)
     {
         var conversationId = Guid.NewGuid();

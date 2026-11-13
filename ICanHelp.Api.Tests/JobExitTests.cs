@@ -85,7 +85,7 @@ public sealed class JobExitTests
     }
 
     [Fact]
-    public async Task Interrupt_ByOwner_EndsJob_NotifiesHelper_AndBothCanRate()
+    public async Task Interrupt_ByOwner_EndsJob_WithoutRatings_HelperResponds_ShownOnProfiles()
     {
         var owner = await _factory.CreateUserAsync();
         var helper = await _factory.CreateUserAsync();
@@ -113,21 +113,82 @@ public sealed class JobExitTests
         var notification = (await helper.GetNotificationsAsync()).Single(n => n.Type == "JobInterrupted");
         notification.Title.ShouldBe("Zleceniodawca przerwał zlecenie");
 
-        // Do wystawienia – z informacją o przerwaniu; obie strony oceniają.
+        // F11 G: bez ocen po przerwaniu (nie ma go w „do wystawienia”) – zamiast tego stanowisko drugiej strony.
         var pending = await helper.Client.GetFromJsonAsync<List<PendingRatingDto>>("/api/me/ratings/pending");
-        var item = pending!.Single(p => p.AnnouncementId == announcementId);
-        item.Interruption!.Reason.ShouldBe("Disagreement");
+        pending!.ShouldNotContain(p => p.AnnouncementId == announcementId);
+        await (await owner.Client.PostAsJsonAsync($"{url}/ratings", new { rate = 5 }))
+            .ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
+        await (await helper.Client.PostAsJsonAsync($"{url}/ratings", new { rate = 5 }))
+            .ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
 
-        (await owner.Client.PostAsJsonAsync($"{url}/ratings", new { rate = 2, comment = "Nie dokończył." }))
-            .StatusCode.ShouldBe(HttpStatusCode.Created);
-        (await helper.Client.PostAsJsonAsync($"{url}/ratings", new { rate = 3 }))
-            .StatusCode.ShouldBe(HttpStatusCode.Created);
+        // Stanowisko: tylko pomocnik (to zleceniodawca przerwał), raz; zleceniodawca dostaje powiadomienie.
+        var response = $"{url}/job-exits/1/response";
+        await (await owner.Client.PostAsJsonAsync(response, new { text = "Moja wersja." }))
+            .ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
+        await (await helper.Client.PostAsJsonAsync(response, new { text = "x" }))
+            .ShouldBeProblemAsync(HttpStatusCode.BadRequest);
+        (await helper.Client.PostAsJsonAsync(response, new { text = "Zakres był inny niż w ogłoszeniu." }))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        await (await helper.Client.PostAsJsonAsync(response, new { text = "Drugi raz." }))
+            .ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
 
-        var received = await helper.Client.GetFromJsonAsync<List<MyRatingDto>>("/api/me/ratings");
-        received!.Single(r => r.AnnouncementId == announcementId).Interruption!.ActorRole.ShouldBe("Client");
+        var exit = (await owner.Client.GetFromJsonAsync<AnnouncementDetailsDto>(url))!.JobExits.Single();
+        exit.Response.ShouldBe("Zakres był inny niż w ogłoszeniu.");
+        exit.RespondedAt.ShouldNotBeNull();
+
+        await _factory.ProcessOutboxAsync();
+        var responded = (await owner.GetNotificationsAsync()).Single(n => n.Type == "JobExitResponded");
+        responded.Title.ShouldBe("Pomocnik dodał swoje stanowisko");
+
+        // Profil publiczny (także dla niezalogowanego): przerwanie u obu stron, z rolą i stanowiskiem.
+        var anonymous = _factory.CreateClient();
+        var ownerProfile = await anonymous.GetFromJsonAsync<UserProfileDto>($"/api/users/{owner.Id}/profile");
+        ownerProfile!.User.Id.ShouldBe(owner.Id);
+        ownerProfile.AsClient.InterruptedByUser.ShouldBe(1);
+        ownerProfile.AsClient.InterruptedByOther.ShouldBe(0);
+        ownerProfile.AsClient.CompletedCount.ShouldBe(0);
+        ownerProfile.AsHelper.InterruptedByUser.ShouldBe(0);
+        var onOwner = ownerProfile.Interruptions.ShouldHaveSingleItem();
+        onOwner.Role.ShouldBe("Client");
+        onOwner.ByUser.ShouldBeTrue();
+        onOwner.Exit.Reason.ShouldBe("Disagreement");
+        onOwner.Exit.Response.ShouldBe("Zakres był inny niż w ogłoszeniu.");
+
+        var helperProfile = await anonymous.GetFromJsonAsync<UserProfileDto>($"/api/users/{helper.Id}/profile");
+        helperProfile!.AsHelper.InterruptedByOther.ShouldBe(1);
+        helperProfile.AsHelper.InterruptedByUser.ShouldBe(0);
+        var onHelper = helperProfile.Interruptions.ShouldHaveSingleItem();
+        onHelper.Role.ShouldBe("Helper");
+        onHelper.ByUser.ShouldBeFalse();
 
         var ownerCounts = await helper.Client.GetFromJsonAsync<UserReliabilityDto>($"/api/users/{owner.Id}/reliability");
         ownerCounts!.InterruptedCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Profile_CountsCompletedJobsAndRatingsPerRole()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var helper = await _factory.CreateUserAsync();
+        var (announcementId, _) = await AcceptedAsync(owner, helper);
+        var url = $"/api/announcements/{announcementId}";
+        (await owner.Client.PostEmptyAsync($"{url}/complete")).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await owner.Client.PostAsJsonAsync($"{url}/ratings", new { rate = 4 })).StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await helper.Client.PostAsJsonAsync($"{url}/ratings", new { rate = 5 })).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var helperProfile = await helper.Client.GetFromJsonAsync<UserProfileDto>($"/api/users/{helper.Id}/profile");
+        helperProfile!.AsHelper.CompletedCount.ShouldBe(1);
+        helperProfile.AsHelper.RatingCount.ShouldBe(1);
+        helperProfile.AsHelper.AverageRating.ShouldBe(4);
+        helperProfile.AsClient.CompletedCount.ShouldBe(0);
+        helperProfile.AsClient.AverageRating.ShouldBeNull();
+
+        var ownerProfile = await helper.Client.GetFromJsonAsync<UserProfileDto>($"/api/users/{owner.Id}/profile");
+        ownerProfile!.AsClient.CompletedCount.ShouldBe(1);
+        ownerProfile.AsClient.AverageRating.ShouldBe(5);
+        ownerProfile.Interruptions.ShouldBeEmpty();
+
+        (await helper.Client.GetAsync($"/api/users/{Guid.NewGuid()}/profile")).StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     [Fact]

@@ -30,6 +30,7 @@ describe('ConversationPage', () => {
     reportDone: vi.fn(() => Promise.resolve(true)),
     complete: vi.fn(() => Promise.resolve(true)),
     exitJob: vi.fn(() => Promise.resolve(true)),
+    respondToExit: vi.fn(() => Promise.resolve(true)),
   };
   const announcements = { getById: vi.fn() };
   const auth = {
@@ -421,6 +422,8 @@ describe('ConversationPage', () => {
         reason: 'NoContact',
         note: 'Nie odbiera.',
         occurredAt: '2026-11-10T10:00:00Z',
+        response: undefined,
+        respondedAt: undefined,
         ...overrides,
       },
     }) as ConversationEntryDto;
@@ -475,7 +478,45 @@ describe('ConversationPage', () => {
     const footer = element.querySelector('ion-footer')?.textContent ?? '';
     expect(footer).toContain('Ustalcie między sobą rozliczenie');
     expect(footer).toContain('Zlecenie przerwane – rozmowa jest tylko do odczytu');
+    expect(footer).toContain('Bez ocen');
     expect(element.querySelector('.job-exit')).toBeNull();
+  });
+
+  it('lets the other side add its statement to the interruption, once', async () => {
+    const { page, element, render } = create(
+      conversationFixture({
+        myRole: 'Client',
+        announcementStatus: 'Interrupted',
+        canWrite: false,
+        timeline: [
+          offerEntry({ status: 'Accepted' }),
+          exitEntry({ kind: 'Interrupted', actorId: 'helper-1', actorRole: 'Helper' }),
+        ],
+      }),
+    );
+    await render();
+
+    expect(element.querySelector('.respond-action')?.textContent).toContain('Dodaj swoje stanowisko');
+    await page.respondToExit(1);
+    expect(offers.respondToExit).toHaveBeenCalledWith('a1', 1);
+    expect(element.querySelector('.profile-link')?.getAttribute('href')).toBe('/users/helper-1');
+  });
+
+  it('shows the statement instead of the button once it is given', async () => {
+    auth.currentUser.set({ id: 'helper-1' } as UserDto);
+    const { element, render } = create(
+      conversationFixture({
+        canWrite: false,
+        timeline: [offerEntry({ status: 'Abandoned' }), exitEntry({ response: 'Zmieniłem zdanie, przepraszam.' })],
+      }),
+    );
+    await render();
+
+    expect(element.querySelector('.respond-action')).toBeNull();
+    expect(element.querySelector('.exit-response')?.textContent).toContain(
+      'Stanowisko pomocnika: Zmieniłem zdanie, przepraszam.',
+    );
+    auth.currentUser.set({ id: 'owner-1' } as UserDto);
   });
 
   it('shows the public counter of the other party', async () => {

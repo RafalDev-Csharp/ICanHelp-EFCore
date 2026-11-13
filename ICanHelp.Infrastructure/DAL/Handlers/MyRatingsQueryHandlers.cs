@@ -31,9 +31,6 @@ internal sealed class GetMyRatingsHandler : IQueryHandler<GetMyRatings, IReadOnl
                 select new { Rating = r, a.Title, a.OwnerId, RaterUserName = rater.UserName })
             .ToListAsync(cancellationToken);
 
-        var interruptions = await LoadInterruptionsAsync(_db, rows.Select(r => r.Rating.AnnouncementId).Distinct(),
-            cancellationToken);
-
         return rows
             .Select(row => new MyRatingDto
             {
@@ -44,34 +41,15 @@ internal sealed class GetMyRatingsHandler : IQueryHandler<GetMyRatings, IReadOnl
                 Rater = new ConversationPartyDto { Id = row.Rating.RaterId, UserName = row.RaterUserName },
                 Rate = row.Rating.Rate,
                 Comment = row.Rating.Comment?.Value,
-                CreatedAt = row.Rating.CreatedAt,
-                Interruption = interruptions.GetValueOrDefault(row.Rating.AnnouncementId.Value)
+                CreatedAt = row.Rating.CreatedAt
             })
             .ToList();
-    }
-
-    /// <summary>F11 E: przerwanie (najwyżej jedno na ogłoszenie) po id ogłoszenia – do pokazania przy ocenie.</summary>
-    internal static async Task<Dictionary<Guid, JobExitDto>> LoadInterruptionsAsync(ICanHelpDbContext db,
-        IEnumerable<Id> announcementIds, CancellationToken cancellationToken)
-    {
-        var ids = announcementIds.ToList();
-        if (ids.Count == 0)
-        {
-            return [];
-        }
-
-        var exits = await db.JobExits
-            .AsNoTracking()
-            .Where(e => e.Kind == JobExitKind.Interrupted && ids.Contains(e.AnnouncementId))
-            .ToListAsync(cancellationToken);
-
-        return exits.ToDictionary(e => e.AnnouncementId.Value, e => e.AsDto());
     }
 }
 
 /// <summary>
-/// Zakończone (i od F11 E przerwane) ogłoszenia, w których czytający był stroną (właściciel albo autor przyjętej
-/// oferty), bez jego oceny.
+/// Zakończone ogłoszenia, w których czytający był stroną (właściciel albo autor przyjętej oferty), bez jego oceny.
+/// F11 G: przerwanych nie oceniamy.
 /// Przyjęta oferta jest w ogłoszeniu najwyżej jedna – stąd złączenie po statusie zamiast po <c>AcceptedOfferId</c>.
 /// </summary>
 internal sealed class GetMyPendingRatingsHandler : IQueryHandler<GetMyPendingRatings, IReadOnlyList<PendingRatingDto>>
@@ -90,7 +68,7 @@ internal sealed class GetMyPendingRatingsHandler : IQueryHandler<GetMyPendingRat
 
         var rows = await (
                 from a in _db.Announcements.AsNoTracking()
-                where a.Status == AnnouncementStatus.Completed || a.Status == AnnouncementStatus.Interrupted
+                where a.Status == AnnouncementStatus.Completed
                 join o in _db.Offers.AsNoTracking().Where(o => o.Status == OfferStatus.Accepted)
                     on a.Id equals o.AnnouncementId
                 where a.OwnerId == userId || o.HelperId == userId
@@ -111,9 +89,6 @@ internal sealed class GetMyPendingRatingsHandler : IQueryHandler<GetMyPendingRat
                 })
             .ToListAsync(cancellationToken);
 
-        var interruptions = await GetMyRatingsHandler.LoadInterruptionsAsync(_db, rows.Select(r => r.Id),
-            cancellationToken);
-
         return rows
             .Select(row =>
             {
@@ -127,8 +102,7 @@ internal sealed class GetMyPendingRatingsHandler : IQueryHandler<GetMyPendingRat
                     OtherParty = isOwner
                         ? new ConversationPartyDto { Id = row.HelperId, UserName = row.HelperUserName }
                         : new ConversationPartyDto { Id = row.OwnerId, UserName = row.OwnerUserName },
-                    CreatedAt = row.CreatedAt,
-                    Interruption = interruptions.GetValueOrDefault(row.Id.Value)
+                    CreatedAt = row.CreatedAt
                 };
             })
             .ToList();
