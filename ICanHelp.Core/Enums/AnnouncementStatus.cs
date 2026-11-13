@@ -10,5 +10,8 @@ public enum AnnouncementStatus
 
     InProgress = 3,
     Completed = 4,
-    Cancelled = 5
+    Cancelled = 5,
+
+    /// <summary>F11 E: one side interrupted the work (final, like Completed – both sides can rate each other).</summary>
+    Interrupted = 6
 }

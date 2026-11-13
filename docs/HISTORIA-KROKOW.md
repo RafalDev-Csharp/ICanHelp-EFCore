@@ -335,5 +335,28 @@
   13.11.2026 lokalnie (`verify.cmd`, Docker; działające `ICanHelp.Api.exe` zatrzymane za zgodą autora): dotnet 536/536
   (Core 223, Application 204, integracyjne 109), `npm run api` (klient zgodny z ręczną edycją), lint + Vitest 322/322
   + build zielone. Przepływ w przeglądarce – do sprawdzenia ręcznie.
+  Część E (13.11.2026): rezygnacja i przerwanie zlecenia. Core: `Announcement.Abandon` (Accepted → Open, oferta →
+  `OfferStatus.Abandoned`) i `Interrupt` (InProgress → `AnnouncementStatus.Interrupted`), encja `JobExit` (część agregatu,
+  `JobExits`), enumy `JobExitKind` / `JobExitReason`, `InvalidJobExitException`, `HasLeftJob` (pomocnik po zerwaniu nie
+  składa oferty ani wątku, jego wątek tylko do odczytu – potwierdzone z autorem), `GetInterruption`, `CreateRating`
+  z Completed lub Interrupted, zdarzenia `JobAbandoned` / `JobInterrupted`, `NotificationType.JobAbandoned/JobInterrupted`.
+  Application: komendy `AbandonJob` / `InterruptJob` (wspólna baza `JobExitCommand`) + handlery, powiadomienia (druga
+  strona, parametry `actorRole` / `exitReason` / `note`) i teksty, DTO `JobExitDto`, `UserReliabilityDto`, query
+  `GetUserReliability`, `jobExits` w szczegółach, `JobExit` w osi wątku, `interruption` w ocenach. Infrastructure: tabela
+  `JobExits` (migracja `JobExits` – czysta), konwertery enumów, `GetUserReliabilityHandler`, kontakt i „do wystawienia”
+  także po przerwaniu. Api: `POST api/announcements/{id}/abandon|interrupt`, `GET api/users/{id}/reliability`, przykłady
+  w `.http`. Front: ręcznie `api-client.ts` (`abandon`, `interrupt`, `getReliability`, DTO), `features/offers/job-exit.ts`
+  + `JobExitModalComponent`, `OffersService.exitJob`, `jobStep().exit`, wątek (wpis, notki, licznik drugiej strony),
+  szczegóły (akcje, historia, licznik właściciela i pomocników, ocena po przerwaniu, „Wystaw ponownie” → `/add?copyOf=`),
+  „Zlecenia” (grupy), „Oceny” (przerwane), teksty i ikony powiadomień, etykiety „Przerwane” / „Zerwana”.
+  Testy: Core `AnnouncementJobExitTests`, Application (handlery, powiadomienia, teksty), Api `JobExitTests`
+  (rezygnacja → Open, 400/409, wątek tylko do odczytu, powiadomienia, liczniki, przerwanie → oceny, „do wystawienia”);
+  Vitest – nowe `job-exit.spec`, dopisane `job-step`, `offer-modals`, `offers.service`, `conversation.page`,
+  `announcement-details.page`, `order-groups`, `notification-texts`. Pierwszy przebieg `verify.cmd`: NSwag spłaszczył
+  wspólną bazę komend (`AbandonJob` / `InterruptJob` bez `JobExitCommand`) i oznaczył `interruption` jako wymagane →
+  typ `JobExitCommand` przeniesiony do `job-exit.ts`, fixture ocen z `null`.
+  13.11.2026 lokalnie (`verify.cmd`, Docker; działające `ICanHelp.Api` zatrzymane za zgodą autora): dotnet 574/574
+  (Core 247, Application 215, integracyjne 112), `npm run api` (klient zgodny), lint + Vitest 342/342 + build zielone.
+  Przepływ w przeglądarce – do sprawdzenia ręcznie.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

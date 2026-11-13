@@ -306,6 +306,38 @@ POST {{baseUrl}}/api/announcements/{{announcementId}}/report-done
 Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
 
 ###
+# F11 E: rezygnacja przed rozpoczęciem (status Accepted, właściciel albo przyjęty pomocnik) -> 204. Powód:
+# CannotMakeIt | TermsDiffer | NoContact | Other (wtedy note wymagane; Disagreement tylko przy przerwaniu -> 400).
+# Ogłoszenie wraca do Open, oferta -> Abandoned, ten pomocnik nie złoży już oferty (409), jego wątek – tylko do odczytu.
+# Druga strona dostaje JobAbandoned. Zamiast tego kroku w przepływie powyżej – alternatywa do „start”.
+POST {{baseUrl}}/api/announcements/{{announcementId}}/abandon
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "reason": "CannotMakeIt",
+  "note": "Wypadł mi wyjazd."
+}
+
+###
+# F11 E: przerwanie w trakcie (status InProgress, każda strona) -> 204, status Interrupted (końcowy). Obie strony
+# mogą się ocenić (POST …/ratings), druga strona dostaje JobInterrupted. Powód jak wyżej + Disagreement.
+POST {{baseUrl}}/api/announcements/{{announcementId}}/interrupt
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "reason": "Disagreement",
+  "note": "Inny zakres prac niż ustaliliśmy."
+}
+
+###
+# F11 E: publiczne liczniki – ile zleceń użytkownik sam zerwał (abandonedCount) i przerwał (interruptedCount);
+# id użytkownika np. z „helperId” oferty albo „ownerId” ogłoszenia; nieznany -> 404
+@reliabilityUserId = 3fa85f64-5717-4562-b3fc-2c963f66afa6
+GET {{baseUrl}}/api/users/{{reliabilityUserId}}/reliability
+
+###
 # Potwierdzenie wykonania (tylko właściciel, z InProgress albo Accepted) -> 204, pomocnik dostaje JobCompleted
 POST {{baseUrl}}/api/announcements/{{announcementId}}/complete
 Authorization: Bearer {{signIn.response.body.$.accessToken}}

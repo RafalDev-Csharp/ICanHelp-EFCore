@@ -54,6 +54,24 @@ describe('notification texts', () => {
     expect(concernsConversation(notification('JobCompleted', title))).toBe(true);
   });
 
+  it('describes an abandoned or interrupted job with the reason (F11 E)', () => {
+    const abandoned = describeNotification(
+      notification('JobAbandoned', { ...title, actorRole: 'Helper', exitReason: 'CannotMakeIt' }),
+    );
+    expect(abandoned).toEqual({
+      title: 'Pomocnik zrezygnował ze zlecenia',
+      body: 'Cieknący kran – powód: nie mogę w tym terminie',
+      icon: 'exit-outline',
+    });
+    const interrupted = describeNotification(
+      notification('JobInterrupted', { ...title, actorRole: 'Client', exitReason: 'Other', note: 'Zalał łazienkę.' }),
+    );
+    expect(interrupted.title).toBe('Zleceniodawca przerwał zlecenie');
+    expect(interrupted.body).toBe('Cieknący kran – powód: Zalał łazienkę.');
+    expect(interrupted.icon).toBe('stop-circle-outline');
+    expect(notificationLink(notification('JobInterrupted', title))).toEqual(['/conversations', 'c1']);
+  });
+
   it('prefers the ready text from the API and keeps the icon from the type', () => {
     const text = describeNotification(
       notification('OfferReceived', { ...title, price: '120.00 PLN' }, { title: 'Z serwera', body: 'Treść' }),

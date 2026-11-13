@@ -60,6 +60,28 @@ public sealed record ReportAnnouncementDone(Guid AnnouncementId, Guid ActorId) :
 /// <summary>Potwierdzenie wykonania (tylko właściciel, Accepted albo InProgress). Potem obie strony mogą się ocenić.</summary>
 public sealed record CompleteAnnouncement(Guid AnnouncementId, Guid ActorId) : ICommand;
 
+/// <summary>
+/// F11 E: wyjście ze zlecenia z powodem – „Zrezygnuj” przed rozpoczęciem (<see cref="AbandonJob"/>) albo
+/// „Przerwij zlecenie” w trakcie (<see cref="InterruptJob"/>). Każda strona (właściciel albo przyjęty pomocnik).
+/// </summary>
+public abstract record JobExitCommand : ICommand
+{
+    [JsonIgnore] public Guid AnnouncementId { get; init; }
+    [JsonIgnore] public Guid ActorId { get; init; }
+
+    /// <summary>CannotMakeIt, TermsDiffer, NoContact, Disagreement (tylko przerwanie) albo Other (wtedy wymagany opis).</summary>
+    public JobExitReason Reason { get; init; }
+
+    /// <summary>Opis (2–500 znaków); wymagany przy Other, w pozostałych – opcjonalny.</summary>
+    public string? Note { get; init; }
+}
+
+/// <summary>Rezygnacja przed rozpoczęciem (Accepted): ogłoszenie wraca do Open, przyjęta oferta → Abandoned. Bez ocen.</summary>
+public sealed record AbandonJob : JobExitCommand;
+
+/// <summary>Przerwanie w trakcie (InProgress → Interrupted). Rozmowa tylko do odczytu, obie strony mogą się ocenić.</summary>
+public sealed record InterruptJob : JobExitCommand;
+
 /// <summary>Ocena drugiej strony po zakończeniu ogłoszenia (raz na ogłoszenie).</summary>
 public sealed record RateAnnouncement : ICommand
 {

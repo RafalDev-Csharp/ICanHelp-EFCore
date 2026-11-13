@@ -13,5 +13,8 @@ public enum OfferStatus
     Withdrawn = 5,
 
     /// <summary>Outdated offer replaced by its author with new terms for the current version of the announcement.</summary>
-    Revised = 6
+    Revised = 6,
+
+    /// <summary>F11 E: the accepted offer whose job one side abandoned before the start („Zerwana”).</summary>
+    Abandoned = 7
 }

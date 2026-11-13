@@ -37,7 +37,8 @@ public sealed record ConversationDto
 }
 
 /// <summary>
-/// One entry of the timeline. Exactly one of <see cref="Message"/>, <see cref="Offer"/>, <see cref="Change"/> is set –
+/// One entry of the timeline. Exactly one of <see cref="Message"/>, <see cref="Offer"/>, <see cref="Change"/>,
+/// <see cref="JobExit"/> is set –
 /// according to <see cref="Type"/>.
 /// </summary>
 public sealed record ConversationEntryDto
@@ -48,13 +49,17 @@ public sealed record ConversationEntryDto
     /// <summary>A "system" entry: the owner edited the announcement (warning sign in the conversation).</summary>
     public const string AnnouncementChangedType = "AnnouncementChanged";
 
-    /// <summary>Message, Offer or AnnouncementChanged.</summary>
+    /// <summary>F11 E: a "system" entry: one side abandoned / interrupted the job of this helper.</summary>
+    public const string JobExitType = "JobExit";
+
+    /// <summary>Message, Offer, AnnouncementChanged or JobExit.</summary>
     public string Type { get; init; } = string.Empty;
     public DateTime At { get; init; }
 
     public MessageDto? Message { get; init; }
     public OfferDto? Offer { get; init; }
     public AnnouncementChangeDto? Change { get; init; }
+    public JobExitDto? JobExit { get; init; }
 }
 
 public sealed record MessageDto

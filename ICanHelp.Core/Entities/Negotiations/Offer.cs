@@ -81,4 +81,6 @@ public class Offer
     internal void MarkAsCountered() => Status = OfferStatus.Countered;
 
     internal void MarkAsRevised() => Status = OfferStatus.Revised;
+
+    internal void MarkAsAbandoned() => Status = OfferStatus.Abandoned;
 }

@@ -20,6 +20,18 @@ describe('order groups', () => {
     expect(clientOrderGroup({ status: 'InProgress' })).toBe('inProgress');
     expect(clientOrderGroup({ status: 'Completed' })).toBe('finished');
     expect(clientOrderGroup({ status: 'Cancelled' })).toBe('finished');
+    expect(clientOrderGroup({ status: 'Interrupted' })).toBe('finished');
+  });
+
+  it('finishes a helper thread whose job was abandoned, although the announcement is open again', () => {
+    expect(
+      helperOrderGroup(myConversationFixture('c1', { announcementStatus: 'Open', lastOffer: offer('Abandoned') })),
+    ).toBe('finished');
+    expect(
+      helperOrderGroup(
+        myConversationFixture('c2', { announcementStatus: 'Interrupted', lastOffer: offer('Accepted') }),
+      ),
+    ).toBe('finished');
   });
 
   it('puts a helper thread in a job group only when my offer was accepted', () => {

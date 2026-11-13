@@ -65,6 +65,9 @@
           <a [routerLink]="['/announcements', item.announcementId]">{{ item.announcementTitle }}</a>
         </h2>
         <p>{{ item.myRole === 'Client' ? 'Oceń pomocnika' : 'Oceń zleceniodawcę' }}: {{ item.otherParty.userName }}</p>
+        @if (item.interruption; as exit) {
+        <p class="interrupted" data-testid="pending-interrupted">Przerwane · {{ exitText(exit) }}</p>
+        }
       </ion-label>
       <ion-button slot="end" (click)="rate(item)" [disabled]="busy()">Oceń</ion-button>
     </ion-item>
@@ -101,6 +104,9 @@
           &#64;{{ rating.rater.userName }} ·
           <a [routerLink]="['/announcements', rating.announcementId]">{{ rating.announcementTitle }}</a>
         </p>
+        @if (rating.interruption; as exit) {
+        <p class="interrupted" data-testid="received-interrupted">Zlecenie przerwane · {{ exitText(exit) }}</p>
+        }
       </ion-label>
       <ion-note slot="end">{{ rating.createdAt | timeAgo }}</ion-note>
     </ion-item>

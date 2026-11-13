@@ -39,13 +39,16 @@ porada). **Pomocnik (Helper)**, który zna się na rzeczy i najlepiej przejeżd�
 - `Notification` (`Entities/Notifications`): powstaje w tle z outboksa. `AnnouncementAlert` (`Entities/Alerts`): obszar / trasa.
 
 ## Przepływ statusów
-Announcement: `Open` → (AcceptOffer) `Accepted` → (Start) `InProgress` → (Complete) `Completed`; `Open`/`Accepted` → `Cancelled`.
-Offer: `Pending` → `Accepted` | `Rejected` | `Withdrawn` | `Countered` (zastąpiona kontrofertą) | `Revised` (autor zaktualizował nieaktualną).
+Announcement: `Open` → (AcceptOffer) `Accepted` → (Start) `InProgress` → (Complete) `Completed`; `Open`/`Accepted` → `Cancelled`;
+F11 E: `Accepted` → (Abandon, każda strona, z powodem) `Open`; `InProgress` → (Interrupt) `Interrupted` (końcowy, z ocenami).
+Offer: `Pending` → `Accepted` | `Rejected` | `Withdrawn` | `Countered` (zastąpiona kontrofertą) | `Revised` (autor zaktualizował nieaktualną);
+`Accepted` → `Abandoned` (zlecenie zerwane przed startem – ten pomocnik nie złoży już oferty, jego wątek tylko do odczytu).
 Akceptuje/odrzuca/kontruje **druga strona** niż autor oferty; wycofuje tylko autor. Oferty tylko w `Open`; po akceptacji pozostałe
 `Pending` → `Rejected`. Oferta sprzed ostatniej edycji jest nieaktualna (`IsOutdated`) – nie da się jej przyjąć; druga strona może kontrować,
 autor – zmienić każdą swoją oczekującą (`ReviseOffer`, `POST …/offers/{id}/revise`).
 `Start` – tylko zaakceptowany pomocnik; `ReportDone` (InProgress, raz, `DoneReportedAt`) – pomocnik; `Complete` (z Accepted lub
-InProgress) i `Cancel` – właściciel; Start / ReportDone / Complete → powiadomienia `Job*`. Ocena tylko po `Completed`, przez uczestnika.
+InProgress) i `Cancel` – właściciel; Start / ReportDone / Complete / Abandon / Interrupt → powiadomienia `Job*`. Ocena po `Completed`
+albo `Interrupted`, przez uczestnika. Publiczne liczniki rezygnacji / przerwań: `GET api/users/{id}/reliability`.
 
 ## Gdzie co leży
 `docs/`: `ARCHITEKTURA.md` (szczegóły obszarów), `PLAN-NEGOCJACJE.md` (Kroki 9–12), `PLAN-POWIADOMIENIA.md` (Kroki 13–17),
@@ -116,7 +119,9 @@ cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /ap
   hub + push, zmiana każdej oczekującej oferty, Start tylko pomocnik, `ReportDone` + potwierdzenie, powiadomienia `Job*`,
   „Zakończone” zwinięte; `verify.cmd`: dotnet 532/532, Vitest 295/295). **F zrobione 13.11.2026** (bez „nieaktualna”: podgląd zmian +
   „Podtrzymuję ofertę”, ekran „Oceny” + `api/me/ratings`, filtry i układ „Szukaj”, dzwonek w `/conversations/all`;
-  `verify.cmd`: dotnet 536/536, Vitest 322/322). Zostało: **E** (rezygnacja / przerwanie zlecenia).
+  `verify.cmd`: dotnet 536/536, Vitest 322/322). **E zrobione 13.11.2026** (Zrezygnuj → Open / Przerwij → `Interrupted`
+  z powodem, `JobExits`, oceny po przerwaniu, „Wystaw ponownie”, liczniki `api/users/{id}/reliability`; `verify.cmd`:
+  dotnet 574/574, Vitest 342/342). Zostało: test ręczny E, potem test z ludźmi.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)

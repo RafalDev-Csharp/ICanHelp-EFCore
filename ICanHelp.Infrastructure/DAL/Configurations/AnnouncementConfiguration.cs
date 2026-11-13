@@ -82,6 +82,13 @@ internal sealed class AnnouncementConfiguration : IEntityTypeConfiguration<Annou
             .OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(x => x.Changes).UsePropertyAccessMode(PropertyAccessMode.Field);
 
+        // F11 E: abandonments / the interruption of the job.
+        builder.HasMany(x => x.JobExits)
+            .WithOne()
+            .HasForeignKey(e => e.AnnouncementId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(x => x.JobExits).UsePropertyAccessMode(PropertyAccessMode.Field);
+
         // The accepted offer. NoAction, because offers are already removed by the cascade above.
         builder.HasOne<Offer>()
             .WithMany()

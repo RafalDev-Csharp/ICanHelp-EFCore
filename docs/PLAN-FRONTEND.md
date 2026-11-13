@@ -449,28 +449,64 @@ Zrobione F (13.11.2026), decyzje:
   „Czeka na odpowiedź pomocnika”) → pomocnik „Zobacz zmiany” → „Podtrzymuję ofertę” → zleceniodawca „podtrzymał ofertę –
   zobacz aktualną” → przyjmuje; ekran „Oceny” po zakończeniu; układ „Szukaj” na niskim telefonie.
 
-**E. Rezygnacja i przerwanie zlecenia (reguła domeny)** – po D
+**E. Rezygnacja i przerwanie zlecenia (reguła domeny)** – zrobione 13.11.2026 (opis niżej)
 Aplikacja nie obsługuje pieniędzy – nie rozstrzyga sporów; daje każdej stronie legalne wyjście, zapisuje co i dlaczego,
 pokazuje to innym (historia, licznik, oceny). Ustalone z autorem 13.11.2026:
-- [ ] **Przed rozpoczęciem (`Accepted`) – „Zrezygnuj”** (każda strona): obowiązkowy powód (lista: „nie mogę w tym
+- [x] **Przed rozpoczęciem (`Accepted`) – „Zrezygnuj”** (każda strona): obowiązkowy powód (lista: „nie mogę w tym
       terminie”, „warunki inne niż w ogłoszeniu”, „brak kontaktu”, „inny” + opis). Ogłoszenie **wraca do `Open`**
       (`AcceptedOfferId` = null), przyjęta oferta → nowy status „Zerwana” (np. `OfferStatus.Abandoned`). **Bez ocen.**
       Druga strona dostaje powiadomienie z powodem.
-- [ ] **W trakcie (`InProgress`) – „Przerwij zlecenie”** (każda strona): obowiązkowy powód (lista jw. + „konflikt / nie
+- [x] **W trakcie (`InProgress`) – „Przerwij zlecenie”** (każda strona): obowiązkowy powód (lista jw. + „konflikt / nie
       dogadaliśmy się”). Ogłoszenie → nowy status końcowy **`Interrupted`** („Przerwane”), nie wraca do `Open`.
       **Obie strony mogą się ocenić** (`CreateRating` z `Completed` lub `Interrupted`), przy ocenie widać, że zlecenie
       przerwano i dlaczego. Rozmowa tylko do odczytu. Notka: „Ustalcie między sobą rozliczenie za wykonaną część.”
-- [ ] **„Wystaw ponownie”** (zleceniodawca, po przerwaniu): nowe ogłoszenie z formularzem wypełnionym kopią (sam front,
+- [x] **„Wystaw ponownie”** (zleceniodawca, po przerwaniu): nowe ogłoszenie z formularzem wypełnionym kopią (sam front,
       `/add` z danymi; zdjęć nie kopiujemy – do dodania od nowa).
-- [ ] **Zapis i licznik**: każda rezygnacja / przerwanie zapisana w agregacie (kto, kiedy, etap, powód, opis – jak
+- [x] **Zapis i licznik**: każda rezygnacja / przerwanie zapisana w agregacie (kto, kiedy, etap, powód, opis – jak
       `Changes`), widoczna w historii ogłoszenia i wątku. Przy profilu użytkownika licznik „N rezygnacji / przerwanych
       zleceń” – **widoczny dla wszystkich**.
-- [ ] Propozycja do potwierdzenia przy realizacji: pomocnik, który zrezygnował / z którego zrezygnowano, nie składa
+- [x] Propozycja do potwierdzenia przy realizacji: pomocnik, który zrezygnował / z którego zrezygnowano, nie składa
       ponownie oferty do tego samego ogłoszenia; jego wątek staje się tylko do odczytu.
 - Powiadomienia, teksty, testy Core/Application/Api/Vitest, `.http`, migracja (nowe statusy to tekst – bez zmian
   kolumn; nowa tabela / kolumny na wpisy rezygnacji).
 - Później (po teście z ludźmi): „Zgłoś problem” do administratora (moderacja, panel), blokowanie użytkownika, limit
   rezygnacji (np. ostrzeżenie po 3 w miesiącu).
+
+Zrobione E (13.11.2026), decyzje:
+- Potwierdzone z autorem przy realizacji: pomocnik po zerwanym zleceniu (rezygnował on albo zleceniodawca) **nie składa
+  ponownie oferty** do tego ogłoszenia (`AddOffer` / `StartConversation` → 409), jego wątek jest tylko do odczytu
+  (`AllowsConversationWith` w Open → false). Licznik – w szczegółach przy zleceniodawcy, u właściciela przy każdym
+  pomocniku z listy negocjacji i w nagłówku wątku (druga strona).
+- Domena: `Announcement.Abandon(actor, reason, note?, at)` (Accepted, właściciel albo przyjęty pomocnik → Open,
+  `AcceptedOfferId` = null, oferta → nowy `OfferStatus.Abandoned` „Zerwana”, `DoneReportedAt` = null) i `Interrupt(...)`
+  (InProgress → nowy końcowy `AnnouncementStatus.Interrupted` „Przerwane”; oferta zostaje `Accepted`, więc uczestnicy
+  i kontakt działają dalej). Wpis w agregacie: `JobExit` (jak `Changes`; tabela `JobExits`, klucz (AnnouncementId,
+  Number), migracja `JobExits` – czysta). Powód: `JobExitReason` CannotMakeIt / TermsDiffer / NoContact / Disagreement
+  (tylko przerwanie) / Other (wymaga opisu) – zły → `InvalidJobExitException` (400). `CreateRating` z Completed lub
+  Interrupted; po rezygnacji – bez ocen. Odrzucone wcześniej oferty innych pomocników zostają odrzucone – po powrocie
+  do Open mogą złożyć nowe (bez osobnego powiadomienia „ogłoszenie znów otwarte” – do rozważenia).
+- Zdarzenia `JobAbandoned` / `JobInterrupted` → powiadomienia o tych samych nazwach dla drugiej strony: „Pomocnik /
+  Zleceniodawca zrezygnował ze zlecenia” / „… przerwał zlecenie”, treść „Tytuł – powód: brak kontaktu (opis)”, link do
+  wątku; ikony `exit-outline` / `stop-circle-outline`.
+- API: `POST api/announcements/{id}/abandon` i `…/interrupt` (body `{ reason, note? }`, 204), `jobExits` w szczegółach
+  (widoczność jak oferty: właściciel – wszystkie, pomocnik – swoje, inni – nic; licznik jest publiczny), wpis `JobExit`
+  w osi czasu wątku, `interruption` w `api/me/ratings` i `…/pending` (do wystawienia także przerwane), kontakt po
+  przerwaniu, publiczne `GET api/users/{id}/reliability` (`abandonedCount`, `interruptedCount` – liczą się tylko wyjścia
+  zrobione samemu, nie te, w których zrezygnowała druga strona). Przykłady w `.http`.
+- Front: `job-step` dostaje `exit` (Accepted → „Zrezygnuj”, InProgress → „Przerwij zlecenie”, obie strony; czerwony
+  przycisk „clear” pod krokiem zlecenia w wątku i w stopce szczegółów), okno `JobExitModalComponent` (lista powodów
+  + opis, tekst o skutkach) → `OffersService.exitJob`. Wątek: wpis „Zleceniodawca zrezygnował ze zlecenia · data ·
+  Powód: …”, po zerwaniu „Zlecenie zerwane przed rozpoczęciem – rozmowa jest tylko do odczytu”, bez „Złóż ofertę”; po
+  przerwaniu notka „Ustalcie między sobą rozliczenie za wykonaną część.” Szczegóły: po przerwaniu notka z powodem,
+  „Oceń…” i u właściciela „Wystaw ponownie” → `/add?copyOf=<id>` (formularz z kopią, bez zdjęć – toast, potem adres
+  bez `copyOf`); „Historia ogłoszenia” – „Rezygnacja / Przerwanie (kto): powód”; pomocnik po zerwaniu – „Zlecenie
+  zerwane – nie złożysz już oferty”. „Zlecenia”: Interrupted i wątek z ofertą `Abandoned` → „Zakończone”. „Oceny”:
+  przy przerwanym zleceniu „Przerwane · Pomocnik: Brak kontaktu”.
+- 13.11.2026 `verify.cmd`: dotnet 574/574 (Core 247, Application 215, integracyjne 112), `npm run api`, lint + Vitest
+  342/342 + build. Pierwszy przebieg: NSwag spłaszczył `JobExitCommand` i oznaczył `interruption` jako wymagane – poprawione.
+- Do sprawdzenia ręcznie (Chrome ↔ Brave): przyjęcie → pomocnik „Zrezygnuj” (powód) → zleceniodawca dostaje push,
+  ogłoszenie znów w „Szukaj”, pomocnik nie może złożyć oferty; drugi pomocnik → „Rozpocznij” → zleceniodawca „Przerwij
+  zlecenie” → obie strony oceniają, „Wystaw ponownie”.
 
 ## Krok F10 – wdrożenie i wymagania przed testem z ludźmi
 

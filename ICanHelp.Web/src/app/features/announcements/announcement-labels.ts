@@ -11,6 +11,7 @@ const STATUS_LABELS: Readonly<Record<string, string>> = {
   InProgress: 'W realizacji',
   Completed: 'Zakończone',
   Cancelled: 'Anulowane',
+  Interrupted: 'Przerwane',
 };
 
 const STATUS_COLORS: Readonly<Record<string, string>> = {
@@ -19,6 +20,7 @@ const STATUS_COLORS: Readonly<Record<string, string>> = {
   InProgress: 'warning',
   Completed: 'medium',
   Cancelled: 'danger',
+  Interrupted: 'danger',
 };
 
 const DIFFICULTY_COLORS: Readonly<Record<string, string>> = {

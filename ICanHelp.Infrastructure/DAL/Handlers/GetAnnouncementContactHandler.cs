@@ -27,9 +27,11 @@ internal sealed class GetAnnouncementContactHandler : IQueryHandler<GetAnnouncem
             .Include(a => a.Offers)
             .SingleOrDefaultAsync(a => a.Id == id, cancellationToken);
 
-        // Kontakt dopiero po akceptacji oferty (anulowane i otwarte – nie).
+        // Kontakt dopiero po akceptacji oferty (anulowane i otwarte – nie). Po przerwaniu (F11 E) – tak: strony
+        // rozliczają się między sobą za wykonaną część.
         if (announcement is null || announcement.Status is not
-                (AnnouncementStatus.Accepted or AnnouncementStatus.InProgress or AnnouncementStatus.Completed))
+                (AnnouncementStatus.Accepted or AnnouncementStatus.InProgress or AnnouncementStatus.Completed
+                or AnnouncementStatus.Interrupted))
         {
             return null;
         }

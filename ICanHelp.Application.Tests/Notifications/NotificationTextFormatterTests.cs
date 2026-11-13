@@ -48,6 +48,36 @@ public class NotificationTextFormatterTests
     }
 
     [Fact]
+    public void JobAbandoned_ByHelper_TitleAndReason()
+        => Format(NotificationType.JobAbandoned, (NotificationPayload.AnnouncementTitle, Title),
+                (NotificationPayload.ActorRole, "Helper"), (NotificationPayload.ExitReason, "CannotMakeIt"))
+            .ShouldBe(new NotificationText("Pomocnik zrezygnował ze zlecenia",
+                $"{Title} – powód: nie mogę w tym terminie"));
+
+    [Fact]
+    public void JobInterrupted_ByOwner_OtherReason_ShowsNote()
+        => Format(NotificationType.JobInterrupted, (NotificationPayload.AnnouncementTitle, Title),
+                (NotificationPayload.ActorRole, "Client"), (NotificationPayload.ExitReason, "Other"),
+                (NotificationPayload.Note, "Zalał łazienkę."))
+            .ShouldBe(new NotificationText("Zleceniodawca przerwał zlecenie", $"{Title} – powód: Zalał łazienkę."));
+
+    [Fact]
+    public void JobInterrupted_ReasonWithNote_ShowsBoth()
+        => Format(NotificationType.JobInterrupted, (NotificationPayload.AnnouncementTitle, Title),
+                (NotificationPayload.ActorRole, "Helper"), (NotificationPayload.ExitReason, "Disagreement"),
+                (NotificationPayload.Note, "Inny zakres."))
+            .Body.ShouldBe($"{Title} – powód: konflikt / nie dogadaliśmy się (Inny zakres.)");
+
+    [Theory]
+    [InlineData(NotificationType.JobAbandoned)]
+    [InlineData(NotificationType.JobInterrupted)]
+    public void JobExit_LinkToConversation(NotificationType type)
+    {
+        var conversationId = Guid.NewGuid();
+        NotificationTextFormatter.Link(type, Guid.NewGuid(), conversationId).ShouldBe($"/conversations/{conversationId}");
+    }
+
+    [Fact]
     public void Offer_WithoutPrice_TitleOnly()
         => Format(NotificationType.OfferReceived, (NotificationPayload.AnnouncementTitle, Title))
             .Title.ShouldBe("Nowa oferta");

@@ -128,6 +128,12 @@
         <p>{{ person.city }} · w serwisie od {{ parseApiDate(person.createdAt) | date: 'MMMM yyyy' }}</p>
       </ion-label>
     </ion-item>
+    @if (ownerReliability(); as reliability) {
+    <ion-item class="reliability">
+      <ion-icon name="warning-outline" slot="start" color="warning" aria-hidden="true"></ion-icon>
+      <ion-label class="ion-text-wrap">{{ reliability }}</ion-label>
+    </ion-item>
+    }
     <ion-item [lines]="recentReviews().length > 0 ? 'inset' : 'none'">
       <ion-icon name="star" slot="start" color="warning" aria-hidden="true"></ion-icon>
       @if (ratingSummary(); as rating) {
@@ -208,6 +214,10 @@
         <p>{{ formatOfferTerm(offer.proposedStart, offer.proposedEnd) }}</p>
         } @else {
         <p>Na razie tylko wiadomości</p>
+        } @if (isOwner() && helperReliability().get(negotiation.helperId); as reliability) {
+        <p class="reliability">
+          <ion-icon name="warning-outline" color="warning" aria-hidden="true"></ion-icon> {{ reliability }}
+        </p>
         }
       </ion-label>
       @if (negotiation.unreadCount > 0) {
@@ -225,11 +235,7 @@
     </ion-list-header>
     @for (entry of history(); track entry.key; let last = $last) {
     <ion-item [lines]="last ? 'none' : 'inset'">
-      <ion-icon
-        [name]="entry.kind === 'offer' ? 'pricetag-outline' : 'create-outline'"
-        slot="start"
-        aria-hidden="true"
-      ></ion-icon>
+      <ion-icon [name]="historyIcons[entry.kind]" slot="start" aria-hidden="true"></ion-icon>
       <ion-label class="ion-text-wrap">{{ entry.text }}</ion-label>
       <ion-note slot="end">{{ entry.at | timeAgo }}</ion-note>
     </ion-item>
@@ -241,17 +247,31 @@
 @if (state() === 'ready') {
 <ion-footer>
   <ion-toolbar>
-    @if (isParticipant() && status() === 'Completed') { @if (rated()) {
+    @if (isParticipant() && rateable()) { @if (interruption(); as exit) {
+    <p class="job-note page-column interrupted-note">
+      <ion-icon name="stop-circle-outline" aria-hidden="true"></ion-icon>
+      {{ exit.title }} – {{ exit.reason }}. {{ interruptedNote }}
+    </p>
+    } @if (rated() && !(isOwner() && interruption())) {
     <p class="footer-note">
       <ion-icon name="checkmark-done-outline" aria-hidden="true"></ion-icon>
-      Zlecenie zakończone · dziękujemy za ocenę.
+      {{ interruption() ? 'Zlecenie przerwane' : 'Zlecenie zakończone' }} · dziękujemy za ocenę.
     </p>
     } @else {
     <div class="actions page-column">
+      @if (isOwner() && interruption()) {
+      <ion-button fill="outline" class="republish-action" (click)="republish()">
+        <ion-icon name="copy-outline" slot="start" aria-hidden="true"></ion-icon>
+        Wystaw ponownie
+      </ion-button>
+      } @if (!rated()) {
       <ion-button class="primary-action" (click)="rate()" [disabled]="busy()">
         <ion-icon name="star-outline" slot="start" aria-hidden="true"></ion-icon>
         {{ isOwner() ? 'Oceń pomocnika' : 'Oceń zleceniodawcę' }}
       </ion-button>
+      } @else {
+      <p class="footer-note primary-action">Dziękujemy za ocenę.</p>
+      }
     </div>
     } } @else if (isParticipant() && (status() === 'Accepted' || status() === 'InProgress')) { @if (job().note; as note)
     {
@@ -284,7 +304,18 @@
       </ion-button>
       }
     </div>
-    } @else if (isOwner()) { @if (isOpen()) {
+    @if (job().exit; as exit) {
+    <div class="actions page-column">
+      <ion-button fill="clear" color="danger" size="small" class="job-exit" (click)="exitJob()" [disabled]="busy()">
+        <ion-icon
+          [name]="exit === 'abandon' ? 'exit-outline' : 'stop-circle-outline'"
+          slot="start"
+          aria-hidden="true"
+        ></ion-icon>
+        {{ exitLabels[exit] }}
+      </ion-button>
+    </div>
+    } } @else if (isOwner()) { @if (isOpen()) {
     <div class="actions page-column">
       <ion-button fill="outline" color="danger" (click)="cancel()" [disabled]="cancelling()">
         <ion-icon name="close-circle-outline" slot="start" aria-hidden="true"></ion-icon>
@@ -297,7 +328,17 @@
     </div>
     } @else {
     <p class="footer-note">{{ statusLabel(status()) }} · to Twoje ogłoszenie.</p>
-    } } @else if (isOpen()) {
+    } } @else if (myAbandonment()) {
+    <div class="actions page-column">
+      <p class="footer-note primary-action abandoned-note">
+        <ion-icon name="exit-outline" aria-hidden="true"></ion-icon>
+        Zlecenie zerwane – nie złożysz już oferty do tego ogłoszenia.
+      </p>
+      @if (myConversationId()) {
+      <ion-button fill="clear" (click)="writeMessage()">Rozmowa</ion-button>
+      }
+    </div>
+    } @else if (isOpen()) {
     <div class="actions page-column">
       <ion-button fill="outline" class="ask-action" (click)="writeMessage()" [disabled]="busy()">
         <ion-icon

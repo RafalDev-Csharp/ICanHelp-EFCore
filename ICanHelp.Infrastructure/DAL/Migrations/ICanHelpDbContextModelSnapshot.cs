@@ -268,6 +268,52 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                     b.ToTable("Images");
                 });
 
+            modelBuilder.Entity("ICanHelp.Core.Entities.JobExit", b =>
+                {
+                    b.Property<Guid>("AnnouncementId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActorParty")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("HelperId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("OfferId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("AnnouncementId", "Number");
+
+                    b.HasIndex("ActorId");
+
+                    b.ToTable("JobExits");
+                });
+
             modelBuilder.Entity("ICanHelp.Core.Entities.Liked.LikedAnnouncement", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -773,6 +819,21 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ICanHelp.Core.Entities.JobExit", b =>
+                {
+                    b.HasOne("ICanHelp.Core.Entities.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ICanHelp.Core.Entities.Announcement", null)
+                        .WithMany("JobExits")
+                        .HasForeignKey("AnnouncementId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("ICanHelp.Core.Entities.Liked.LikedAnnouncement", b =>
                 {
                     b.HasOne("ICanHelp.Core.Entities.Announcement", null)
@@ -973,6 +1034,8 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                     b.Navigation("Changes");
 
                     b.Navigation("Images");
+
+                    b.Navigation("JobExits");
 
                     b.Navigation("Offers");
                 });

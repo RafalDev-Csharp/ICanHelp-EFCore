@@ -23,7 +23,7 @@ import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { NotificationsBellComponent } from '../../shared/components/notifications-bell/notifications-bell.component';
 
 import type { PhotoItem } from './form/announcement-form';
-import { createAnnouncementForm, toCreateCommand } from './form/announcement-form';
+import { createAnnouncementForm, formValueOf, toCreateCommand } from './form/announcement-form';
 import { AnnouncementFormComponent } from './form/announcement-form.component';
 import { releasePhotos } from './form/photo-picker.component';
 import { syncPhotos } from './form/photo-upload';
@@ -31,6 +31,8 @@ import { syncPhotos } from './form/photo-upload';
 /**
  * Nowe ogłoszenie (zakładka „Dodaj”, tylko zalogowani): formularz → `POST api/announcements` → zdjęcia po kolei
  * → szczegóły nowego ogłoszenia. Zakładka zostaje w pamięci, więc po sukcesie czyścimy formularz.
+ * F11 E: `/add?copyOf=<id>` („Wystaw ponownie” po przerwanym zleceniu) – formularz wypełniony kopią ogłoszenia
+ * (kategoria, trudność, tytuł, opis, budżet, miejsce); zdjęć nie kopiujemy – dodaje się je od nowa.
  */
 @Component({
   selector: 'app-add-announcement',
@@ -64,6 +66,27 @@ export class AddAnnouncementPage implements ViewWillEnter {
 
   ionViewWillEnter(): void {
     this.categories.load().subscribe({ error: () => undefined });
+    const copyOf = this.router.parseUrl(this.router.url).queryParams['copyOf'];
+    if (typeof copyOf === 'string' && copyOf) {
+      this.fillCopyOf(copyOf);
+    }
+  }
+
+  /** Kopia ogłoszenia do formularza; potem adres bez `copyOf` (ponowne wejście w zakładkę nie nadpisze zmian). */
+  private fillCopyOf(announcementId: string): void {
+    this.client.getById(announcementId).subscribe({
+      next: (announcement) => {
+        releasePhotos(this.photos());
+        this.photos.set([]);
+        this.form.reset(formValueOf(announcement));
+        this.location.set(announcement.location);
+        this.submitted.set(false);
+        void this.toast.info('Formularz wypełniony kopią ogłoszenia – zdjęcia dodaj od nowa.');
+        void this.router.navigate(['/add'], { replaceUrl: true });
+      },
+      // Błąd pokazał interceptor – zostaje pusty formularz.
+      error: () => undefined,
+    });
   }
 
   submit(): void {

@@ -267,7 +267,39 @@ public sealed class AnnouncementsController : ControllerBase
         [FromServices] ICommandHandler<CompleteAnnouncement> handler, CancellationToken cancellationToken)
         => Execute(userId => new CompleteAnnouncement(announcementId, userId), handler, cancellationToken);
 
-    /// <summary>Ocena drugiej strony po zakończeniu (raz na ogłoszenie; ocenianego wybiera domena).</summary>
+    /// <summary>
+    /// F11 E: „Zrezygnuj” przed rozpoczęciem (status Accepted, właściciel albo przyjęty pomocnik). Powód obowiązkowy
+    /// (<c>Other</c> – z opisem, <c>Disagreement</c> – tylko przy przerwaniu → 400). Ogłoszenie wraca do Open, przyjęta
+    /// oferta → Abandoned, ten pomocnik nie złoży już oferty, jego wątek – tylko do odczytu. Bez ocen.
+    /// Druga strona dostaje powiadomienie JobAbandoned.
+    /// </summary>
+    [HttpPost("{announcementId:guid}/abandon")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public Task<IActionResult> Abandon(Guid announcementId, [FromBody] AbandonJob command,
+        [FromServices] ICommandHandler<AbandonJob> handler, CancellationToken cancellationToken)
+        => Execute(userId => command with { AnnouncementId = announcementId, ActorId = userId }, handler,
+            cancellationToken);
+
+    /// <summary>
+    /// F11 E: „Przerwij zlecenie” w trakcie (status InProgress, każda strona). Powód obowiązkowy. Status końcowy
+    /// Interrupted – rozmowa tylko do odczytu, obie strony mogą się ocenić. Druga strona dostaje JobInterrupted.
+    /// </summary>
+    [HttpPost("{announcementId:guid}/interrupt")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public Task<IActionResult> Interrupt(Guid announcementId, [FromBody] InterruptJob command,
+        [FromServices] ICommandHandler<InterruptJob> handler, CancellationToken cancellationToken)
+        => Execute(userId => command with { AnnouncementId = announcementId, ActorId = userId }, handler,
+            cancellationToken);
+
+    /// <summary>Ocena drugiej strony po zakończeniu albo przerwaniu (raz na ogłoszenie; ocenianego wybiera domena).</summary>
     [HttpPost("{announcementId:guid}/ratings")]
     [Authorize]
     [ProducesResponseType<CreatedDto>(StatusCodes.Status201Created)]

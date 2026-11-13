@@ -29,6 +29,7 @@ const OFFER_STATUS_LABELS: Readonly<Record<string, string>> = {
   Withdrawn: 'Wycofana',
   Countered: 'Kontroferta',
   Revised: 'Zaktualizowana',
+  Abandoned: 'Zerwana',
 };
 
 const OFFER_STATUS_COLORS: Readonly<Record<string, string>> = {
@@ -38,6 +39,7 @@ const OFFER_STATUS_COLORS: Readonly<Record<string, string>> = {
   Withdrawn: 'medium',
   Countered: 'medium',
   Revised: 'medium',
+  Abandoned: 'danger',
 };
 
 const PARTY_LABELS: Readonly<Record<string, string>> = {

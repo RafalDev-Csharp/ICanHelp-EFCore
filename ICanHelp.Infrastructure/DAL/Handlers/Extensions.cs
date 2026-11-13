@@ -63,7 +63,30 @@ internal static class Extensions
             HelperCount = entity.Offers.Select(o => o.HelperId).Distinct().Count(),
             IsLiked = isLiked,
             Images = entity.Images.OrderBy(i => i.AddedAt).ThenBy(i => i.Id.Value).Select(i => i.AsDto()).ToList(),
-            Changes = entity.Changes.OrderBy(c => c.Revision).Select(c => c.AsDto()).ToList()
+            Changes = entity.Changes.OrderBy(c => c.Revision).Select(c => c.AsDto()).ToList(),
+            JobExits = entity.GetJobExitsVisibleTo(viewerId).Select(e => e.AsDto()).ToList()
+        };
+
+    /// <summary>F11 E: like offers – the owner sees all exits, a helper only those of his own job, others none.</summary>
+    private static IEnumerable<JobExit> GetJobExitsVisibleTo(this Announcement entity, UserId? viewerId)
+        => viewerId is null
+            ? []
+            : entity.JobExits
+                .Where(e => viewerId == entity.OwnerId || e.HelperId == viewerId)
+                .OrderBy(e => e.Number);
+
+    public static JobExitDto AsDto(this JobExit entity)
+        => new()
+        {
+            Number = entity.Number,
+            Kind = entity.Kind.ToString(),
+            OfferId = entity.OfferId,
+            HelperId = entity.HelperId,
+            ActorId = entity.ActorId,
+            ActorRole = entity.ActorParty.ToString(),
+            Reason = entity.Reason.ToString(),
+            Note = entity.Note?.Value,
+            OccurredAt = entity.OccurredAt
         };
 
     /// <summary>The announcement is needed to tell whether it changed after the offer (warning in the UI).</summary>
@@ -125,6 +148,15 @@ internal static class Extensions
                 Change = c.AsDto()
             });
 
+        var exits = announcement.JobExits
+            .Where(e => e.HelperId == entity.HelperId)
+            .Select(e => new ConversationEntryDto
+            {
+                Type = ConversationEntryDto.JobExitType,
+                At = e.OccurredAt,
+                JobExit = e.AsDto()
+            });
+
         return new ConversationDto
         {
             Id = entity.Id,
@@ -142,13 +174,14 @@ internal static class Extensions
             UnreadCount = entity.CountUnread(readerId),
             CanWrite = announcement.AllowsConversationWith(entity.HelperId),
             // Przy tym samym czasie: najpierw zmiana ogłoszenia, potem oferta, potem wiadomość (przyczyna przed reakcją).
-            Timeline = changes.Concat(offers).Concat(messages)
+            Timeline = changes.Concat(offers).Concat(exits).Concat(messages)
                 .OrderBy(e => e.At)
                 .ThenBy(e => e.Type switch
                 {
                     ConversationEntryDto.AnnouncementChangedType => 0,
                     ConversationEntryDto.OfferType => 1,
-                    _ => 2
+                    ConversationEntryDto.JobExitType => 2,
+                    _ => 3
                 })
                 .ToList()
         };

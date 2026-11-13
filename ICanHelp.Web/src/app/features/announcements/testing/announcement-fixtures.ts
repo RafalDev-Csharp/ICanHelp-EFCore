@@ -30,7 +30,7 @@ export function announcementDetails(
   id: string,
   overrides: Partial<AnnouncementDetailsDto> = {},
 ): AnnouncementDetailsDto {
-  return { ...announcement(id), offers: [], isLiked: false, images: [], changes: [], ...overrides };
+  return { ...announcement(id), offers: [], isLiked: false, images: [], changes: [], jobExits: [], ...overrides };
 }
 
 /** `n` ogłoszeń o kolejnych id z prefiksem. */

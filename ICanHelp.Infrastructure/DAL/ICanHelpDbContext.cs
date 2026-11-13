@@ -21,6 +21,7 @@ public sealed class ICanHelpDbContext : DbContext
     public DbSet<Offer> Offers => Set<Offer>();
     public DbSet<Image> Images => Set<Image>();
     public DbSet<AnnouncementChange> AnnouncementChanges => Set<AnnouncementChange>();
+    public DbSet<JobExit> JobExits => Set<JobExit>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Subcategory> Subcategories => Set<Subcategory>();
@@ -104,6 +105,8 @@ public sealed class ICanHelpDbContext : DbContext
         configurationBuilder.Properties<NotificationType>().HaveConversion<string>().HaveMaxLength(40);
         configurationBuilder.Properties<AlertKind>().HaveConversion<string>().HaveMaxLength(20);
         configurationBuilder.Properties<DevicePlatform>().HaveConversion<string>().HaveMaxLength(20);
+        configurationBuilder.Properties<JobExitKind>().HaveConversion<string>().HaveMaxLength(20);
+        configurationBuilder.Properties<JobExitReason>().HaveConversion<string>().HaveMaxLength(20);
         // [Flags] as text, e.g. "Workdays" or "Monday, Saturday".
         configurationBuilder.Properties<WeekDays>().HaveConversion<string>().HaveMaxLength(100);
         // [Flags] enum as text, e.g. "Description, Budget" (Enum.Parse reads it back).

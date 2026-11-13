@@ -1,3 +1,5 @@
+using ICanHelp.Core.Enums;
+
 namespace ICanHelp.Core.Events;
 
 // F11 D: realizacja zlecenia (po przyjęciu oferty). Każde zdarzenie zna obie strony – handler wybiera odbiorcę bez wczytywania.
@@ -21,4 +23,26 @@ public sealed record JobCompleted(
     Guid AnnouncementId,
     Guid OwnerId,
     Guid HelperId,
+    DateTime OccurredAt) : IDomainEvent;
+
+/// <summary>F11 E: one side abandoned the job before the start (Accepted → Open). The other side gets the reason.</summary>
+public sealed record JobAbandoned(
+    Guid AnnouncementId,
+    Guid OwnerId,
+    Guid HelperId,
+    Guid ActorId,
+    OfferParty ActorParty,
+    JobExitReason Reason,
+    string? Note,
+    DateTime OccurredAt) : IDomainEvent;
+
+/// <summary>F11 E: one side interrupted the work (InProgress → Interrupted). Both sides can rate each other.</summary>
+public sealed record JobInterrupted(
+    Guid AnnouncementId,
+    Guid OwnerId,
+    Guid HelperId,
+    Guid ActorId,
+    OfferParty ActorParty,
+    JobExitReason Reason,
+    string? Note,
     DateTime OccurredAt) : IDomainEvent;

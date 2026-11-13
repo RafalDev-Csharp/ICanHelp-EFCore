@@ -193,6 +193,36 @@ public class TransactionNotificationHandlerTests
     }
 
     [Fact]
+    public async Task JobAbandoned_ByHelper_NotifiesOwnerWithReason()
+    {
+        await _handler.HandleAsync(Guid.NewGuid(), new JobAbandoned(_announcement.Id, _owner, _helper, _helper,
+            OfferParty.Helper, JobExitReason.CannotMakeIt, null, Now));
+
+        var notification = _notifications.Notifications.ShouldHaveSingleItem();
+        notification.UserId.ShouldBe(_owner);
+        notification.Type.ShouldBe(NotificationType.JobAbandoned);
+        notification.ConversationId.ShouldBe(_conversation.Id);
+        var parameters = NotificationPayload.Deserialize(notification.Payload);
+        parameters[NotificationPayload.ActorRole].ShouldBe("Helper");
+        parameters[NotificationPayload.ExitReason].ShouldBe("CannotMakeIt");
+        parameters.ContainsKey(NotificationPayload.Note).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task JobInterrupted_ByOwner_NotifiesHelperWithNote()
+    {
+        await _handler.HandleAsync(Guid.NewGuid(), new JobInterrupted(_announcement.Id, _owner, _helper, _owner,
+            OfferParty.Client, JobExitReason.Other, "Zalał łazienkę.", Now));
+
+        var notification = _notifications.Notifications.ShouldHaveSingleItem();
+        notification.UserId.ShouldBe(_helper);
+        notification.Type.ShouldBe(NotificationType.JobInterrupted);
+        var parameters = NotificationPayload.Deserialize(notification.Payload);
+        parameters[NotificationPayload.ActorRole].ShouldBe("Client");
+        parameters[NotificationPayload.Note].ShouldBe("Zalał łazienkę.");
+    }
+
+    [Fact]
     public async Task SameEventTwice_GivesOneNotification_AndOneDelivery()
     {
         var eventId = Guid.NewGuid();

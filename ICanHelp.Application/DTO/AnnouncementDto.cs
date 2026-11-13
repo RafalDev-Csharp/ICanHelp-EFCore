@@ -50,6 +50,12 @@ public sealed record AnnouncementDetailsDto : AnnouncementDto
 
     /// <summary>History of edits, oldest first.</summary>
     public IReadOnlyList<AnnouncementChangeDto> Changes { get; init; } = [];
+
+    /// <summary>
+    /// F11 E: abandonments and the interruption, oldest first – like offers: the owner sees all, a helper only his own,
+    /// anybody else none (everybody sees the counters: <c>GET api/users/{id}/reliability</c>).
+    /// </summary>
+    public IReadOnlyList<JobExitDto> JobExits { get; init; } = [];
 }
 
 /// <summary>One edit of an announcement: which revision it created and what exactly changed.</summary>

@@ -38,16 +38,20 @@ export function clientOrderGroup(announcement: Pick<AnnouncementDto, 'status'>):
 /**
  * „Pomagam”: mój wątek jako pomocnik. Ogłoszenie otwarte = negocjacje (także same pytania); po akceptacji liczy się,
  * czy przyjęto moją ofertę (ostatnia oferta wątku `Accepted`) – jeśli wybrano kogoś innego, wątek jest „Zakończony”.
+ * F11 E: zlecenie zerwane przed startem (moja oferta `Abandoned`) – „Zakończone”, choć ogłoszenie znów jest otwarte.
  */
 export function helperOrderGroup(
   conversation: Pick<MyConversationDto, 'announcementStatus' | 'lastOffer'>,
 ): OrderGroupKey {
+  // Wątek bez ofert (same pytania) – API zwraca `lastOffer: null`, choć typ NSwag tego nie mówi.
+  const lastOffer = conversation.lastOffer as LastOfferDto | null | undefined;
+  if (lastOffer?.status === 'Abandoned') {
+    return 'finished';
+  }
   const group = statusGroup(conversation.announcementStatus);
   if (group === 'negotiating') {
     return group;
   }
-  // Wątek bez ofert (same pytania) – API zwraca `lastOffer: null`, choć typ NSwag tego nie mówi.
-  const lastOffer = conversation.lastOffer as LastOfferDto | null | undefined;
   const mine = lastOffer?.status === 'Accepted';
   return mine ? group : 'finished';
 }

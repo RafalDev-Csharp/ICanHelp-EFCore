@@ -55,6 +55,10 @@ public static class NotificationTextFormatter
                 return new("Pomocnik zgłosił wykonanie – potwierdź", title);
             case NotificationType.JobCompleted:
                 return new("Zlecenie zakończone – możesz ocenić", title);
+            case NotificationType.JobAbandoned:
+                return new($"{ActorLabel(parameters)} zrezygnował ze zlecenia", ExitBody(title, parameters));
+            case NotificationType.JobInterrupted:
+                return new($"{ActorLabel(parameters)} przerwał zlecenie", ExitBody(title, parameters));
             case NotificationType.MessageReceived:
                 return new(title.Length > 0 ? $"Nowa wiadomość: {title}" : "Nowa wiadomość",
                     Get(parameters, NotificationPayload.MessagePreview));
@@ -172,6 +176,41 @@ public static class NotificationTextFormatter
         }
 
         return (negative ? "-" : string.Empty) + grouped + fraction;
+    }
+
+    /// <summary>F11 E: the reasons as in the web app (<c>job-exit.ts</c>).</summary>
+    public static readonly IReadOnlyDictionary<string, string> ExitReasonLabels = new Dictionary<string, string>
+    {
+        [nameof(JobExitReason.CannotMakeIt)] = "nie mogę w tym terminie",
+        [nameof(JobExitReason.TermsDiffer)] = "warunki inne niż w ogłoszeniu",
+        [nameof(JobExitReason.NoContact)] = "brak kontaktu",
+        [nameof(JobExitReason.Disagreement)] = "konflikt / nie dogadaliśmy się",
+        [nameof(JobExitReason.Other)] = "inny"
+    };
+
+    private static string ActorLabel(IReadOnlyDictionary<string, string> parameters)
+        => Get(parameters, NotificationPayload.ActorRole) == nameof(OfferParty.Client) ? "Zleceniodawca" : "Pomocnik";
+
+    // „Cieknący kran – powód: brak kontaktu”; „Inny” → sam opis („powód: Sam naprawiłem.”).
+    private static string ExitBody(string title, IReadOnlyDictionary<string, string> parameters)
+    {
+        var reason = Get(parameters, NotificationPayload.ExitReason);
+        var note = Get(parameters, NotificationPayload.Note);
+        var label = reason == nameof(JobExitReason.Other) && note.Length > 0
+            ? note
+            : ExitReasonLabels.GetValueOrDefault(reason, reason);
+
+        if (reason != nameof(JobExitReason.Other) && note.Length > 0)
+        {
+            label = $"{label} ({note})";
+        }
+
+        if (label.Length == 0)
+        {
+            return title;
+        }
+
+        return title.Length > 0 ? $"{title} – powód: {label}" : $"Powód: {label}";
     }
 
     private static string ChangedFields(string value)

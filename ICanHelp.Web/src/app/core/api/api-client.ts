@@ -963,7 +963,7 @@ export class AnnouncementsClient {
     }
 
     /**
-     * Ocena drugiej strony po zakończeniu (raz na ogłoszenie; ocenianego wybiera domena).
+     * Ocena drugiej strony po zakończeniu albo przerwaniu (raz na ogłoszenie; ocenianego wybiera domena).
      * @param body (optional) 
      * @return Created
      */
@@ -1548,6 +1548,158 @@ export class AnnouncementsClient {
         if (status === 204) {
             return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
             return _observableOf(null as any);
+            }));
+        } else if (status === 404) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Not Found", status, _responseText, _headers, result404);
+            }));
+        } else if (status === 409) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result409: any = null;
+            result409 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Conflict", status, _responseText, _headers, result409);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    /**
+     * F11 E: „Zrezygnuj” przed rozpoczęciem (status Accepted, właściciel albo przyjęty pomocnik). Powód obowiązkowy
+    (`Other` – z opisem, `Disagreement` – tylko przy przerwaniu → 400). Ogłoszenie wraca do Open, przyjęta
+    oferta → Abandoned, ten pomocnik nie złoży już oferty, jego wątek – tylko do odczytu. Bez ocen.
+    Druga strona dostaje powiadomienie JobAbandoned.
+     * @param body (optional) 
+     * @return No Content
+     */
+    abandon(announcementId: string, body?: AbandonJob | undefined): Observable<void> {
+        let url_ = this.baseUrl + "/api/announcements/{announcementId}/abandon";
+        if (announcementId === undefined || announcementId === null)
+            throw new globalThis.Error("The parameter 'announcementId' must be defined.");
+        url_ = url_.replace("{announcementId}", encodeURIComponent("" + announcementId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(body);
+
+        let options_ : any = {
+            body: content_,
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Content-Type": "application/json",
+            })
+        };
+
+        return this.http.request("post", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processAbandon(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processAbandon(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<void>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<void>;
+        }));
+    }
+
+    protected processAbandon(response: HttpResponseBase): Observable<void> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return _observableOf(null as any);
+            }));
+        } else if (status === 400) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result400: any = null;
+            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Bad Request", status, _responseText, _headers, result400);
+            }));
+        } else if (status === 404) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Not Found", status, _responseText, _headers, result404);
+            }));
+        } else if (status === 409) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result409: any = null;
+            result409 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Conflict", status, _responseText, _headers, result409);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    /**
+     * F11 E: „Przerwij zlecenie” w trakcie (status InProgress, każda strona). Powód obowiązkowy. Status końcowy
+    Interrupted – rozmowa tylko do odczytu, obie strony mogą się ocenić. Druga strona dostaje JobInterrupted.
+     * @param body (optional) 
+     * @return No Content
+     */
+    interrupt(announcementId: string, body?: InterruptJob | undefined): Observable<void> {
+        let url_ = this.baseUrl + "/api/announcements/{announcementId}/interrupt";
+        if (announcementId === undefined || announcementId === null)
+            throw new globalThis.Error("The parameter 'announcementId' must be defined.");
+        url_ = url_.replace("{announcementId}", encodeURIComponent("" + announcementId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(body);
+
+        let options_ : any = {
+            body: content_,
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Content-Type": "application/json",
+            })
+        };
+
+        return this.http.request("post", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processInterrupt(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processInterrupt(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<void>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<void>;
+        }));
+    }
+
+    protected processInterrupt(response: HttpResponseBase): Observable<void> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return _observableOf(null as any);
+            }));
+        } else if (status === 400) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result400: any = null;
+            result400 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Bad Request", status, _responseText, _headers, result400);
             }));
         } else if (status === 404) {
             return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
@@ -3715,6 +3867,67 @@ export class UsersClient {
     }
 
     /**
+     * F11 E: publiczne liczniki – ile zleceń użytkownik sam zerwał przed rozpoczęciem (`abandonedCount`)
+    i przerwał w trakcie (`interruptedCount`). Rezygnacja drugiej strony się nie liczy.
+     * @return OK
+     */
+    getReliability(userId: string): Observable<UserReliabilityDto> {
+        let url_ = this.baseUrl + "/api/users/{userId}/reliability";
+        if (userId === undefined || userId === null)
+            throw new globalThis.Error("The parameter 'userId' must be defined.");
+        url_ = url_.replace("{userId}", encodeURIComponent("" + userId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetReliability(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetReliability(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<UserReliabilityDto>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<UserReliabilityDto>;
+        }));
+    }
+
+    protected processGetReliability(response: HttpResponseBase): Observable<UserReliabilityDto> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as UserReliabilityDto;
+            return _observableOf(result200);
+            }));
+        } else if (status === 404) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result404: any = null;
+            result404 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as ProblemDetails;
+            return throwException("Not Found", status, _responseText, _headers, result404);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    /**
      * Oceny, które użytkownik otrzymał – podstawa jego reputacji.
      * @return OK
      */
@@ -3901,6 +4114,11 @@ export class UsersClient {
     }
 }
 
+export interface AbandonJob {
+    reason: JobExitReason;
+    note: string | undefined;
+}
+
 export interface AlertDto {
     id: string;
     name: string;
@@ -3960,6 +4178,7 @@ export interface AnnouncementDetailsDto {
     isLiked: boolean;
     images: ImageDto[];
     changes: AnnouncementChangeDto[];
+    jobExits: JobExitDto[];
 }
 
 export interface AnnouncementDto {
@@ -3989,7 +4208,7 @@ export interface AnnouncementFieldChangeDto {
     newValue: string | undefined;
 }
 
-export type AnnouncementStatus = "Open" | "Accepted" | "InProgress" | "Completed" | "Cancelled";
+export type AnnouncementStatus = "Open" | "Accepted" | "InProgress" | "Completed" | "Cancelled" | "Interrupted";
 
 export interface CategoryDto {
     id: string;
@@ -4029,6 +4248,7 @@ export interface ConversationEntryDto {
     message: MessageDto;
     offer: OfferDto;
     change: AnnouncementChangeDto;
+    jobExit: JobExitDto;
 }
 
 export interface ConversationPartyDto {
@@ -4091,6 +4311,25 @@ export interface ImageDto {
     url: string;
     addedAt: string;
 }
+
+export interface InterruptJob {
+    reason: JobExitReason;
+    note: string | undefined;
+}
+
+export interface JobExitDto {
+    number: number;
+    kind: string;
+    offerId: string;
+    helperId: string;
+    actorId: string;
+    actorRole: string;
+    reason: string;
+    note: string | undefined;
+    occurredAt: string;
+}
+
+export type JobExitReason = "CannotMakeIt" | "TermsDiffer" | "NoContact" | "Disagreement" | "Other";
 
 export interface JwtDto {
     accessToken: string;
@@ -4165,6 +4404,7 @@ export interface MyRatingDto {
     rate: number;
     comment: string | undefined;
     createdAt: string;
+    interruption: JobExitDto;
 }
 
 export interface NotificationDto {
@@ -4208,6 +4448,7 @@ export interface PendingRatingDto {
     myRole: string;
     otherParty: ConversationPartyDto;
     createdAt: string;
+    interruption: JobExitDto;
 }
 
 export interface PriceDto {
@@ -4326,6 +4567,12 @@ export interface UserPublicDto {
     description: string | undefined;
     city: string;
     createdAt: string;
+}
+
+export interface UserReliabilityDto {
+    userId: string;
+    abandonedCount: number;
+    interruptedCount: number;
 }
 
 export type WeekDays = "None" | "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Workdays" | "Saturday" | "Sunday" | "Weekend" | "All";

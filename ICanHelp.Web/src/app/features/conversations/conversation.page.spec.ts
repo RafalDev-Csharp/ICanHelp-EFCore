@@ -16,7 +16,7 @@ import { ConversationPage } from './conversation.page';
 
 describe('ConversationPage', () => {
   const conversations = { getById: vi.fn(), postMessage: vi.fn(), markAsRead: vi.fn() };
-  const users = { getById: vi.fn() };
+  const users = { getById: vi.fn(), getReliability: vi.fn() };
   const offers = {
     make: vi.fn(),
     accept: vi.fn(() => Promise.resolve(true)),
@@ -29,6 +29,7 @@ describe('ConversationPage', () => {
     start: vi.fn(() => Promise.resolve(true)),
     reportDone: vi.fn(() => Promise.resolve(true)),
     complete: vi.fn(() => Promise.resolve(true)),
+    exitJob: vi.fn(() => Promise.resolve(true)),
   };
   const announcements = { getById: vi.fn() };
   const auth = {
@@ -90,6 +91,7 @@ describe('ConversationPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     users.getById.mockReturnValue(of({ id: 'helper-1', fullName: 'Anna Nowak' }));
+    users.getReliability.mockReturnValue(of({ userId: 'helper-1', abandonedCount: 0, interruptedCount: 0 }));
     conversations.markAsRead.mockReturnValue(of(undefined));
     announcements.getById.mockReturnValue(
       of(
@@ -402,5 +404,86 @@ describe('ConversationPage', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('app-empty-state h2')?.textContent).toContain(
       'Nie ma takiej rozmowy',
     );
+  });
+  // ---------- F11 E ----------
+
+  const exitEntry = (overrides = {}): ConversationEntryDto =>
+    ({
+      type: 'JobExit',
+      at: '2026-11-10T10:00:00Z',
+      jobExit: {
+        number: 1,
+        kind: 'Abandoned',
+        offerId: 'o1',
+        helperId: 'helper-1',
+        actorId: 'owner-1',
+        actorRole: 'Client',
+        reason: 'NoContact',
+        note: 'Nie odbiera.',
+        occurredAt: '2026-11-10T10:00:00Z',
+        ...overrides,
+      },
+    }) as ConversationEntryDto;
+
+  it('shows the abandonment in the timeline and closes the thread of that helper', async () => {
+    auth.currentUser.set({ id: 'helper-1' } as UserDto);
+    const { element, render } = create(
+      conversationFixture({
+        canWrite: false,
+        timeline: [offerEntry({ status: 'Abandoned' }), exitEntry()],
+      }),
+    );
+    await render();
+
+    expect(element.querySelector('.change.exit')?.textContent).toContain('Zleceniodawca zrezygnował ze zlecenia');
+    expect(element.querySelector('.change.exit')?.textContent).toContain('Brak kontaktu – Nie odbiera.');
+    const footer = element.querySelector('ion-footer')?.textContent ?? '';
+    expect(footer).toContain('Zlecenie zerwane przed rozpoczęciem');
+    expect(footer).not.toContain('Złóż ofertę');
+    auth.currentUser.set({ id: 'owner-1' } as UserDto);
+  });
+
+  it('lets a participant interrupt the work in progress', async () => {
+    const { page, element, render } = create(
+      conversationFixture({
+        myRole: 'Client',
+        announcementStatus: 'InProgress',
+        timeline: [offerEntry({ status: 'Accepted' })],
+      }),
+    );
+    await render();
+
+    expect(element.querySelector('.job-exit')?.textContent).toContain('Przerwij zlecenie');
+    await page.exitJob();
+    expect(offers.exitJob).toHaveBeenCalledWith('a1', 'interrupt', 'Pomocnik');
+  });
+
+  it('after an interruption shows the settlement note and the read-only reason', async () => {
+    const { element, render } = create(
+      conversationFixture({
+        myRole: 'Client',
+        announcementStatus: 'Interrupted',
+        canWrite: false,
+        timeline: [
+          offerEntry({ status: 'Accepted' }),
+          exitEntry({ kind: 'Interrupted', actorId: 'helper-1', actorRole: 'Helper' }),
+        ],
+      }),
+    );
+    await render();
+
+    const footer = element.querySelector('ion-footer')?.textContent ?? '';
+    expect(footer).toContain('Ustalcie między sobą rozliczenie');
+    expect(footer).toContain('Zlecenie przerwane – rozmowa jest tylko do odczytu');
+    expect(element.querySelector('.job-exit')).toBeNull();
+  });
+
+  it('shows the public counter of the other party', async () => {
+    users.getReliability.mockReturnValue(of({ userId: 'helper-1', abandonedCount: 1, interruptedCount: 0 }));
+    const { element, render } = create(conversationFixture({ myRole: 'Client' }));
+    await render();
+
+    expect(users.getReliability).toHaveBeenCalledWith('helper-1');
+    expect(element.querySelector('.reliability')?.textContent).toContain('Pomocnik: 1 rezygnacja');
   });
 });

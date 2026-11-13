@@ -40,5 +40,11 @@ public enum NotificationType
     JobDoneReported,
 
     /// <summary>F11 D: the owner confirmed the work – the job is completed, I can rate.</summary>
-    JobCompleted
+    JobCompleted,
+
+    /// <summary>F11 E: the other side abandoned the job before the start (with the reason).</summary>
+    JobAbandoned,
+
+    /// <summary>F11 E: the other side interrupted the work (with the reason) – I can rate.</summary>
+    JobInterrupted
 }

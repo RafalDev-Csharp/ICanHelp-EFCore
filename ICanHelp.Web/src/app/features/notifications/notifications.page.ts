@@ -30,6 +30,7 @@ import {
   closeCircleOutline,
   cloudOfflineOutline,
   createOutline,
+  exitOutline,
   flagOutline,
   locationOutline,
   notificationsOutline,
@@ -37,6 +38,7 @@ import {
   pricetagOutline,
   refreshOutline,
   starOutline,
+  stopCircleOutline,
   swapHorizontalOutline,
 } from 'ionicons/icons';
 
@@ -109,6 +111,7 @@ export class NotificationsPage implements ViewWillEnter {
       closeCircleOutline,
       cloudOfflineOutline,
       createOutline,
+      exitOutline,
       flagOutline,
       locationOutline,
       notificationsOutline,
@@ -116,6 +119,7 @@ export class NotificationsPage implements ViewWillEnter {
       pricetagOutline,
       refreshOutline,
       starOutline,
+      stopCircleOutline,
       swapHorizontalOutline,
     });
 

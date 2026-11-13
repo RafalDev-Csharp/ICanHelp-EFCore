@@ -36,7 +36,9 @@ import {
   closeCircleOutline,
   cloudOfflineOutline,
   constructOutline,
+  copyOutline,
   createOutline,
+  exitOutline,
   eyeOutline,
   flagOutline,
   heart,
@@ -51,6 +53,8 @@ import {
   pricetagOutline,
   star,
   starOutline,
+  stopCircleOutline,
+  warningOutline,
 } from 'ionicons/icons';
 import { catchError, filter, firstValueFrom, forkJoin, of } from 'rxjs';
 
@@ -60,6 +64,7 @@ import type {
   MyConversationDto,
   RatingDto,
   UserPublicDto,
+  UserReliabilityDto,
 } from '../../../core/api/api-client';
 import { AnnouncementsClient, ConversationsClient, UsersClient } from '../../../core/api/api-client';
 import { errorStatus } from '../../../core/api/api-errors';
@@ -77,13 +82,15 @@ import { MapComponent } from '../../../shared/components/map/map.component';
 import { PricePipe } from '../../../shared/pipes/price.pipe';
 import { TimeAgoPipe, parseApiDate } from '../../../shared/pipes/time-ago.pipe';
 import { pluralPl } from '../../../shared/text/plural';
+import { INTERRUPTED_NOTE, jobExitReasonText, jobExitTitle, reliabilityLabel } from '../../offers/job-exit';
 import type { JobAction, JobStep } from '../../offers/job-step';
-import { JOB_ACTION_ICONS, JOB_ACTION_LABELS, jobStep } from '../../offers/job-step';
+import { JOB_ACTION_ICONS, JOB_ACTION_LABELS, JOB_EXIT_LABELS, jobStep } from '../../offers/job-step';
 import { formatOfferTerm, offerStateColor, offerStateLabel, pendingOffer } from '../../offers/offer-labels';
 import { OffersService } from '../../offers/offers.service';
 import { difficultyColor, difficultyLabel, statusColor, statusLabel } from '../announcement-labels';
 import { LikesService } from '../likes/likes.service';
 
+import type { HistoryEntry } from './announcement-negotiations';
 import { negotiationsOf, ownerHistory } from './announcement-negotiations';
 
 type LoadState = 'loading' | 'ready' | 'not-found' | 'failed';
@@ -94,8 +101,11 @@ const VISIBLE_RATINGS = 3;
 /** Wątki jednego ogłoszenia – więcej pomocników w jednym ogłoszeniu się nie spodziewamy. */
 const CONVERSATIONS_LIMIT = 50;
 
-/** Statusy po akceptacji oferty – wtedy uczestnicy widzą swoje dane kontaktowe. */
-const AFTER_ACCEPTANCE = ['Accepted', 'InProgress', 'Completed'];
+/** Statusy po akceptacji oferty – wtedy uczestnicy widzą swoje dane kontaktowe (po przerwaniu też – rozliczenie). */
+const AFTER_ACCEPTANCE = ['Accepted', 'InProgress', 'Completed', 'Interrupted'];
+
+/** Statusy końcowe z oceną (F11 E: także przerwane zlecenie). */
+const RATEABLE = ['Completed', 'Interrupted'];
 
 /**
  * Szczegóły ogłoszenia (publiczne): zdjęcia, opis, mapa, właściciel z ocenami, serduszko. Akcje zależą od roli:
@@ -104,6 +114,9 @@ const AFTER_ACCEPTANCE = ['Accepted', 'InProgress', 'Completed'];
  *   kontakt, „Rozpocznij” → „Zgłoś wykonanie” (F11 D), ocena po zakończeniu;
  * - właściciel: „Edytuj” (Open), „Anuluj” (Open/Accepted), lista negocjacji i historia ogłoszenia (oferty,
  *   kontroferty, edycje), po akceptacji – kontakt, „Potwierdź wykonanie” (wyróżnione po zgłoszeniu), ocena po zakończeniu.
+ * - F11 E: obie strony – „Zrezygnuj” (Accepted) / „Przerwij zlecenie” (InProgress) z powodem; po przerwaniu ocena,
+ *   notka o rozliczeniu i u właściciela „Wystaw ponownie” (`/add?copyOf=`). Liczniki rezygnacji / przerwań właściciela
+ *   i (u właściciela) każdego pomocnika – `GET api/users/{id}/reliability`.
  * Powiadomienie o tym ogłoszeniu (`activity$`) przeładowuje ekran.
  * Akcje na samych ofertach (przyjmij, odrzuć, kontroferta, wycofaj) są w wątku – tam widać całą negocjację.
  */
@@ -180,6 +193,18 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
   protected readonly formatOfferTerm = formatOfferTerm;
   protected readonly jobLabels = JOB_ACTION_LABELS;
   protected readonly jobIcons = JOB_ACTION_ICONS;
+  protected readonly exitLabels = JOB_EXIT_LABELS;
+  protected readonly historyIcons: Readonly<Record<HistoryEntry['kind'], string>> = {
+    offer: 'pricetag-outline',
+    change: 'create-outline',
+    abandoned: 'exit-outline',
+    interrupted: 'stop-circle-outline',
+  };
+  protected readonly interruptedNote = INTERRUPTED_NOTE;
+  /** Licznik rezygnacji / przerwań właściciela („1 rezygnacja”, pusty = brak). */
+  protected readonly ownerReliability = signal('');
+  /** Właściciel: liczniki pomocników z listy negocjacji (helperId → tekst). */
+  protected readonly helperReliability = signal<ReadonlyMap<string, string>>(new Map());
 
   protected readonly images = computed(() =>
     (this.announcement()?.images ?? []).map((image) => ({ id: image.id, url: apiResourceUrl(image.url) ?? '' })),
@@ -222,6 +247,25 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     );
   });
   protected readonly isParticipant = computed(() => this.isOwner() || this.isAcceptedHelper());
+  /** Zakończone albo przerwane – uczestnicy mogą się ocenić. */
+  protected readonly rateable = computed(() => RATEABLE.includes(this.status()));
+  /** F11 E: przerwanie zlecenia (kto, powód) – do notki w stopce. */
+  protected readonly interruption = computed(() => {
+    const exit = this.announcement()?.jobExits?.find((e) => e.kind === 'Interrupted');
+    return exit
+      ? { title: jobExitTitle(exit, this.auth.currentUser()?.id ?? ''), reason: jobExitReasonText(exit) }
+      : null;
+  });
+  /**
+   * F11 E: pomocnik, którego zlecenie zerwano przed rozpoczęciem (on albo zleceniodawca) – nie złoży już oferty,
+   * jego wątek jest tylko do odczytu.
+   */
+  protected readonly myAbandonment = computed(() => {
+    const userId = this.auth.currentUser()?.id;
+    return this.isOwner() || !userId
+      ? undefined
+      : this.announcement()?.jobExits?.find((e) => e.kind === 'Abandoned' && e.helperId === userId);
+  });
   protected readonly afterAcceptance = computed(() => AFTER_ACCEPTANCE.includes(this.status()));
   protected readonly negotiations = computed(() =>
     negotiationsOf(this.announcement()?.offers ?? [], this.conversations(), this.auth.currentUser()?.id),
@@ -287,7 +331,9 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
       closeCircleOutline,
       cloudOfflineOutline,
       constructOutline,
+      copyOutline,
       createOutline,
+      exitOutline,
       eyeOutline,
       flagOutline,
       heart,
@@ -302,6 +348,8 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
       pricetagOutline,
       star,
       starOutline,
+      stopCircleOutline,
+      warningOutline,
     });
 
     // F11 D: powiadomienie (hub albo push) o tym ogłoszeniu – np. pomocnik zgłosił wykonanie, druga strona zmieniła
@@ -453,7 +501,21 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     }
   }
 
-  /** Ocena drugiej strony po zakończeniu. */
+  /** F11 E: „Zrezygnuj” / „Przerwij zlecenie” – okno z powodem (wspólne z wątkiem). */
+  async exitJob(): Promise<void> {
+    const exit = this.job().exit;
+    if (exit) {
+      const otherSide = this.isOwner() ? 'Pomocnik' : 'Zleceniodawca';
+      await this.lifecycle((id) => this.offers.exitJob(id, exit, otherSide));
+    }
+  }
+
+  /** F11 E: „Wystaw ponownie” po przerwaniu – formularz „Dodaj” wypełniony kopią (bez zdjęć). */
+  republish(): void {
+    void this.router.navigate(['/add'], { queryParams: { copyOf: this.announcementId() } });
+  }
+
+  /** Ocena drugiej strony po zakończeniu albo przerwaniu. */
   async rate(): Promise<void> {
     const announcement = this.announcement();
     if (!announcement || this.busy()) {
@@ -565,7 +627,10 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     this.conversationsClient
       .getMine(undefined, undefined, announcement.id, 1, CONVERSATIONS_LIMIT)
       .pipe(catchError(() => of<MyConversationDto[]>([])))
-      .subscribe((conversations) => this.conversations.set(conversations));
+      .subscribe((conversations) => {
+        this.conversations.set(conversations);
+        this.loadHelperReliability();
+      });
 
     const userId = this.auth.currentUser()?.id;
     const participant =
@@ -581,7 +646,7 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
       .getContact(announcement.id)
       .pipe(catchError(() => of(null)))
       .subscribe((contact) => this.contact.set(contact));
-    if (announcement.status === 'Completed') {
+    if (RATEABLE.includes(announcement.status)) {
       this.announcements
         .getRatings(announcement.id)
         .pipe(catchError(() => of<RatingDto[]>([])))
@@ -601,12 +666,29 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
   private loadOwner(ownerId: string): void {
     this.owner.set(null);
     this.ownerRatings.set([]);
+    this.ownerReliability.set('');
     forkJoin({
       owner: this.users.getById(ownerId).pipe(catchError(() => of(null))),
       ratings: this.users.getRatings(ownerId).pipe(catchError(() => of<RatingDto[]>([]))),
-    }).subscribe(({ owner, ratings }) => {
+      reliability: this.users.getReliability(ownerId).pipe(catchError(() => of<UserReliabilityDto | null>(null))),
+    }).subscribe(({ owner, ratings, reliability }) => {
       this.owner.set(owner);
       this.ownerRatings.set(ratings);
+      this.ownerReliability.set(reliabilityLabel(reliability));
     });
+  }
+
+  /** Właściciel: liczniki rezygnacji / przerwań pomocników z listy negocjacji (dodatek – błąd = bez licznika). */
+  private loadHelperReliability(): void {
+    const helperIds = this.isOwner() ? this.negotiations().map((negotiation) => negotiation.helperId) : [];
+    if (helperIds.length === 0) {
+      this.helperReliability.set(new Map());
+      return;
+    }
+    forkJoin(
+      helperIds.map((id) => this.users.getReliability(id).pipe(catchError(() => of<UserReliabilityDto | null>(null)))),
+    ).subscribe((results) =>
+      this.helperReliability.set(new Map(helperIds.map((id, index) => [id, reliabilityLabel(results[index])]))),
+    );
   }
 }

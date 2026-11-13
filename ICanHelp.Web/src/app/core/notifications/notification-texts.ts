@@ -63,6 +63,18 @@ function describeFromParameters(notification: NotificationDto): NotificationText
       return { title: 'Pomocnik zgłosił wykonanie – potwierdź', body: title, icon: 'flag-outline' };
     case 'JobCompleted':
       return { title: 'Zlecenie zakończone – możesz ocenić', body: title, icon: 'star-outline' };
+    case 'JobAbandoned':
+      return {
+        title: `${actorLabel(p['actorRole'])} zrezygnował ze zlecenia`,
+        body: exitBody(title, p['exitReason'], p['note']),
+        icon: 'exit-outline',
+      };
+    case 'JobInterrupted':
+      return {
+        title: `${actorLabel(p['actorRole'])} przerwał zlecenie`,
+        body: exitBody(title, p['exitReason'], p['note']),
+        icon: 'stop-circle-outline',
+      };
     case 'MessageReceived':
       return {
         title: title ? `Nowa wiadomość: ${title}` : 'Nowa wiadomość',
@@ -135,6 +147,31 @@ export function formatApiPrice(value: string | undefined): string {
     return value;
   }
   return formatPrice(number);
+}
+
+/** F11 E: powody wyjścia ze zlecenia – te same co `JobExitReason` w backendzie (i `features/offers/job-exit.ts`). */
+export const JOB_EXIT_REASON_LABELS: Readonly<Record<string, string>> = {
+  CannotMakeIt: 'nie mogę w tym terminie',
+  TermsDiffer: 'warunki inne niż w ogłoszeniu',
+  NoContact: 'brak kontaktu',
+  Disagreement: 'konflikt / nie dogadaliśmy się',
+  Other: 'inny',
+};
+
+function actorLabel(role: string | undefined): string {
+  return role === 'Client' ? 'Zleceniodawca' : 'Pomocnik';
+}
+
+/** „Cieknący kran – powód: brak kontaktu”; „Inny” → sam opis; inny powód z opisem → „brak kontaktu (opis)”. */
+function exitBody(title: string, reason: string | undefined, note: string | undefined): string {
+  const label =
+    reason === 'Other' && note
+      ? note
+      : `${JOB_EXIT_REASON_LABELS[reason ?? ''] ?? reason ?? ''}${note ? ` (${note})` : ''}`;
+  if (!label) {
+    return title;
+  }
+  return title ? `${title} – powód: ${label}` : `Powód: ${label}`;
 }
 
 function changedFields(value: string | undefined): string {

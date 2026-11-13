@@ -41,13 +41,16 @@ shared/           components/ (EmptyStateComponent, `app-brand` – logo w nagł
 features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poza zakładkami, `?returnUrl=`),
                   announcements („Szukaj”: fraza, kafelki kategorii, lista ↔ mapa: `list/` – store, filtry, karta; `details/` – `/announcements/:announcementId`;
                   `form/` – formularz ogłoszenia (pola, miejsce, zdjęcia + `resizeImage`, `syncPhotos`), wspólny dla
-                  `add-announcement.page` (`/add`) i `edit/` (`/announcements/:id/edit`); `likes/` – `LikesService`;
+                  `add-announcement.page` (`/add`, `?copyOf=<id>` – „Wystaw ponownie” po przerwaniu, bez zdjęć) i `edit/`
+                  (`/announcements/:id/edit`); `likes/` – `LikesService`;
                   `details/announcement-negotiations.ts` – negocjacje per pomocnik i „Historia ogłoszenia” właściciela;
                   `testing/` – dane i zaślepki do specs),
                   offers (`offer-labels` – teksty, `offerStateLabel` (bez „nieaktualna”) i `offerActions` = reguły domeny,
                   `offer-changes` + `OfferChangesModalComponent` – podgląd zmian ogłoszenia było → jest i decyzja autora
                   oferty (`OffersService.reviewChanges`: podtrzymaj / zmień / wycofaj), `job-step` – krok realizacji zlecenia
-                  (Rozpocznij / Zgłoś wykonanie / Potwierdź wykonanie + notka; wątek i szczegóły), `offer-form` – formularz oferty /
+                  (Rozpocznij / Zgłoś wykonanie / Potwierdź wykonanie + notka; wątek i szczegóły; F11 E: `exit` – Zrezygnuj /
+                  Przerwij zlecenie), `job-exit` (powody, teksty wpisów, `reliabilityLabel`) + `JobExitModalComponent`
+                  (powód + opis → `OffersService.exitJob`), `offer-form` – formularz oferty /
                   kontroferty, okna `OfferFormModalComponent` i `RatingModalComponent`, `OffersService` – okno → potwierdzenie
                   → API → toast, wspólny dla wątku i szczegółów; `testing/offer-fixtures`),
                   orders (zakładka „Zlecenia” `/conversations`: Zlecam = moje ogłoszenia, Pomagam = moje wątki pomocnika,

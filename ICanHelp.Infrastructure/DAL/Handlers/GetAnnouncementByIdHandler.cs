@@ -25,6 +25,7 @@ internal sealed class GetAnnouncementByIdHandler : IQueryHandler<GetAnnouncement
             .Include(a => a.Offers)
             .Include(a => a.Images)
             .Include(a => a.Changes)
+            .Include(a => a.JobExits)
             .AsSplitQuery()
             .SingleOrDefaultAsync(a => a.Id == id, cancellationToken);
 

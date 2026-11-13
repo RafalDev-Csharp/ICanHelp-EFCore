@@ -20,6 +20,7 @@ public class Announcement : AggregateRoot
     private readonly List<Offer> _offers = new();
     private readonly List<Image> _images = new();
     private readonly List<AnnouncementChange> _changes = new();
+    private readonly List<JobExit> _jobExits = new();
 
     public Id Id { get; private set; }
     public UserId OwnerId { get; private set; }
@@ -59,6 +60,9 @@ public class Announcement : AggregateRoot
 
     /// <summary>History of edits, one entry per revision.</summary>
     public IReadOnlyCollection<AnnouncementChange> Changes => _changes.AsReadOnly();
+
+    /// <summary>F11 E: abandonments (before the start) and the interruption (during the work), oldest first.</summary>
+    public IReadOnlyCollection<JobExit> JobExits => _jobExits.AsReadOnly();
 
     // Required by EF Core.
     private Announcement()
@@ -224,6 +228,12 @@ public class Announcement : AggregateRoot
         if (helperId == OwnerId)
         {
             throw new DomainRuleException("The owner cannot make an offer on his own announcement.");
+        }
+
+        if (HasLeftJob(helperId))
+        {
+            throw new DomainRuleException(
+                "This helper's job on the announcement was abandoned – he cannot make another offer on it.");
         }
 
         if (_offers.Any(o => o.HelperId == helperId && o.Status == OfferStatus.Pending))
@@ -395,18 +405,24 @@ public class Announcement : AggregateRoot
             throw new DomainRuleException("The owner cannot start a conversation on his own announcement.");
         }
 
+        if (HasLeftJob(helperId))
+        {
+            throw new DomainRuleException("This helper's job on the announcement was abandoned.");
+        }
+
         return new Conversation(conversationId, Id, OwnerId, helperId, createdAtUtc);
     }
 
     /// <summary>
-    /// Can the owner and this helper (still) write to each other? While open – every helper. After acceptance only
-    /// the accepted helper, until the job is done (details of the job). Completed – nobody: the conversation becomes
-    /// read-only, what is left is rating each other. Cancelled – nobody.
+    /// Can the owner and this helper (still) write to each other? While open – every helper, except the one whose
+    /// job was abandoned (F11 E: his conversation becomes read-only). After acceptance only the accepted helper, until
+    /// the job is done (details of the job). Completed / Interrupted – nobody: the conversation becomes read-only, what
+    /// is left is rating each other. Cancelled – nobody.
     /// </summary>
     public bool AllowsConversationWith(UserId helperId)
         => Status switch
         {
-            AnnouncementStatus.Open => true,
+            AnnouncementStatus.Open => !HasLeftJob(helperId),
             AnnouncementStatus.Accepted or AnnouncementStatus.InProgress => helperId == GetAcceptedHelperId(),
             _ => false
         };
@@ -458,6 +474,58 @@ public class Announcement : AggregateRoot
         AddDomainEvent(new JobCompleted(Id, OwnerId, GetAcceptedHelperId()!, completedAtUtc));
     }
 
+    /// <summary>
+    /// F11 E: one side (owner or accepted helper) gives up before the work started. The announcement goes back to
+    /// <see cref="AnnouncementStatus.Open"/> (other helpers can make offers again), the accepted offer becomes
+    /// <see cref="OfferStatus.Abandoned"/>. This helper cannot make another offer here and his conversation becomes
+    /// read-only. No ratings – nothing was done. The reason is required (<see cref="JobExitReason.Other"/> with a note).
+    /// </summary>
+    public JobExit Abandon(UserId actorId, JobExitReason reason, Description? note, DateTime abandonedAtUtc)
+    {
+        EnsureStatus(AnnouncementStatus.Accepted, "be abandoned");
+        EnsureReason(reason, note, JobExitKind.Abandoned);
+
+        var offer = GetOffer(AcceptedOfferId!);
+        var exit = RecordExit(JobExitKind.Abandoned, offer, actorId, reason, note, abandonedAtUtc);
+
+        offer.MarkAsAbandoned();
+        AcceptedOfferId = null;
+        DoneReportedAt = null;
+        Status = AnnouncementStatus.Open;
+
+        AddDomainEvent(new JobAbandoned(Id, OwnerId, offer.HelperId, actorId, exit.ActorParty, reason, note?.Value,
+            abandonedAtUtc));
+        return exit;
+    }
+
+    /// <summary>
+    /// F11 E: one side (owner or accepted helper) stops the work in progress. Final status
+    /// <see cref="AnnouncementStatus.Interrupted"/> – it does not go back to Open; the conversation becomes read-only
+    /// and both sides can rate each other (the settlement for the part done is up to them – the app has no money).
+    /// </summary>
+    public JobExit Interrupt(UserId actorId, JobExitReason reason, Description? note, DateTime interruptedAtUtc)
+    {
+        EnsureStatus(AnnouncementStatus.InProgress, "be interrupted");
+        EnsureReason(reason, note, JobExitKind.Interrupted);
+
+        var offer = GetOffer(AcceptedOfferId!);
+        var exit = RecordExit(JobExitKind.Interrupted, offer, actorId, reason, note, interruptedAtUtc);
+
+        Status = AnnouncementStatus.Interrupted;
+
+        AddDomainEvent(new JobInterrupted(Id, OwnerId, offer.HelperId, actorId, exit.ActorParty, reason, note?.Value,
+            interruptedAtUtc));
+        return exit;
+    }
+
+    /// <summary>F11 E: true if a job of this helper on the announcement was abandoned (by either side).</summary>
+    public bool HasLeftJob(UserId helperId)
+        => _jobExits.Any(e => e.Kind == JobExitKind.Abandoned && e.HelperId == helperId);
+
+    /// <summary>F11 E: the interruption of the job (null unless the status is Interrupted).</summary>
+    public JobExit? GetInterruption()
+        => _jobExits.FirstOrDefault(e => e.Kind == JobExitKind.Interrupted);
+
     public void Cancel(UserId actorId)
     {
         if (Status is not (AnnouncementStatus.Open or AnnouncementStatus.Accepted))
@@ -481,12 +549,17 @@ public class Announcement : AggregateRoot
     // ---------- rating ----------
 
     /// <summary>
-    /// After completion each participant can rate the other one: the owner rates the helper and the other way round.
+    /// After completion (or an interruption – F11 E: part of the work was done) each participant can rate the other one:
+    /// the owner rates the helper and the other way round.
     /// Rating is a separate aggregate; the "only once" rule is checked by the application layer (and a unique index).
     /// </summary>
     public Rating CreateRating(Id ratingId, UserId raterId, Rate rate, Description? comment, DateTime createdAtUtc)
     {
-        EnsureStatus(AnnouncementStatus.Completed, "be rated");
+        if (Status is not (AnnouncementStatus.Completed or AnnouncementStatus.Interrupted))
+        {
+            throw new DomainRuleException($"Announcement in status {Status} cannot be rated.");
+        }
+
         EnsureParticipant(raterId);
 
         var rateeId = raterId == OwnerId ? GetAcceptedHelperId()! : OwnerId;
@@ -505,6 +578,38 @@ public class Announcement : AggregateRoot
         _changes.Add(change);
         AddDomainEvent(new AnnouncementEdited(Id, OwnerId, Revision, change.ChangedFields, changedAtUtc));
         return change.ChangedFields;
+    }
+
+    // F11 E: only the owner or the accepted helper; the entry remembers on whose side the actor was.
+    private JobExit RecordExit(JobExitKind kind, Offer offer, UserId actorId, JobExitReason reason, Description? note,
+        DateTime occurredAtUtc)
+    {
+        EnsureParticipant(actorId);
+        var party = actorId == OwnerId ? OfferParty.Client : OfferParty.Helper;
+
+        var exit = new JobExit(Id, _jobExits.Count + 1, kind, offer.Id, offer.HelperId, actorId, party, reason, note,
+            occurredAtUtc);
+        _jobExits.Add(exit);
+        return exit;
+    }
+
+    private static void EnsureReason(JobExitReason reason, Description? note, JobExitKind kind)
+    {
+        if (!Enum.IsDefined(reason))
+        {
+            throw new InvalidJobExitException($"Reason: {reason} is invalid.");
+        }
+
+        // „Konflikt / nie dogadaliśmy się” is a reason to stop the work, not to give up before it started.
+        if (reason == JobExitReason.Disagreement && kind == JobExitKind.Abandoned)
+        {
+            throw new InvalidJobExitException("Disagreement is a reason only for interrupting the work.");
+        }
+
+        if (reason == JobExitReason.Other && note is null)
+        {
+            throw new InvalidJobExitException("Describe the reason when choosing Other.");
+        }
     }
 
     private static string Format(Price price)

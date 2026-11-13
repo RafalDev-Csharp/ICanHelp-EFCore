@@ -10,7 +10,14 @@
 - `Announcement` (agregat): OwnerId, CategoryId, SubcategoryId, Difficulty (enum), Title, Description, Budget (Price),
   Location (VO lat/lon), Status, CreatedAt, AcceptedOfferId?, **Offers**, **Images** (max 5),
   **Revision** (0 = opublikowane, +1 przy realnej edycji; token współbieżności), UpdatedAt?, **Changes** (`AnnouncementChange`:
-  rewizja, czas, `AnnouncementFields` [Flags]), DoneReportedAt? (F11 D: pomocnik zgłosił wykonanie).
+  rewizja, czas, `AnnouncementFields` [Flags]), DoneReportedAt? (F11 D: pomocnik zgłosił wykonanie), **JobExits**
+  (F11 E, `JobExit`: numer, Kind Abandoned/Interrupted, OfferId, HelperId, ActorId + ActorParty, Reason
+  (`JobExitReason`), Note?, OccurredAt; tabela `JobExits`, klucz (AnnouncementId, Number), indeks ActorId).
+  - F11 E: `Abandon(actor, reason, note?, at)` – Accepted, właściciel albo przyjęty pomocnik → Open, `AcceptedOfferId` = null,
+    oferta → `Abandoned`, zdarzenie `JobAbandoned`; ten pomocnik (`HasLeftJob`) nie złoży już oferty ani wątku, jego
+    wątek – tylko do odczytu. `Interrupt(...)` – InProgress, każda strona → status końcowy `Interrupted` (oferta zostaje
+    `Accepted`), `JobInterrupted`; `CreateRating` z Completed **lub** Interrupted. Powód obowiązkowy: `Other` wymaga opisu,
+    `Disagreement` tylko przy przerwaniu (inaczej `InvalidJobExitException` → 400).
   - metody: `Update(actor, ..., at)` (tylko właściciel, `Open`), `GetChangesSince(rev)`, `AddOffer`, `CounterOffer`, `ReviseOffer`, `AcceptOffer`,
     `RejectOffer`, `WithdrawOffer`, `AddImage(actor,…,at)`, `RemoveImage(actor, id, at)`, `GetThumbnail()`, `Start(actor, at)`
     (tylko przyjęty pomocnik → `JobStarted`), `ReportDone(actor, at)` (przyjęty pomocnik, InProgress, raz → `JobDoneReported`),
@@ -33,7 +40,8 @@
   `Client/HelperLastReadAt`, **Messages** (`ConversationMessage`: SenderId, Text (Description ≤ 500), SentAt, AnnouncementRevision).
   Jeden na parę (AnnouncementId, HelperId). Tworzy go `announcement.StartConversation` (tylko Open, nie właściciel);
   `SendMessage(..., announcement, at)` sprawdza `announcement.AllowsConversationWith(HelperId)`: Open – każdy, Accepted/InProgress –
-  tylko zaakceptowany pomocnik, Completed/Cancelled – nikt (wątek tylko do odczytu). `MarkAsRead` (znacznik nie cofa się; wysłanie =
+  tylko zaakceptowany pomocnik, Completed/Cancelled/Interrupted – nikt (wątek tylko do odczytu; F11 E: w Open – też nie
+  pomocnik po zerwanym zleceniu). `MarkAsRead` (znacznik nie cofa się; wysłanie =
   przeczytane), `CountUnread`. Rozmowa ≠ oferta (wiadomości nie da się zaakceptować).
 - `AggregateRoot` (baza `Announcement`, `Conversation`): `DomainEvents` (`Core/Events`: `AnnouncementPublished/Edited`,
   `OfferMade/Countered/Revised/Accepted/Rejected/Withdrawn`, `MessageSent`, F11 D: `JobStarted/DoneReported/Completed`),
@@ -126,7 +134,7 @@
 ## Rozmowa (Krok 11)
 - `POST api/announcements/{id}/conversations` – pomocnik zakłada wątek (201 + Location `api/conversations/{id}`; istniał → 200 z jego id;
   kontroler po komendzie czyta id query `GetConversationId`). `MakeOffer` zakłada wątek automatycznie (`GetOrStartAsync` w `RepositoryExtensions`).
-- `api/conversations` (`[Authorize]`): `GET {id}` (`ConversationDto`: `Timeline` = Message/Offer/AnnouncementChanged od najstarszych – oferty
+- `api/conversations` (`[Authorize]`): `GET {id}` (`ConversationDto`: `Timeline` = Message/Offer/AnnouncementChanged/JobExit od najstarszych – oferty
   tego pomocnika, zmiany ogłoszenia po `CreatedAt` wątku; `MyRole`, `UnreadCount`, `CanWrite`; obcy → 404), `POST {id}/messages` (201),
   `POST {id}/read` (204). Obcy przy zapisie → 409 (DomainRule), brak wątku → 404 `ConversationNotFound`.
 - `GET api/me/conversations` (Krok 12, query `GetMyConversations`, handler `GetMyConversationsHandler`): `MyConversationDto` –
@@ -138,6 +146,13 @@
   otrzymane oceny (`MyRatingDto`: ogłoszenie + tytuł, `myRole` = Client/Helper wg właściciela ogłoszenia – `MyRatingDto.RoleOf`,
   `rater`, ocena, komentarz), `GET pending` – „do wystawienia” (`PendingRatingDto`: zakończone ogłoszenia, gdzie czytający jest
   właścicielem albo autorem przyjętej oferty, bez jego oceny; `otherParty`, miniatura). Publiczne `api/users/{id}/ratings` bez zmian.
+  F11 E: także przerwane zlecenia (`Interrupted`); oba DTO mają `interruption` (`JobExitDto` – kto i dlaczego) albo null.
+- F11 E – wyjście ze zlecenia: `POST api/announcements/{id}/abandon` i `…/interrupt` (body `{ reason, note? }`, 204; zły powód →
+  400 `InvalidJobExit`, zły status / obcy → 409), powiadomienia `JobAbandoned` / `JobInterrupted` dla drugiej strony (parametry
+  `actorRole`, `exitReason`, `note`). `AnnouncementDetailsDto.jobExits` – jak oferty: właściciel wszystkie, pomocnik swoje, inni
+  nic; w wątku wpis osi czasu `JobExit`. Publiczne liczniki: `GET api/users/{id}/reliability` (`UserReliabilityDto`:
+  `abandonedCount`, `interruptedCount` – tylko wyjścia, które użytkownik zrobił sam; nieznany → 404). Kontakt
+  (`…/contact`) widać też po przerwaniu.
 - Tabele `Conversations` (unikalny indeks AnnouncementId+HelperId, indeksy ClientId/HelperId) i `ConversationMessages` (indeks ConversationId+SentAt),
   Cascade z ogłoszenia. Migracja `Conversations` zakłada wątki dla istniejących ofert.
 

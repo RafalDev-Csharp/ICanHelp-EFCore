@@ -13,6 +13,11 @@ public static class NotificationPayload
     public const string Revision = "revision";
     public const string ChangedFields = "changedFields";
 
+    // F11 E: abandonment / interruption of a job.
+    public const string ActorRole = "actorRole";
+    public const string ExitReason = "exitReason";
+    public const string Note = "note";
+
     // Krok 14: alerts about new announcements.
     public const string CategoryName = "categoryName";
     public const string AlertName = "alertName";

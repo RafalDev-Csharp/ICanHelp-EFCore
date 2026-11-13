@@ -8,6 +8,7 @@ import { CategoriesService } from '../../core/categories/categories.service';
 import { PushService } from '../../core/pwa/push.service';
 import { ToastService } from '../../core/ui/toast.service';
 
+import { JobExitModalComponent } from './job-exit-modal.component';
 import { OfferChangesModalComponent } from './offer-changes-modal.component';
 import { OfferFormModalComponent } from './offer-form-modal.component';
 import { OffersService } from './offers.service';
@@ -26,6 +27,8 @@ describe('OffersService', () => {
     reportDone: vi.fn(),
     complete: vi.fn(),
     postRating: vi.fn(),
+    abandon: vi.fn(),
+    interrupt: vi.fn(),
   };
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
   const push = { suggest: vi.fn(() => Promise.resolve()) };
@@ -285,5 +288,29 @@ describe('OffersService', () => {
     await expect(service.rate('a1', 'Jan')).resolves.toBe(true);
     expect(modals.create.mock.calls[0][0].component).toBe(RatingModalComponent);
     expect(client.postRating).toHaveBeenCalledWith('a1', { rate: 5, comment: 'Polecam' });
+  });
+
+  it('abandons or interrupts the job with the reason from the window', async () => {
+    client.abandon.mockReturnValue(of(undefined));
+    client.interrupt.mockReturnValue(of(undefined));
+    const service = create();
+
+    modalResult = { data: { reason: 'CannotMakeIt', note: undefined }, role: 'confirm' };
+    await expect(service.exitJob('a1', 'abandon', 'Zleceniodawca')).resolves.toBe(true);
+    expect(modals.create.mock.calls[0][0].component).toBe(JobExitModalComponent);
+    expect(modals.create.mock.calls[0][0].componentProps).toEqual({ action: 'abandon', otherSide: 'Zleceniodawca' });
+    expect(client.abandon).toHaveBeenCalledWith('a1', { reason: 'CannotMakeIt', note: undefined });
+
+    modalResult = { data: { reason: 'Disagreement', note: 'Inny zakres.' }, role: 'confirm' };
+    await expect(service.exitJob('a1', 'interrupt', 'Pomocnik')).resolves.toBe(true);
+    expect(client.interrupt).toHaveBeenCalledWith('a1', { reason: 'Disagreement', note: 'Inny zakres.' });
+  });
+
+  it('does not abandon when the reason window is closed', async () => {
+    modalResult = { role: 'cancel' };
+    const service = create();
+
+    await expect(service.exitJob('a1', 'abandon', 'Pomocnik')).resolves.toBe(false);
+    expect(client.abandon).not.toHaveBeenCalled();
   });
 });

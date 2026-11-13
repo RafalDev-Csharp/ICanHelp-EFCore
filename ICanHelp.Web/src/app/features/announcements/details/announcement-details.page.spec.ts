@@ -45,6 +45,7 @@ describe('AnnouncementDetailsPage', () => {
     start: vi.fn(),
     reportDone: vi.fn(),
     complete: vi.fn(),
+    exitJob: vi.fn(),
   };
   let notifications = notificationsStub();
   const likes = { load: vi.fn(() => of([])), isLiked: vi.fn(() => false), sync: vi.fn(), toggle: vi.fn() };
@@ -61,7 +62,7 @@ describe('AnnouncementDetailsPage', () => {
       });
     }),
   };
-  const users = { getById: vi.fn(), getRatings: vi.fn() };
+  const users = { getById: vi.fn(), getRatings: vi.fn(), getReliability: vi.fn() };
   const toast = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
   const auth = {
     isAuthenticated: signal(false),
@@ -108,6 +109,7 @@ describe('AnnouncementDetailsPage', () => {
     auth.currentUser.set(null);
     alertRole = 'cancel';
     conversations.getMine.mockReturnValue(of([]));
+    users.getReliability.mockReturnValue(of({ userId: 'x', abandonedCount: 0, interruptedCount: 0 }));
     announcements.getContact.mockReturnValue(of(null));
     announcements.getRatings.mockReturnValue(of([]));
     announcements.getById.mockReturnValue(
@@ -394,6 +396,140 @@ describe('AnnouncementDetailsPage', () => {
     expect(footer).not.toContain('Rozpocznij');
     expect(footer).toContain('Przyjęte – pomocnik rozpocznie zlecenie.');
     expect(footer).toContain('Potwierdź wykonanie');
+  });
+
+  // ---------- F11 E: rezygnacja i przerwanie ----------
+
+  it('lets the accepted helper abandon the job before the start', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'helper-1' } as UserDto);
+    announcements.getById.mockReturnValue(
+      of(
+        announcementDetails('a1', {
+          status: 'Accepted',
+          acceptedOfferId: 'o1',
+          offers: [offerFixture('o1', { status: 'Accepted' })],
+        }),
+      ),
+    );
+    offers.exitJob.mockResolvedValue(true);
+    const { page, element, render } = create();
+    await render();
+
+    expect(element.querySelector('.job-exit')?.textContent).toContain('Zrezygnuj');
+    await page.exitJob();
+
+    expect(offers.exitJob).toHaveBeenCalledWith('a1', 'abandon', 'Zleceniodawca');
+    expect(announcements.getById).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets the owner interrupt the work in progress', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'owner-1' } as UserDto);
+    announcements.getById.mockReturnValue(
+      of(
+        announcementDetails('a1', {
+          status: 'InProgress',
+          acceptedOfferId: 'o1',
+          offers: [offerFixture('o1', { status: 'Accepted' })],
+        }),
+      ),
+    );
+    offers.exitJob.mockResolvedValue(true);
+    const { page, element, render } = create();
+    await render();
+
+    expect(element.querySelector('.job-exit')?.textContent).toContain('Przerwij zlecenie');
+    await page.exitJob();
+    expect(offers.exitJob).toHaveBeenCalledWith('a1', 'interrupt', 'Pomocnik');
+  });
+
+  it('after an interruption shows the reason, lets the owner rate and republish', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'owner-1' } as UserDto);
+    announcements.getById.mockReturnValue(
+      of(
+        announcementDetails('a1', {
+          status: 'Interrupted',
+          acceptedOfferId: 'o1',
+          offers: [offerFixture('o1', { status: 'Accepted' })],
+          jobExits: [
+            {
+              number: 1,
+              kind: 'Interrupted',
+              offerId: 'o1',
+              helperId: 'helper-1',
+              actorId: 'helper-1',
+              actorRole: 'Helper',
+              reason: 'NoContact',
+              note: undefined,
+              occurredAt: '2026-11-13T10:00:00Z',
+            },
+          ],
+        }),
+      ),
+    );
+    const { page, element, render } = create();
+    await render();
+
+    const footer = element.querySelector('ion-footer')?.textContent ?? '';
+    expect(footer).toContain('Pomocnik przerwał zlecenie – Brak kontaktu');
+    expect(footer).toContain('Ustalcie między sobą rozliczenie');
+    expect(footer).toContain('Oceń pomocnika');
+    expect(announcements.getContact).toHaveBeenCalledWith('a1');
+    expect(announcements.getRatings).toHaveBeenCalledWith('a1');
+    expect(element.querySelector('.history')?.textContent).toContain('Przerwanie (pomocnik): Brak kontaktu');
+
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    page.republish();
+    expect(navigate).toHaveBeenCalledWith(['/add'], { queryParams: { copyOf: 'a1' } });
+  });
+
+  it('does not let a helper whose job was abandoned make another offer', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'helper-1' } as UserDto);
+    announcements.getById.mockReturnValue(
+      of(
+        announcementDetails('a1', {
+          status: 'Open',
+          offers: [offerFixture('o1', { status: 'Abandoned' })],
+          jobExits: [
+            {
+              number: 1,
+              kind: 'Abandoned',
+              offerId: 'o1',
+              helperId: 'helper-1',
+              actorId: 'owner-1',
+              actorRole: 'Client',
+              reason: 'NoContact',
+              note: undefined,
+              occurredAt: '2026-11-13T10:00:00Z',
+            },
+          ],
+        }),
+      ),
+    );
+    const { element, render } = create();
+    await render();
+
+    const footer = element.querySelector('ion-footer')?.textContent ?? '';
+    expect(footer).toContain('Zlecenie zerwane');
+    expect(footer).not.toContain('Złóż ofertę');
+  });
+
+  it('shows the public abandonment counters of the owner and (for the owner) of helpers', async () => {
+    auth.isAuthenticated.set(true);
+    auth.currentUser.set({ id: 'owner-1' } as UserDto);
+    users.getReliability.mockReturnValue(of({ userId: 'x', abandonedCount: 2, interruptedCount: 1 }));
+    announcements.getById.mockReturnValue(of(announcementDetails('a1', { offers: [offerFixture('o1')] })));
+    conversations.getMine.mockReturnValue(of([myConversationFixture('c1')]));
+    const { element, render } = create();
+    await render();
+
+    expect(element.querySelector('.owner .reliability')?.textContent).toContain('2 rezygnacje · 1 przerwane zlecenie');
+    expect(element.querySelector('.negotiations .reliability')?.textContent).toContain('2 rezygnacje');
+    expect(users.getReliability).toHaveBeenCalledWith('owner-1');
+    expect(users.getReliability).toHaveBeenCalledWith('helper-1');
   });
 
   it('lists negotiations and the history for the owner', async () => {

@@ -15,6 +15,7 @@ namespace ICanHelp.Application.Notifications;
 /// <item>OfferAccepted / OfferRejected → autor oferty; odrzucona automatycznie (wybrano innego) → pomocnik</item>
 /// <item>MessageSent → druga osoba w wątku; AnnouncementEdited → pomocnicy z wątkami (każda oferta zakłada wątek)</item>
 /// <item>F11 D: JobStarted / JobDoneReported → właściciel; JobCompleted → pomocnik (link do wątku)</item>
+/// <item>F11 E: JobAbandoned / JobInterrupted → druga strona niż ta, która wyszła (powód i opis w parametrach)</item>
 /// </list>
 /// Ogłoszenia już nie ma (usunięte) → nic nie wysyłamy.
 /// </summary>
@@ -29,7 +30,9 @@ internal sealed class TransactionNotificationHandler :
     IDomainEventHandler<AnnouncementEdited>,
     IDomainEventHandler<JobStarted>,
     IDomainEventHandler<JobDoneReported>,
-    IDomainEventHandler<JobCompleted>
+    IDomainEventHandler<JobCompleted>,
+    IDomainEventHandler<JobAbandoned>,
+    IDomainEventHandler<JobInterrupted>
 {
     private readonly IAnnouncementRepository _announcements;
     private readonly IConversationRepository _conversations;
@@ -148,7 +151,35 @@ internal sealed class TransactionNotificationHandler :
         => OfferAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.OwnerId, recipient: e.HelperId,
             NotificationType.JobCompleted, e.OccurredAt, new(), cancellationToken);
 
+    public Task HandleAsync(Guid eventId, JobAbandoned e, CancellationToken cancellationToken = default)
+        => OfferAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.ActorId,
+            recipient: OtherSideOf(e.ActorParty, e.OwnerId, e.HelperId),
+            NotificationType.JobAbandoned, e.OccurredAt, ExitParameters(e.ActorParty, e.Reason, e.Note),
+            cancellationToken);
+
+    public Task HandleAsync(Guid eventId, JobInterrupted e, CancellationToken cancellationToken = default)
+        => OfferAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.ActorId,
+            recipient: OtherSideOf(e.ActorParty, e.OwnerId, e.HelperId),
+            NotificationType.JobInterrupted, e.OccurredAt, ExitParameters(e.ActorParty, e.Reason, e.Note),
+            cancellationToken);
+
     // ---------- helpers ----------
+
+    private static Dictionary<string, string> ExitParameters(OfferParty actorParty, JobExitReason reason, string? note)
+    {
+        var parameters = new Dictionary<string, string>
+        {
+            [NotificationPayload.ActorRole] = actorParty.ToString(),
+            [NotificationPayload.ExitReason] = reason.ToString()
+        };
+
+        if (!string.IsNullOrWhiteSpace(note))
+        {
+            parameters[NotificationPayload.Note] = MyConversationDto.ToPreview(note);
+        }
+
+        return parameters;
+    }
 
     /// <summary>The user on the given side of the negotiation (Client = owner).</summary>
     private static Guid SideOf(OfferParty party, Guid ownerId, Guid helperId)

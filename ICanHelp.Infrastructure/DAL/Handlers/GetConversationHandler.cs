@@ -36,6 +36,7 @@ internal sealed class GetConversationHandler : IQueryHandler<GetConversation, Co
             .AsNoTracking()
             .Include(a => a.Offers)
             .Include(a => a.Changes)
+            .Include(a => a.JobExits)
             .AsSplitQuery()
             .SingleOrDefaultAsync(a => a.Id == conversation.AnnouncementId, cancellationToken);
 

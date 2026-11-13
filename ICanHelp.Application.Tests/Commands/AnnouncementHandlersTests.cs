@@ -339,6 +339,63 @@ public class AnnouncementHandlersTests
         announcement.Status.ShouldBe(AnnouncementStatus.Cancelled);
     }
 
+    // ---------- F11 E: rezygnacja i przerwanie ----------
+
+    [Fact]
+    public async Task AbandonJob_ByHelper_ReopensAnnouncement()
+    {
+        var announcement = await AcceptedAnnouncementAsync();
+
+        await new AbandonJobHandler(_announcements, _unitOfWork, _clock).HandleAsync(new AbandonJob
+        {
+            AnnouncementId = announcement.Id, ActorId = _helper.Id, Reason = JobExitReason.CannotMakeIt, Note = "  "
+        });
+
+        announcement.Status.ShouldBe(AnnouncementStatus.Open);
+        var exit = announcement.JobExits.ShouldHaveSingleItem();
+        exit.ActorId.ShouldBe(_helper.Id);
+        exit.Note.ShouldBeNull();
+        exit.OccurredAt.ShouldBe(_clock.UtcNow);
+    }
+
+    [Fact]
+    public async Task AbandonJob_OtherWithoutNote_Throws()
+    {
+        var announcement = await AcceptedAnnouncementAsync();
+
+        await Should.ThrowAsync<InvalidJobExitException>(() => new AbandonJobHandler(_announcements, _unitOfWork, _clock)
+            .HandleAsync(new AbandonJob { AnnouncementId = announcement.Id, ActorId = _owner.Id, Reason = JobExitReason.Other }));
+        announcement.Status.ShouldBe(AnnouncementStatus.Accepted);
+    }
+
+    [Fact]
+    public async Task InterruptJob_ByOwner_WithNote_EndsAsInterrupted_AndBothCanRate()
+    {
+        var announcement = await AcceptedAnnouncementAsync();
+        announcement.Start(_helper.Id, _clock.UtcNow);
+
+        await new InterruptJobHandler(_announcements, _unitOfWork, _clock).HandleAsync(new InterruptJob
+        {
+            AnnouncementId = announcement.Id, ActorId = _owner.Id, Reason = JobExitReason.Other, Note = " Zalał łazienkę. "
+        });
+
+        announcement.Status.ShouldBe(AnnouncementStatus.Interrupted);
+        announcement.GetInterruption()!.Note!.Value.ShouldBe("Zalał łazienkę.");
+
+        await RateHandler().HandleAsync(RateCommand(announcement.Id, _owner.Id, 2));
+        await RateHandler().HandleAsync(RateCommand(announcement.Id, _helper.Id, 3));
+        _ratings.Ratings.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task InterruptJob_WhenAccepted_Throws()
+    {
+        var announcement = await AcceptedAnnouncementAsync();
+
+        await Should.ThrowAsync<DomainRuleException>(() => new InterruptJobHandler(_announcements, _unitOfWork, _clock)
+            .HandleAsync(new InterruptJob { AnnouncementId = announcement.Id, ActorId = _owner.Id, Reason = JobExitReason.NoContact }));
+    }
+
     // ---------- ocena ----------
 
     [Fact]

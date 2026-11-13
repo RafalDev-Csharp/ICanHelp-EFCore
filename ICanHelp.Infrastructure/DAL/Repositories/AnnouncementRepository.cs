@@ -14,12 +14,13 @@ internal sealed class AnnouncementRepository : IAnnouncementRepository
         _db = db;
     }
 
-    // The whole aggregate is loaded (offers + images + edit history), so its rules can be checked in memory.
+    // The whole aggregate is loaded (offers + images + edit history + job exits), so its rules can be checked in memory.
     public Task<Announcement?> GetByIdAsync(Id id, CancellationToken cancellationToken = default)
         => _db.Announcements
             .Include(a => a.Offers)
             .Include(a => a.Images)
             .Include(a => a.Changes)
+            .Include(a => a.JobExits)
             .AsSplitQuery()
             .SingleOrDefaultAsync(a => a.Id == id, cancellationToken);
 

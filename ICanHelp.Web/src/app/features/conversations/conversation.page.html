@@ -29,6 +29,12 @@
           >
           · jesteś: {{ partyLabel(thread.myRole).toLowerCase() }}
         </p>
+        @if (otherReliability(); as reliability) {
+        <p class="reliability">
+          <ion-icon name="warning-outline" color="warning" aria-hidden="true"></ion-icon>
+          {{ partyLabel(thread.myRole === 'Client' ? 'Helper' : 'Client') }}: {{ reliability }}
+        </p>
+        }
       </div>
       <ion-button
         class="subject-link"
@@ -158,7 +164,16 @@
       }
       <span class="when">{{ item.at | timeAgo }}</span>
     </article>
-    } } @else {
+    } } @else if (item.kind === 'exit') {
+    <p class="change exit" [class.mine]="item.mine">
+      <ion-icon
+        [name]="item.exit.kind === 'Abandoned' ? 'exit-outline' : 'stop-circle-outline'"
+        aria-hidden="true"
+      ></ion-icon>
+      {{ item.title }} · {{ formatDateTime(item.at) }}<br />
+      Powód: {{ item.reason }}
+    </p>
+    } @else {
     <p class="change" [class.mine]="item.mine">
       <ion-icon [name]="item.mine ? 'checkmark-done-outline' : 'create-outline'" aria-hidden="true"></ion-icon>
       @if (item.mine) { Edytowałeś ogłoszenie{{ item.fields ? ': ' + item.fields : '' }} · {{ formatDateTime(item.at) }}
@@ -201,8 +216,32 @@
         <ion-icon [name]="jobIcons[action]" slot="start" aria-hidden="true"></ion-icon>
         {{ jobLabels[action] }}
       </ion-button>
+      } @if (step.exit; as exit) {
+      <ion-button
+        expand="block"
+        fill="clear"
+        color="danger"
+        size="small"
+        class="ion-padding-horizontal job-exit"
+        (click)="exitJob()"
+        [disabled]="busy()"
+      >
+        <ion-icon
+          [name]="exit === 'abandon' ? 'exit-outline' : 'stop-circle-outline'"
+          slot="start"
+          aria-hidden="true"
+        ></ion-icon>
+        {{ exitLabels[exit] }}
+      </ion-button>
       }
     </div>
+  </ion-toolbar>
+  } @if (interrupted()) {
+  <ion-toolbar>
+    <p class="job-note page-column">
+      <ion-icon name="stop-circle-outline" aria-hidden="true"></ion-icon>
+      {{ interruptedNote }}
+    </p>
   </ion-toolbar>
   } @if (notice(); as current) {
   <ion-toolbar>

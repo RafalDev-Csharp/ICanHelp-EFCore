@@ -16,6 +16,8 @@ import { PushService } from '../../core/pwa/push.service';
 import { ToastService } from '../../core/ui/toast.service';
 import { formatPrice } from '../../shared/pipes/price.pipe';
 
+import type { JobExitAction, JobExitCommand } from './job-exit';
+import { JobExitModalComponent } from './job-exit-modal.component';
 import { fieldChangeRows } from './offer-changes';
 import type { OfferChangesChoice } from './offer-changes-modal.component';
 import { OfferChangesModalComponent } from './offer-changes-modal.component';
@@ -204,7 +206,27 @@ export class OffersService {
     );
   }
 
-  /** Ocena drugiej strony po zakończeniu (raz na ogłoszenie – backend pilnuje, 409 `AlreadyRated`). */
+  /**
+   * F11 E: „Zrezygnuj” (Accepted → ogłoszenie znów otwarte) albo „Przerwij zlecenie” (InProgress → Interrupted):
+   * okno z obowiązkowym powodem → API → toast. `otherSide` – „Zleceniodawca” / „Pomocnik” do tekstu w oknie.
+   */
+  async exitJob(announcementId: string, action: JobExitAction, otherSide: string): Promise<boolean> {
+    const modal = await this.modals.create({ component: JobExitModalComponent, componentProps: { action, otherSide } });
+    await modal.present();
+    const { data, role } = await modal.onWillDismiss<JobExitCommand>();
+    if (role !== 'confirm' || !data) {
+      return false;
+    }
+    const request =
+      action === 'abandon' ? this.client.abandon(announcementId, data) : this.client.interrupt(announcementId, data);
+    const success =
+      action === 'abandon'
+        ? 'Zrezygnowałeś ze zlecenia – druga strona dostała powiadomienie.'
+        : 'Zlecenie przerwane. Możecie się teraz ocenić.';
+    return (await this.run(request, success)) !== null;
+  }
+
+  /** Ocena drugiej strony po zakończeniu albo przerwaniu (raz na ogłoszenie – backend pilnuje, 409 `AlreadyRated`). */
   async rate(announcementId: string, otherParty: string): Promise<boolean> {
     const modal = await this.modals.create({ component: RatingModalComponent, componentProps: { otherParty } });
     await modal.present();

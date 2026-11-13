@@ -28,6 +28,7 @@ import {
   checkmarkDoneOutline,
   cloudOfflineOutline,
   createOutline,
+  exitOutline,
   eyeOutline,
   flagOutline,
   helpCircleOutline,
@@ -37,6 +38,8 @@ import {
   playOutline,
   pricetagOutline,
   send,
+  stopCircleOutline,
+  warningOutline,
 } from 'ionicons/icons';
 import { catchError, filter, of } from 'rxjs';
 
@@ -51,14 +54,15 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { PricePipe } from '../../shared/pipes/price.pipe';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
 import { statusColor, statusLabel } from '../announcements/announcement-labels';
+import { INTERRUPTED_NOTE, reliabilityLabel } from '../offers/job-exit';
 import type { JobAction, JobStep } from '../offers/job-step';
-import { JOB_ACTION_ICONS, JOB_ACTION_LABELS, jobStep } from '../offers/job-step';
+import { JOB_ACTION_ICONS, JOB_ACTION_LABELS, JOB_EXIT_LABELS, jobStep } from '../offers/job-step';
 import { OFFER_RULES } from '../offers/offer-form';
 import { formatDateTime, formatOfferTerm, partyLabel, pendingOffer } from '../offers/offer-labels';
 import { OffersService } from '../offers/offers.service';
 
 import type { ThreadNotice } from './conversation-timeline';
-import { offersOf, threadNotice, toTimelineItems } from './conversation-timeline';
+import { jobExitOf, offersOf, threadNotice, toTimelineItems } from './conversation-timeline';
 
 type LoadState = 'loading' | 'ready' | 'not-found' | 'failed';
 
@@ -116,6 +120,8 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
   readonly conversation = signal<ConversationDto | null>(null);
   /** Imię i nazwisko drugiej strony (nagłówek); do czasu wczytania – rola. */
   readonly otherName = signal('');
+  /** „1 rezygnacja · 2 przerwane zlecenia” drugiej strony (pusty = brak). */
+  readonly otherReliability = signal('');
   readonly busy = signal(false);
   draft = '';
 
@@ -129,6 +135,8 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
   readonly highlightedOfferId = signal<string | null>(null);
   protected readonly jobLabels = JOB_ACTION_LABELS;
   protected readonly jobIcons = JOB_ACTION_ICONS;
+  protected readonly exitLabels = JOB_EXIT_LABELS;
+  protected readonly interruptedNote = INTERRUPTED_NOTE;
 
   readonly items = computed(() => {
     const conversation = this.conversation();
@@ -163,7 +171,7 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
       return null;
     }
     const step = jobStep(conversation.announcementStatus, conversation.myRole, conversation.announcementDoneReportedAt);
-    return step.action || step.note ? step : null;
+    return step.action || step.note || step.exit ? step : null;
   });
   readonly jobAction = computed<JobAction | null>(() => this.job()?.action ?? null);
   /**
@@ -175,20 +183,35 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
     return conversation ? threadNotice(conversation) : null;
   });
 
-  /** Pomocnik w otwartym ogłoszeniu bez oczekującej oferty może złożyć nową (np. po odrzuceniu). */
+  /**
+   * Pomocnik w otwartym ogłoszeniu bez oczekującej oferty może złożyć nową (np. po odrzuceniu) – ale nie po zerwanym
+   * zleceniu (F11 E: rezygnacja jego albo zleceniodawcy zamyka ten wątek).
+   */
   readonly canMakeOffer = computed(() => {
     const conversation = this.conversation();
     return (
       !!conversation &&
       conversation.myRole === 'Helper' &&
       conversation.announcementStatus === 'Open' &&
-      !pendingOffer(offersOf(conversation))
+      !pendingOffer(offersOf(conversation)) &&
+      !jobExitOf(conversation)
     );
   });
 
+  /** F11 E: zlecenie przerwane w tym wątku – notka o rozliczeniu nad stopką. */
+  readonly interrupted = computed(() => this.conversation()?.announcementStatus === 'Interrupted');
+
   /** Dlaczego nie można pisać (`canWrite: false`) – wg reguły `Announcement.AllowsConversationWith`. */
   readonly readOnlyReason = computed(() => {
-    switch (this.conversation()?.announcementStatus) {
+    const conversation = this.conversation();
+    if (
+      conversation &&
+      conversation.announcementStatus !== 'Interrupted' &&
+      jobExitOf(conversation)?.kind === 'Abandoned'
+    ) {
+      return 'Zlecenie zerwane przed rozpoczęciem – rozmowa jest tylko do odczytu.';
+    }
+    switch (conversation?.announcementStatus) {
       case 'Accepted':
       case 'InProgress':
         return 'Zleceniodawca przyjął inną ofertę – rozmowa jest tylko do odczytu.';
@@ -196,6 +219,8 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
         return 'Zlecenie zakończone – rozmowa jest tylko do odczytu. Ocenę wystawisz w Koncie → Oceny.';
       case 'Cancelled':
         return 'Ogłoszenie anulowane – rozmowa jest tylko do odczytu.';
+      case 'Interrupted':
+        return 'Zlecenie przerwane – rozmowa jest tylko do odczytu. Ocenę wystawisz w Koncie → Oceny.';
       default:
         return 'Rozmowa jest tylko do odczytu.';
     }
@@ -208,6 +233,7 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
       checkmarkDoneOutline,
       cloudOfflineOutline,
       createOutline,
+      exitOutline,
       eyeOutline,
       flagOutline,
       helpCircleOutline,
@@ -217,6 +243,8 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
       playOutline,
       pricetagOutline,
       send,
+      stopCircleOutline,
+      warningOutline,
     });
 
     // Powiadomienie (hub albo push) o tym wątku albo jego ogłoszeniu – np. druga strona zmieniła ofertę, pomocnik
@@ -369,6 +397,17 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
     await this.act(run[action]);
   }
 
+  /** F11 E: „Zrezygnuj” / „Przerwij zlecenie” – okno z powodem (`OffersService.exitJob`). */
+  async exitJob(): Promise<void> {
+    const conversation = this.conversation();
+    const exit = this.job()?.exit;
+    if (!conversation || !exit) {
+      return;
+    }
+    const otherSide = partyLabel(conversation.myRole === 'Client' ? 'Helper' : 'Client');
+    await this.act(() => this.offers.exitJob(conversation.announcementId, exit, otherSide));
+  }
+
   /** Jedna akcja naraz; po zmianie (albo błędzie 409 – stan mógł się zmienić) przeładowanie wątku. */
   private async act(action: () => Promise<boolean>): Promise<void> {
     if (this.busy()) {
@@ -389,6 +428,11 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
       .getById(otherId)
       .pipe(catchError(() => of(null)))
       .subscribe((user) => this.otherName.set(user?.fullName ?? ''));
+    // F11 E: publiczny licznik rezygnacji / przerwań drugiej strony (dodatek – błąd = bez licznika).
+    this.users
+      .getReliability(otherId)
+      .pipe(catchError(() => of(null)))
+      .subscribe((counts) => this.otherReliability.set(reliabilityLabel(counts)));
   }
 
   /** Dodatek do karty ogłoszenia – błąd nie psuje wątku (zostaje ikona). */

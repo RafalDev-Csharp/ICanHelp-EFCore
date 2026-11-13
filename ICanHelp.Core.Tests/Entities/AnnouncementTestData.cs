@@ -83,6 +83,12 @@ internal static class AnnouncementTestData
             return announcement;
         }
 
+        if (status == AnnouncementStatus.Interrupted)
+        {
+            announcement.Interrupt(Helper, JobExitReason.NoContact, null, Now.AddDays(2));
+            return announcement;
+        }
+
         announcement.Complete(OwnerId, Now.AddDays(2));
         return announcement;
     }

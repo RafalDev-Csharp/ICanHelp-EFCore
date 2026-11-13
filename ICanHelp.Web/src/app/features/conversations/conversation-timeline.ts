@@ -1,4 +1,11 @@
-import type { AnnouncementFieldChangeDto, ConversationDto, MessageDto, OfferDto } from '../../core/api/api-client';
+import type {
+  AnnouncementFieldChangeDto,
+  ConversationDto,
+  JobExitDto,
+  MessageDto,
+  OfferDto,
+} from '../../core/api/api-client';
+import { jobExitReasonText, jobExitTitle } from '../offers/job-exit';
 import type { OfferActions } from '../offers/offer-labels';
 import {
   changedFieldsLabel,
@@ -44,6 +51,18 @@ export type TimelineItem =
       /** Pola „było → jest” tej edycji (podgląd zmian). */
       changes: AnnouncementFieldChangeDto[];
       /** Edytował czytający (zleceniodawca) – „Edytowałeś ogłoszenie”, inaczej „Zleceniodawca zmienił ogłoszenie”. */
+      mine: boolean;
+    }
+  | {
+      /** F11 E: rezygnacja / przerwanie zlecenia tego pomocnika. */
+      kind: 'exit';
+      key: string;
+      at: string;
+      exit: JobExitDto;
+      /** „Zrezygnowałeś ze zlecenia” / „Pomocnik przerwał zlecenie” (`jobExitTitle`). */
+      title: string;
+      /** Powód z opisem (`jobExitReasonText`). */
+      reason: string;
       mine: boolean;
     };
 
@@ -91,9 +110,25 @@ export function toTimelineItems(conversation: ConversationDto, myId: string | un
         changes: entry.change.fields,
         mine: conversation.myRole === 'Client',
       });
+    } else if (entry.type === 'JobExit' && entry.jobExit) {
+      const exit = entry.jobExit;
+      items.push({
+        kind: 'exit',
+        key: `x-${exit.number}`,
+        at: entry.at,
+        exit,
+        title: jobExitTitle(exit, myId ?? ''),
+        reason: jobExitReasonText(exit),
+        mine: exit.actorId === myId,
+      });
     }
   }
   return items;
+}
+
+/** F11 E: wyjście ze zlecenia w tym wątku (rezygnacja albo przerwanie), ostatnie – albo `undefined`. */
+export function jobExitOf(conversation: ConversationDto): JobExitDto | undefined {
+  return conversation.timeline.filter((entry) => entry.type === 'JobExit' && entry.jobExit).at(-1)?.jobExit;
 }
 
 /** Oferty wątku (do „czy mam oczekującą ofertę”, podpowiedzi ceny). */

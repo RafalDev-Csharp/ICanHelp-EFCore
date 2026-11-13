@@ -136,6 +136,23 @@ public sealed class UsersController : ControllerBase
         return user is null ? NotFound() : Ok(user);
     }
 
+    /// <summary>
+    /// F11 E: publiczne liczniki – ile zleceń użytkownik sam zerwał przed rozpoczęciem (<c>abandonedCount</c>)
+    /// i przerwał w trakcie (<c>interruptedCount</c>). Rezygnacja drugiej strony się nie liczy.
+    /// </summary>
+    [HttpGet("{userId:guid}/reliability")]
+    [ProducesResponseType<UserReliabilityDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<UserReliabilityDto>> GetReliability(
+        Guid userId,
+        [FromServices] IQueryHandler<GetUserReliability, UserReliabilityDto?> handler,
+        CancellationToken cancellationToken)
+    {
+        var reliability = await handler.HandleAsync(new GetUserReliability { UserId = userId }, cancellationToken);
+
+        return reliability is null ? NotFound() : Ok(reliability);
+    }
+
     /// <summary>Oceny, które użytkownik otrzymał – podstawa jego reputacji.</summary>
     [HttpGet("{userId:guid}/ratings")]
     [ProducesResponseType<IReadOnlyList<RatingDto>>(StatusCodes.Status200OK)]
