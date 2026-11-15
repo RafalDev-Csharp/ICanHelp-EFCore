@@ -2,7 +2,6 @@ import type { OnInit } from '@angular/core';
 import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
-  AlertController,
   IonBackButton,
   IonButton,
   IonButtons,
@@ -23,17 +22,18 @@ import {
   IonToolbar,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { cloudOfflineOutline, notificationsOffOutline, searchOutline } from 'ionicons/icons';
+import { notificationsOffOutline } from 'ionicons/icons';
 import type { Observable } from 'rxjs';
 
 import type { AlertKind, AnnouncementDto } from '../../core/api/api-client';
 import { AlertsClient } from '../../core/api/api-client';
 import { errorStatus } from '../../core/api/api-errors';
 import { CategoriesService } from '../../core/categories/categories.service';
-import type { GeoPoint } from '../../core/geo/geo-point';
 import { ToastService } from '../../core/ui/toast.service';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { LoadFailedComponent } from '../../shared/components/load-state/load-failed.component';
+import { LoadingComponent } from '../../shared/components/load-state/loading.component';
 import { LocationPickerComponent } from '../announcements/form/location-picker.component';
 import { AnnouncementCardComponent } from '../announcements/list/announcement-card.component';
 
@@ -51,14 +51,22 @@ import {
   toUpdateAlert,
   validateAlertForm,
 } from './alert-form';
+import { AlertRemovalService } from './alert-removal.service';
 import { RoutePickerComponent } from './route-picker.component';
 
 /** Ile ogłoszeń pokazuje podgląd „Pasujące teraz”. */
 export const PREVIEW_LIMIT = 20;
 
+/** Wartość z pola Ionic (`$event.detail.value` ma typ nieznany) jako tekst; coś innego → pusty. */
+function asText(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
 /**
  * Nowy alert (`/profile/alerts/new?kind=Area|Route`) albo edycja (`/profile/alerts/:alertId`) – z podglądem
  * „Pasujące teraz” (`/preview`, stan zapisany w API). Rodzaju zapisanego alertu nie da się zmienić (backend też nie pozwala).
+ * Stan formularza, walidacja i zamiana na komendy API – `alert-form.ts`; pola wołają `patch` (albo `set…`, gdy
+ * wartość z pola trzeba najpierw sprawdzić).
  */
 @Component({
   selector: 'app-alert-edit',
@@ -85,6 +93,8 @@ export const PREVIEW_LIMIT = 20;
     IonSpinner,
     IonList,
     EmptyStateComponent,
+    LoadingComponent,
+    LoadFailedComponent,
     AnnouncementCardComponent,
     LocationPickerComponent,
     RoutePickerComponent,
@@ -94,7 +104,7 @@ export class AlertEditPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly client = inject(AlertsClient);
-  private readonly alerts = inject(AlertController);
+  private readonly removal = inject(AlertRemovalService);
   private readonly toast = inject(ToastService);
   protected readonly categories = inject(CategoriesService);
 
@@ -127,7 +137,7 @@ export class AlertEditPage implements OnInit {
   });
 
   constructor() {
-    addIcons({ cloudOfflineOutline, notificationsOffOutline, searchOutline });
+    addIcons({ notificationsOffOutline });
   }
 
   ngOnInit(): void {
@@ -162,24 +172,18 @@ export class AlertEditPage implements OnInit {
     }
   }
 
-  retryPreview(): void {
-    const alertId = this.alertId();
-    if (alertId) {
-      this.loadPreview(alertId);
-    }
-  }
-
+  /** Zmiana pól formularza (miejsce, trasa, dni – wartości już sprawdzone przez komponent pola). */
   patch(changes: Partial<AlertFormValue>): void {
     this.form.update((value) => ({ ...value, ...changes }));
   }
 
   setName(value: unknown): void {
-    this.patch({ name: typeof value === 'string' ? value : '' });
+    this.patch({ name: asText(value) });
   }
 
   /** Inna kategoria = podkategorie od nowa (należały do poprzedniej). */
   setCategory(value: unknown): void {
-    const categoryId = typeof value === 'string' ? value : '';
+    const categoryId = asText(value);
     if (categoryId !== this.form().categoryId) {
       this.patch({ categoryId, subcategoryIds: [] });
     }
@@ -198,22 +202,6 @@ export class AlertEditPage implements OnInit {
     }
   }
 
-  setCenter(center: GeoPoint | null): void {
-    this.patch({ center });
-  }
-
-  setRouteStart(routeStart: GeoPoint | null): void {
-    this.patch({ routeStart });
-  }
-
-  setRouteEnd(routeEnd: GeoPoint | null): void {
-    this.patch({ routeEnd });
-  }
-
-  setRoutePoints(routePoints: GeoPoint[]): void {
-    this.patch({ routePoints });
-  }
-
   hasDay(bit: number): boolean {
     return (this.form().days & bit) !== 0;
   }
@@ -222,20 +210,16 @@ export class AlertEditPage implements OnInit {
     this.patch({ days: this.form().days ^ bit });
   }
 
-  setDays(mask: number): void {
-    this.patch({ days: mask });
-  }
-
   setLimitHours(value: unknown): void {
     this.patch({ limitHours: value === true });
   }
 
   setFrom(value: unknown): void {
-    this.patch({ from: typeof value === 'string' ? value : '' });
+    this.patch({ from: asText(value) });
   }
 
   setTo(value: unknown): void {
-    this.patch({ to: typeof value === 'string' ? value : '' });
+    this.patch({ to: asText(value) });
   }
 
   save(): void {
@@ -261,7 +245,7 @@ export class AlertEditPage implements OnInit {
         if (alertId) {
           this.loadPreview(alertId);
         } else {
-          void this.router.navigateByUrl('/profile/alerts', { replaceUrl: true });
+          this.backToList();
         }
       },
       // Komunikat pokazuje interceptor błędów.
@@ -271,26 +255,9 @@ export class AlertEditPage implements OnInit {
 
   async remove(): Promise<void> {
     const alertId = this.alertId();
-    if (!alertId) {
-      return;
+    if (alertId && (await this.removal.remove({ id: alertId, name: this.form().name }))) {
+      this.backToList();
     }
-    const confirm = await this.alerts.create({
-      header: 'Usunąć alert?',
-      message: `„${this.form().name}” – nie dostaniesz już powiadomień z tego alertu.`,
-      buttons: [
-        { text: 'Anuluj', role: 'cancel' },
-        { text: 'Usuń', role: 'destructive' },
-      ],
-    });
-    await confirm.present();
-    const { role } = await confirm.onDidDismiss();
-    if (role !== 'destructive') {
-      return;
-    }
-    this.client.delete(alertId).subscribe(() => {
-      void this.toast.success('Alert usunięty.');
-      void this.router.navigateByUrl('/profile/alerts', { replaceUrl: true });
-    });
   }
 
   loadPreview(alertId: string): void {
@@ -299,5 +266,9 @@ export class AlertEditPage implements OnInit {
       next: (items) => this.preview.set(items),
       error: () => this.previewFailed.set(true),
     });
+  }
+
+  private backToList(): void {
+    void this.router.navigateByUrl('/profile/alerts', { replaceUrl: true });
   }
 }

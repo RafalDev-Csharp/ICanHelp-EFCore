@@ -6,21 +6,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ICanHelp.Infrastructure.DAL.Handlers;
 
-internal sealed class GetConversationHandler : IQueryHandler<GetConversation, ConversationDto?>
+internal sealed class GetConversationHandler(ICanHelpDbContext db) : IQueryHandler<GetConversation, ConversationDto?>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetConversationHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<ConversationDto?> HandleAsync(GetConversation query, CancellationToken cancellationToken = default)
     {
         var id = new Id(query.ConversationId);
         var userId = new UserId(query.UserId);
 
-        var conversation = await _db.Conversations
+        var conversation = await db.Conversations
             .AsNoTracking()
             .Include(c => c.Messages)
             .SingleOrDefaultAsync(c => c.Id == id, cancellationToken);
@@ -32,7 +25,7 @@ internal sealed class GetConversationHandler : IQueryHandler<GetConversation, Co
         }
 
         // Oferty i historia zmian są potrzebne do osi czasu i do IsOutdated/ChangesSinceOffer.
-        var announcement = await _db.Announcements
+        var announcement = await db.Announcements
             .AsNoTracking()
             .Include(a => a.Offers)
             .Include(a => a.Changes)
@@ -44,21 +37,14 @@ internal sealed class GetConversationHandler : IQueryHandler<GetConversation, Co
     }
 }
 
-internal sealed class GetConversationIdHandler : IQueryHandler<GetConversationId, Guid?>
+internal sealed class GetConversationIdHandler(ICanHelpDbContext db) : IQueryHandler<GetConversationId, Guid?>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetConversationIdHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<Guid?> HandleAsync(GetConversationId query, CancellationToken cancellationToken = default)
     {
         var announcementId = new Id(query.AnnouncementId);
         var helperId = new UserId(query.HelperId);
 
-        var conversation = await _db.Conversations
+        var conversation = await db.Conversations
             .AsNoTracking()
             .Where(c => c.AnnouncementId == announcementId && c.HelperId == helperId)
             .Select(c => c.Id)

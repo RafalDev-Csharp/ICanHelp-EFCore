@@ -12,23 +12,10 @@ namespace ICanHelp.Application.Commands.Handlers;
 /// (<c>Announcement.AddImage</c>: właściciel, Open, limit), dopiero potem zapis pliku, (3) commit.
 /// Gdy cokolwiek po zapisie pliku się nie uda (np. konflikt współbieżności), plik jest kasowany – nie zostają sieroty.
 /// </summary>
-internal sealed class AddAnnouncementImageHandler : ICommandHandler<AddAnnouncementImage>
+internal sealed class AddAnnouncementImageHandler(IAnnouncementRepository announcements, IUserRepository users,
+    IUnitOfWork unitOfWork, IFileStorage storage, IClock clock) : ICommandHandler<AddAnnouncementImage>
 {
-    private readonly IAnnouncementRepository _announcements;
-    private readonly IUserRepository _users;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IFileStorage _storage;
-    private readonly IClock _clock;
-
-    public AddAnnouncementImageHandler(IAnnouncementRepository announcements, IUserRepository users,
-        IUnitOfWork unitOfWork, IFileStorage storage, IClock clock)
-    {
-        _announcements = announcements;
-        _users = users;
-        _unitOfWork = unitOfWork;
-        _storage = storage;
-        _clock = clock;
-    }
+    private const int ReadBufferBytes = 81920;
 
     public async Task HandleAsync(AddAnnouncementImage command, CancellationToken cancellationToken = default)
     {
@@ -41,10 +28,10 @@ internal sealed class AddAnnouncementImageHandler : ICommandHandler<AddAnnouncem
 
         try
         {
-            await _unitOfWork.ExecuteAsync(async () =>
+            await unitOfWork.ExecuteAsync(async () =>
             {
-                await _users.GetActiveOrThrowAsync(command.ActorId, cancellationToken);
-                var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
+                await users.GetActiveOrThrowAsync(command.ActorId, cancellationToken);
+                var announcement = await announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
 
                 announcement.AddImage(
                     new UserId(command.ActorId),
@@ -52,16 +39,16 @@ internal sealed class AddAnnouncementImageHandler : ICommandHandler<AddAnnouncem
                     ImageFiles.NormalizeFileName(command.FileName, format),
                     format.Extension,
                     path,
-                    _clock.UtcNow);
+                    clock.UtcNow);
 
                 using var stream = new MemoryStream(content, writable: false);
-                await _storage.SaveAsync(path, stream, cancellationToken);
+                await storage.SaveAsync(path, stream, cancellationToken);
                 fileSaved = true;
             }, cancellationToken);
         }
         catch when (fileSaved)
         {
-            await _storage.DeleteAsync(path, CancellationToken.None);
+            await storage.DeleteAsync(path, CancellationToken.None);
             throw;
         }
     }
@@ -70,7 +57,7 @@ internal sealed class AddAnnouncementImageHandler : ICommandHandler<AddAnnouncem
     private static async Task<byte[]> ReadLimitedAsync(Stream source, int maxBytes, CancellationToken cancellationToken)
     {
         using var buffer = new MemoryStream();
-        var chunk = new byte[81920];
+        var chunk = new byte[ReadBufferBytes];
         int read;
 
         while ((read = await source.ReadAsync(chunk, cancellationToken)) > 0)
@@ -93,37 +80,24 @@ internal sealed class AddAnnouncementImageHandler : ICommandHandler<AddAnnouncem
 }
 
 /// <summary>Usuwa zdjęcie z ogłoszenia, a po udanym zapisie – plik z magazynu.</summary>
-internal sealed class RemoveAnnouncementImageHandler : ICommandHandler<RemoveAnnouncementImage>
+internal sealed class RemoveAnnouncementImageHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork,
+    IFileStorage storage, IClock clock) : ICommandHandler<RemoveAnnouncementImage>
 {
-    private readonly IAnnouncementRepository _announcements;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IFileStorage _storage;
-    private readonly IClock _clock;
-
-    public RemoveAnnouncementImageHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork,
-        IFileStorage storage, IClock clock)
-    {
-        _announcements = announcements;
-        _unitOfWork = unitOfWork;
-        _storage = storage;
-        _clock = clock;
-    }
-
     public async Task HandleAsync(RemoveAnnouncementImage command, CancellationToken cancellationToken = default)
     {
         string? path = null;
 
-        await _unitOfWork.ExecuteAsync(async () =>
+        await unitOfWork.ExecuteAsync(async () =>
         {
-            var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
-            var image = announcement.RemoveImage(new UserId(command.ActorId), new Id(command.ImageId), _clock.UtcNow);
+            var announcement = await announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
+            var image = announcement.RemoveImage(new UserId(command.ActorId), new Id(command.ImageId), clock.UtcNow);
             path = image.FilePath;
         }, cancellationToken);
 
         // Dopiero po commicie: gdyby zapis się nie udał, zdjęcie w bazie nadal miałoby swój plik.
         if (path is not null)
         {
-            await _storage.DeleteAsync(path, cancellationToken);
+            await storage.DeleteAsync(path, cancellationToken);
         }
     }
 }

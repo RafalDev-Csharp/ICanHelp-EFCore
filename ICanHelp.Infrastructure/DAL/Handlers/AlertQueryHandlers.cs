@@ -9,21 +9,14 @@ using NetTopologySuite.Geometries;
 
 namespace ICanHelp.Infrastructure.DAL.Handlers;
 
-internal sealed class GetMyAlertsHandler : IQueryHandler<GetMyAlerts, IReadOnlyList<AlertDto>>
+internal sealed class GetMyAlertsHandler(ICanHelpDbContext db) : IQueryHandler<GetMyAlerts, IReadOnlyList<AlertDto>>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetMyAlertsHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<IReadOnlyList<AlertDto>> HandleAsync(GetMyAlerts query,
         CancellationToken cancellationToken = default)
     {
         var userId = new UserId(query.UserId);
 
-        var alerts = await _db.AnnouncementAlerts
+        var alerts = await db.AnnouncementAlerts
             .AsNoTracking()
             .Where(a => a.UserId == userId)
             .OrderByDescending(a => a.CreatedAt)
@@ -33,21 +26,14 @@ internal sealed class GetMyAlertsHandler : IQueryHandler<GetMyAlerts, IReadOnlyL
     }
 }
 
-internal sealed class GetMyAlertHandler : IQueryHandler<GetMyAlert, AlertDto?>
+internal sealed class GetMyAlertHandler(ICanHelpDbContext db) : IQueryHandler<GetMyAlert, AlertDto?>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetMyAlertHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<AlertDto?> HandleAsync(GetMyAlert query, CancellationToken cancellationToken = default)
     {
         var userId = new UserId(query.UserId);
         var alertId = new Id(query.AlertId);
 
-        var alert = await _db.AnnouncementAlerts
+        var alert = await db.AnnouncementAlerts
             .AsNoTracking()
             .SingleOrDefaultAsync(a => a.Id == alertId && a.UserId == userId, cancellationToken);
 
@@ -56,17 +42,11 @@ internal sealed class GetMyAlertHandler : IQueryHandler<GetMyAlert, AlertDto?>
 }
 
 /// <summary>Otwarte ogłoszenia w strefie alertu teraz (to samo dopasowanie co przy powiadomieniu, bez harmonogramu).</summary>
-internal sealed class GetAlertPreviewHandler : IQueryHandler<GetAlertPreview, IReadOnlyList<AnnouncementDto>?>
+internal sealed class GetAlertPreviewHandler(ICanHelpDbContext db)
+    : IQueryHandler<GetAlertPreview, IReadOnlyList<AnnouncementDto>?>
 {
     // Podkategorie filtrujemy w pamięci (lista w JSON) – z bazy bierzemy najwyżej tyle najnowszych kandydatów.
     private const int MaxCandidates = 500;
-
-    private readonly ICanHelpDbContext _db;
-
-    public GetAlertPreviewHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
 
     public async Task<IReadOnlyList<AnnouncementDto>?> HandleAsync(GetAlertPreview query,
         CancellationToken cancellationToken = default)
@@ -74,7 +54,7 @@ internal sealed class GetAlertPreviewHandler : IQueryHandler<GetAlertPreview, IR
         var userId = new UserId(query.UserId);
         var alertId = new Id(query.AlertId);
 
-        var alert = await _db.AnnouncementAlerts
+        var alert = await db.AnnouncementAlerts
             .AsNoTracking()
             .Where(a => a.Id == alertId && a.UserId == userId)
             .Select(a => new
@@ -99,10 +79,10 @@ internal sealed class GetAlertPreviewHandler : IQueryHandler<GetAlertPreview, IR
         var zone = alert.Zone;
         var shape = alert.Shape;
         var categoryId = alert.CategoryId;
-        var limit = Math.Clamp(query.Limit, 1, 100);
+        var limit = Math.Clamp(query.Limit, 1, Paging.MaxPageSize);
 
         // GeoPoint.STIntersects(@zone) – indeks IX_Announcements_GeoPoint.
-        var candidates = await _db.Announcements
+        var candidates = await db.Announcements
             .AsNoTracking()
             .Where(a => a.Status == AnnouncementStatus.Open
                         && a.CategoryId == categoryId
@@ -110,24 +90,13 @@ internal sealed class GetAlertPreviewHandler : IQueryHandler<GetAlertPreview, IR
                         && EF.Property<Point>(a, Spatial.GeoPoint).Intersects(zone))
             .OrderByDescending(a => a.CreatedAt)
             .Take(MaxCandidates)
-            .Select(a => new
-            {
-                Announcement = a,
-                Distance = EF.Property<Point>(a, Spatial.GeoPoint).Distance(shape),
-                ThumbnailId = a.Images.OrderBy(i => i.AddedAt).Select(i => i.Id).FirstOrDefault(),
-                HelperCount = a.Offers.Select(o => o.HelperId).Distinct().Count()
-            })
+            .ToListRows(distanceFrom: shape)
             .ToListAsync(cancellationToken);
 
         return candidates
             .Where(x => alert.SubcategoryIds.Count == 0 || alert.SubcategoryIds.Contains(x.Announcement.SubcategoryId))
             .Take(limit)
-            .Select(x => x.Announcement.AsDto() with
-            {
-                DistanceKm = Math.Round(x.Distance / 1000, 2),
-                ThumbnailUrl = x.ThumbnailId is null ? null : ImageDto.GetUrl(x.Announcement.Id, x.ThumbnailId),
-                HelperCount = x.HelperCount
-            })
+            .Select(x => x.AsDto())
             .ToList();
     }
 }
@@ -142,12 +111,8 @@ internal static class AlertDtoMapping
             Kind = entity.Kind,
             CategoryId = entity.CategoryId,
             SubcategoryIds = entity.SubcategoryIds.Select(s => s.Value).ToList(),
-            Center = entity.Center is { } center
-                ? new LocationDto { Latitude = center.Latitude, Longitude = center.Longitude }
-                : null,
-            RoutePoints = entity.RoutePoints
-                .Select(p => new LocationDto { Latitude = p.Latitude, Longitude = p.Longitude })
-                .ToList(),
+            Center = entity.Center?.AsDto(),
+            RoutePoints = entity.RoutePoints.Select(p => p.AsDto()).ToList(),
             RadiusKm = entity.RadiusKm,
             Schedule = new AlertScheduleDto
             {

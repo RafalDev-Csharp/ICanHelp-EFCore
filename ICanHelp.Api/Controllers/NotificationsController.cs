@@ -1,4 +1,3 @@
-using ICanHelp.Api.Security;
 using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.Commands;
 using ICanHelp.Application.DTO;
@@ -13,10 +12,9 @@ namespace ICanHelp.Api.Controllers;
 /// nowa wiadomość, edycja ogłoszenia, o które negocjuje. Powstają w tle (outbox) chwilę po zdarzeniu;
 /// na żywo przychodzą też przez SignalR (<c>/hubs/notifications</c>). Cudze powiadomienia → 404.
 /// </summary>
-[ApiController]
 [Route("api/me/notifications")]
 [Authorize]
-public sealed class NotificationsController : ControllerBase
+public sealed class NotificationsController : ApiController
 {
     /// <summary>Moje powiadomienia od najnowszych; <c>unreadOnly=true</c> – tylko nieprzeczytane.</summary>
     [HttpGet]
@@ -29,14 +27,9 @@ public sealed class NotificationsController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
         var notifications = await handler.HandleAsync(new GetMyNotifications
         {
-            UserId = userId,
+            UserId = CurrentUserId,
             UnreadOnly = unreadOnly,
             Page = page,
             PageSize = pageSize
@@ -52,33 +45,18 @@ public sealed class NotificationsController : ControllerBase
     public async Task<ActionResult<UnreadCountDto>> GetUnreadCount(
         [FromServices] IQueryHandler<GetUnreadNotificationCount, UnreadCountDto> handler,
         CancellationToken cancellationToken)
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        return Ok(await handler.HandleAsync(new GetUnreadNotificationCount { UserId = userId }, cancellationToken));
-    }
+        => Ok(await handler.HandleAsync(new GetUnreadNotificationCount { UserId = CurrentUserId }, cancellationToken));
 
     /// <summary>Oznacza jedno powiadomienie jako przeczytane (ponownie – bez zmian). Cudze albo nieistniejące → 404.</summary>
     [HttpPost("{notificationId:guid}/read")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> MarkAsRead(
+    public Task<IActionResult> MarkAsRead(
         Guid notificationId,
         [FromServices] ICommandHandler<MarkNotificationAsRead> handler,
         CancellationToken cancellationToken)
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        await handler.HandleAsync(new MarkNotificationAsRead(notificationId, userId), cancellationToken);
-        return NoContent();
-    }
+        => Send(new MarkNotificationAsRead(notificationId, CurrentUserId), handler, cancellationToken);
 
     /// <summary>
     /// Oznacza wszystkie moje powiadomienia jako przeczytane; z <c>conversationId</c> – tylko te z jednego wątku
@@ -87,17 +65,9 @@ public sealed class NotificationsController : ControllerBase
     [HttpPost("read-all")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> MarkAllAsRead(
+    public Task<IActionResult> MarkAllAsRead(
         [FromServices] ICommandHandler<MarkAllNotificationsAsRead> handler,
         CancellationToken cancellationToken,
         [FromQuery] Guid? conversationId = null)
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        await handler.HandleAsync(new MarkAllNotificationsAsRead(userId, conversationId), cancellationToken);
-        return NoContent();
-    }
+        => Send(new MarkAllNotificationsAsRead(CurrentUserId, conversationId), handler, cancellationToken);
 }

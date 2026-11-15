@@ -8,11 +8,9 @@ import { CategoriesService } from '../../core/categories/categories.service';
 import { PushService } from '../../core/pwa/push.service';
 import { ToastService } from '../../core/ui/toast.service';
 
-import { JobExitModalComponent } from './job-exit-modal.component';
 import { OfferChangesModalComponent } from './offer-changes-modal.component';
 import { OfferFormModalComponent } from './offer-form-modal.component';
 import { OffersService } from './offers.service';
-import { RatingModalComponent } from './rating-modal.component';
 import { offerFixture } from './testing/offer-fixtures';
 
 describe('OffersService', () => {
@@ -23,13 +21,6 @@ describe('OffersService', () => {
     accept: vi.fn(),
     reject: vi.fn(),
     withdraw: vi.fn(),
-    start: vi.fn(),
-    reportDone: vi.fn(),
-    complete: vi.fn(),
-    postRating: vi.fn(),
-    abandon: vi.fn(),
-    interrupt: vi.fn(),
-    respondToJobExit: vi.fn(),
   };
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
   const push = { suggest: vi.fn(() => Promise.resolve()) };
@@ -248,30 +239,6 @@ describe('OffersService', () => {
     expect(toast.success).toHaveBeenCalledWith('Oferta przyjęta.');
   });
 
-  it('starts, reports and completes the job only after confirmation', async () => {
-    client.start.mockReturnValue(of(undefined));
-    client.reportDone.mockReturnValue(of(undefined));
-    client.complete.mockReturnValue(of(undefined));
-    const service = create();
-
-    alertRole = 'cancel';
-    await expect(service.start('a1')).resolves.toBe(false);
-    expect(client.start).not.toHaveBeenCalled();
-
-    alertRole = 'confirm';
-    await expect(service.start('a1')).resolves.toBe(true);
-    expect(client.start).toHaveBeenCalledWith('a1');
-    expect(toast.success).toHaveBeenCalledWith('Zlecenie w realizacji.');
-
-    await expect(service.reportDone('a1')).resolves.toBe(true);
-    expect(client.reportDone).toHaveBeenCalledWith('a1');
-    expect(toast.success).toHaveBeenCalledWith('Wykonanie zgłoszone – czekasz na potwierdzenie.');
-
-    await expect(service.complete('a1')).resolves.toBe(true);
-    expect(client.complete).toHaveBeenCalledWith('a1');
-    expect(toast.success).toHaveBeenCalledWith('Zlecenie zakończone. Oceń współpracę!');
-  });
-
   it('reports failure when the API refuses (message shown by the interceptor)', async () => {
     alertRole = 'destructive';
     client.withdraw.mockReturnValue(throwError(() => ({ status: 409 })));
@@ -279,66 +246,5 @@ describe('OffersService', () => {
 
     await expect(service.withdraw(offerFixture('o1'))).resolves.toBe(false);
     expect(toast.success).not.toHaveBeenCalled();
-  });
-
-  it('rates the other side from the rating window', async () => {
-    modalResult = { data: { rate: 5, comment: 'Polecam' }, role: 'confirm' };
-    client.postRating.mockReturnValue(of({ id: 'r1' }));
-    const service = create();
-
-    await expect(service.rate('a1', 'Jan')).resolves.toBe(true);
-    expect(modals.create.mock.calls[0][0].component).toBe(RatingModalComponent);
-    expect(client.postRating).toHaveBeenCalledWith('a1', { rate: 5, comment: 'Polecam' });
-  });
-
-  it('abandons or interrupts the job with the reason from the window', async () => {
-    client.abandon.mockReturnValue(of(undefined));
-    client.interrupt.mockReturnValue(of(undefined));
-    const service = create();
-
-    modalResult = { data: { reason: 'CannotMakeIt', note: undefined }, role: 'confirm' };
-    await expect(service.exitJob('a1', 'abandon', 'Zleceniodawca')).resolves.toBe(true);
-    expect(modals.create.mock.calls[0][0].component).toBe(JobExitModalComponent);
-    expect(modals.create.mock.calls[0][0].componentProps).toEqual({ action: 'abandon', otherSide: 'Zleceniodawca' });
-    expect(client.abandon).toHaveBeenCalledWith('a1', { reason: 'CannotMakeIt', note: undefined });
-
-    modalResult = { data: { reason: 'Disagreement', note: 'Inny zakres.' }, role: 'confirm' };
-    await expect(service.exitJob('a1', 'interrupt', 'Pomocnik')).resolves.toBe(true);
-    expect(client.interrupt).toHaveBeenCalledWith('a1', { reason: 'Disagreement', note: 'Inny zakres.' });
-  });
-
-  it('sends the statement from the text window', async () => {
-    client.respondToJobExit.mockReturnValue(of(undefined));
-    alerts.create.mockImplementationOnce(() =>
-      Promise.resolve({
-        present: () => Promise.resolve(),
-        onDidDismiss: () => Promise.resolve({ role: 'confirm', data: { values: { text: '  Inny zakres.  ' } } }),
-      }),
-    );
-    const service = create();
-
-    await expect(service.respondToExit('a1', 2)).resolves.toBe(true);
-    expect(client.respondToJobExit).toHaveBeenCalledWith('a1', 2, { text: 'Inny zakres.' });
-  });
-
-  it('does not send an empty statement', async () => {
-    alerts.create.mockImplementationOnce(() =>
-      Promise.resolve({
-        present: () => Promise.resolve(),
-        onDidDismiss: () => Promise.resolve({ role: 'confirm', data: { values: { text: ' ' } } }),
-      }),
-    );
-    const service = create();
-
-    await expect(service.respondToExit('a1', 1)).resolves.toBe(false);
-    expect(client.respondToJobExit).not.toHaveBeenCalled();
-  });
-
-  it('does not abandon when the reason window is closed', async () => {
-    modalResult = { role: 'cancel' };
-    const service = create();
-
-    await expect(service.exitJob('a1', 'abandon', 'Pomocnik')).resolves.toBe(false);
-    expect(client.abandon).not.toHaveBeenCalled();
   });
 });

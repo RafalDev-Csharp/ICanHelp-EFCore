@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { NonNullableFormBuilder } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
@@ -16,16 +16,14 @@ import { map, switchMap } from 'rxjs';
 
 import { AnnouncementsClient } from '../../core/api/api-client';
 import { CategoriesService } from '../../core/categories/categories.service';
-import type { GeoPoint } from '../../core/geo/geo-point';
 import { PushService } from '../../core/pwa/push.service';
 import { ToastService } from '../../core/ui/toast.service';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { NotificationsBellComponent } from '../../shared/components/notifications-bell/notifications-bell.component';
 
-import type { PhotoItem } from './form/announcement-form';
-import { createAnnouncementForm, formValueOf, toCreateCommand } from './form/announcement-form';
+import { toCreateCommand } from './form/announcement-form';
+import { AnnouncementFormState } from './form/announcement-form-state';
 import { AnnouncementFormComponent } from './form/announcement-form.component';
-import { releasePhotos } from './form/photo-picker.component';
 import { syncPhotos } from './form/photo-upload';
 
 /**
@@ -58,11 +56,8 @@ export class AddAnnouncementPage implements ViewWillEnter {
   private readonly toast = inject(ToastService);
   private readonly push = inject(PushService);
 
-  readonly form = createAnnouncementForm(inject(NonNullableFormBuilder));
-  readonly location = signal<GeoPoint | null>(null);
-  readonly photos = signal<PhotoItem[]>([]);
-  readonly submitted = signal(false);
-  readonly saving = signal(false);
+  /** Pola, miejsce i zdjęcia nowego ogłoszenia. */
+  readonly draft = new AnnouncementFormState(inject(NonNullableFormBuilder));
 
   ionViewWillEnter(): void {
     this.categories.load().subscribe({ error: () => undefined });
@@ -76,11 +71,7 @@ export class AddAnnouncementPage implements ViewWillEnter {
   private fillCopyOf(announcementId: string): void {
     this.client.getById(announcementId).subscribe({
       next: (announcement) => {
-        releasePhotos(this.photos());
-        this.photos.set([]);
-        this.form.reset(formValueOf(announcement));
-        this.location.set(announcement.location);
-        this.submitted.set(false);
+        this.draft.fill(announcement);
         void this.toast.info('Formularz wypełniony kopią ogłoszenia – zdjęcia dodaj od nowa.');
         void this.router.navigate(['/add'], { replaceUrl: true });
       },
@@ -90,42 +81,32 @@ export class AddAnnouncementPage implements ViewWillEnter {
   }
 
   submit(): void {
-    this.submitted.set(true);
-    const location = this.location();
-    if (this.form.invalid || !location) {
-      this.form.markAllAsTouched();
+    const input = this.draft.validated();
+    if (!input) {
       void this.toast.error('Uzupełnij zaznaczone pola.');
       return;
     }
-    if (this.saving()) {
+    if (this.draft.saving()) {
       return;
     }
 
-    const photos = this.photos();
-    this.saving.set(true);
+    const photos = this.draft.photos();
+    this.draft.saving.set(true);
     this.client
-      .create(toCreateCommand(this.form.getRawValue(), location))
+      .create(toCreateCommand(input.value, input.location))
       .pipe(switchMap(({ id }) => syncPhotos(this.client, id, photos).pipe(map((failed) => ({ id, failed })))))
       .subscribe({
         next: ({ id, failed }) => {
-          this.saving.set(false);
+          this.draft.saving.set(false);
           void (failed > 0
             ? this.toast.info('Ogłoszenie dodane, ale nie wszystkie zdjęcia – możesz je dodać w edycji.')
             : this.toast.success('Ogłoszenie dodane.'));
-          this.reset();
+          this.draft.clear();
           void this.router.navigate(['/announcements', id]);
           void this.push.suggest('Powiadomić Cię, gdy ktoś złoży ofertę do tego ogłoszenia?');
         },
         // Komunikat (np. zła kategoria) pokazał interceptor – formularz zostaje, można poprawić i wysłać znowu.
-        error: () => this.saving.set(false),
+        error: () => this.draft.saving.set(false),
       });
-  }
-
-  private reset(): void {
-    releasePhotos(this.photos());
-    this.photos.set([]);
-    this.location.set(null);
-    this.submitted.set(false);
-    this.form.reset();
   }
 }

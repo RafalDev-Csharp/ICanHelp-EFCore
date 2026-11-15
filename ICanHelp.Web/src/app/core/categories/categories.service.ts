@@ -48,6 +48,11 @@ export class CategoriesService {
     return id ? (this.names().get(id) ?? '') : '';
   }
 
+  /** „Dom · Hydraulika” – kategoria z podkategorią ogłoszenia (bez nazw, których jeszcze nie znamy). */
+  path(categoryId: string | null | undefined, subcategoryId: string | null | undefined): string {
+    return [this.name(categoryId), this.name(subcategoryId)].filter(Boolean).join(' · ');
+  }
+
   subcategoriesOf(categoryId: string | null | undefined): SubcategoryDto[] {
     return this.categories().find((category) => category.id === categoryId)?.subcategories ?? [];
   }

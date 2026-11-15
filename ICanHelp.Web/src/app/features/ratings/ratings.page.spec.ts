@@ -4,9 +4,11 @@ import { of, throwError } from 'rxjs';
 
 import type { MyRatingDto, PendingRatingDto } from '../../core/api/api-client';
 import { MyRatingsClient } from '../../core/api/api-client';
-import { OffersService } from '../offers/offers.service';
+import { JobService } from '../offers/job.service';
 
-import { RatingsPage, groupByRater, groupedAverage } from './ratings.page';
+import { groupByRater, groupedAverage } from './rating-groups';
+import { starIcon } from './rating-stars.component';
+import { RatingsPage } from './ratings.page';
 
 function received(id: string, overrides: Partial<MyRatingDto> = {}): MyRatingDto {
   return {
@@ -36,7 +38,7 @@ function pendingItem(id: string, overrides: Partial<PendingRatingDto> = {}): Pen
 
 describe('RatingsPage', () => {
   const client = { getMine: vi.fn(), getPending: vi.fn() };
-  const offers = { rate: vi.fn() };
+  const jobs = { rate: vi.fn() };
 
   function create(): { page: RatingsPage; element: HTMLElement; render: () => Promise<void> } {
     TestBed.configureTestingModule({
@@ -44,7 +46,7 @@ describe('RatingsPage', () => {
       providers: [
         provideRouter([]),
         { provide: MyRatingsClient, useValue: client },
-        { provide: OffersService, useValue: offers },
+        { provide: JobService, useValue: jobs },
       ],
     });
     const fixture = TestBed.createComponent(RatingsPage);
@@ -67,7 +69,7 @@ describe('RatingsPage', () => {
   it('starts on "to rate" and rates the other side, then reloads', async () => {
     client.getMine.mockReturnValue(of([]));
     client.getPending.mockReturnValue(of([pendingItem('a7'), pendingItem('a8', { myRole: 'Helper' })]));
-    offers.rate.mockResolvedValue(true);
+    jobs.rate.mockResolvedValue(true);
     const { page, element, render } = create();
     await render();
 
@@ -80,14 +82,14 @@ describe('RatingsPage', () => {
 
     await page.rate(page.pending()[0]);
 
-    expect(offers.rate).toHaveBeenCalledWith('a7', 'pomocnik1');
+    expect(jobs.rate).toHaveBeenCalledWith('a7', 'pomocnik1');
     expect(client.getPending).toHaveBeenCalledTimes(2);
   });
 
   it('does not reload when the rating window is closed', async () => {
     client.getMine.mockReturnValue(of([]));
     client.getPending.mockReturnValue(of([pendingItem('a7')]));
-    offers.rate.mockResolvedValue(false);
+    jobs.rate.mockResolvedValue(false);
     const { page, render } = create();
     await render();
 
@@ -195,11 +197,7 @@ describe('RatingsPage', () => {
   });
 
   it('draws half stars for an average', () => {
-    client.getMine.mockReturnValue(of([]));
-    client.getPending.mockReturnValue(of([]));
-    const { page } = create();
-
-    expect([1, 2, 3, 4, 5].map((index) => page.starIcon(index, 3.5))).toEqual([
+    expect([1, 2, 3, 4, 5].map((index) => starIcon(index, 3.5))).toEqual([
       'star',
       'star',
       'star',

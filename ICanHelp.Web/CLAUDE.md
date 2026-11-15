@@ -17,7 +17,8 @@ app.config.ts     providery (router, Ionic, locale) · app.routes.ts → tabs/ta
                   bez zakładki – dzwonek; nieznany adres → /announcements)
 core/             jedno miejsce na całą aplikację: config/locale.ts (pl-PL, PLN), config/map.ts (kafelki, środek domyślny);
                   api/ – `api-client.ts` (NSwag, generowany), `provideApi()` (API_BASE_URL), `isApiUrl`, `apiResourceUrl`
-                  (adresy zdjęć), `errorStatus`; categories/ – `CategoriesService` (raz na sesję, `name(id)`),
+                  (adresy zdjęć), `errorStatus`, `ApiCommands` (komenda po akcji użytkownika: żądanie → komunikat sukcesu
+                  → `true` / `false`); categories/ – `CategoriesService` (raz na sesję, `name(id)`, `path(kat, podkat)`),
                   `category-icons` (kafelki „Szukaj”);
                   geo/ – `GeoPoint`, `GeolocationService` (tylko po kliknięciu, ~100 m), `GeocodingService` (Nominatim, ≥ 1,1 s
                   między zapytaniami, `approximatePoint`), `RoutingService` (OpenRouteService, `prepareRoute`; bez klucza –
@@ -25,46 +26,65 @@ core/             jedno miejsce na całą aplikację: config/locale.ts (pl-PL, P
                   auth/ – `AuthService` (sygnały `currentUser`, `isAuthenticated`; tokeny w localStorage `icanhelp.auth`, synchronizacja kart,
                   jedno odświeżenie naraz), `authGuard` (+ `loginUrlTree`, `safeReturnUrl`);
                   notifications/ – `NotificationsService` (hub SignalR `/hubs/notifications`, dopóki zalogowany; `unreadCount`,
-                  `received$` (z huba), `activity$` (hub + push: `{announcementId, conversationId}` – otwarte ekrany
-                  przeładowują dane), toast „Pokaż”, `openConversation` = wątek na ekranie), `notification-texts` (tekst i link
-                  z `type` + `parameters`), `NOTIFICATION_HUB_FACTORY` (w specs – fałszywe połączenie);
+                  `received$` (z huba), `activity$` (hub + push: `{announcementId, conversationId}`), toast „Pokaż”,
+                  `openConversation` = wątek na ekranie), `NotificationHubClient` (jedno połączenie: start z ponawianiem, token),
+                  `reloadOnActivity` (otwarty ekran przeładowuje dane po `activity$`), `notification-model` (`PushNotice`,
+                  `NotificationActivity`, `isRead`, `asRead`), `notification-texts` (tekst i link z `type` + `parameters`),
+                  `NOTIFICATION_HUB_FACTORY` (w specs – fałszywe połączenie);
                   pwa/ – `PushService` (FCM: zgoda po akcji – `suggest()` / `enable()`, `api/me/devices`, `unregister()` przed
-                  wylogowaniem, push z workera → `NotificationsService.showPush`), `PUSH_MESSAGING` (Firebase SDK, leniwie;
-                  w specs zaślepka), `InstallPromptService` (`beforeinstallprompt`, instrukcja iPhone);
+                  wylogowaniem, push z workera → `NotificationsService.showPush`), `push-platform` (`PUSH_PLATFORM` – dostęp do
+                  przeglądarki), `push-storage` (pamięć urządzenia), `push-messages` (`parseWorkerMessage`), `PUSH_MESSAGING`
+                  (Firebase SDK, leniwie; w specs zaślepka), `InstallPromptService` (`beforeinstallprompt`, instrukcja iPhone);
                   interceptors/ – `authInterceptor` (Bearer, odświeżenie przed wygaśnięciem i raz po 401), `errorInterceptor`
-                  (ProblemDetails → toast, mapa `error-messages.ts`, `SKIP_ERROR_TOAST`); ui/ – `ToastService` (error/success/info);
+                  (ProblemDetails → toast, mapa `error-messages.ts`, `SKIP_ERROR_TOAST`); ui/ – `ToastService` (error/success/info),
+                  `DialogService` (`confirm`, `prompt` → gotowa odpowiedź), `ModalService` (okno z komponentem → dane albo `null`);
                   testing/ – helpery do specs (`provideNotificationsStub` – strony z dzwonkiem)
-shared/           components/ (EmptyStateComponent, `app-brand` – logo w nagłówku każdej strony → `/announcements`,
+shared/           components/ (EmptyStateComponent, `app-loading` / `app-load-failed` – stany „wczytuję” i „nie udało się”
+                  z „Spróbuj ponownie”, `app-brand` – logo w nagłówku każdej strony → `/announcements`,
                   `app-notifications-bell` – dzwonek z plakietką w nagłówku korzeni zakładek, `app-map` – Leaflet: pinezki, okrąg promienia, trasa z pasem, tryb poglądowy,
                   `app-place-search` – moja pozycja + adres),
-                  pipes/ (`price`, `distance` – km z API, `timeAgo` – „2 h temu”), text/ (`pluralPl` – „1 ocena / 2 oceny / 5 ocen”)
-features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poza zakładkami, `?returnUrl=`),
-                  announcements („Szukaj”: fraza, kafelki kategorii, lista ↔ mapa: `list/` – store, filtry, karta; `details/` – `/announcements/:announcementId`;
-                  `form/` – formularz ogłoszenia (pola, miejsce, zdjęcia + `resizeImage`, `syncPhotos`), wspólny dla
-                  `add-announcement.page` (`/add`, `?copyOf=<id>` – „Wystaw ponownie” po przerwaniu, bez zdjęć) i `edit/`
-                  (`/announcements/:id/edit`); `likes/` – `LikesService`;
-                  `details/announcement-negotiations.ts` – negocjacje per pomocnik i „Historia ogłoszenia” właściciela;
-                  `testing/` – dane i zaślepki do specs),
-                  offers (`offer-labels` – teksty, `offerStateLabel` (bez „nieaktualna”) i `offerActions` = reguły domeny,
+                  data/ (`RemoteList` / `PagedList` – lista z API ze stanem `loading | ready | failed`, odświeżanie i
+                  doładowywanie; `RemoteData` / `RemoteItem` – jeden zasób, 404 → `not-found`; `runExclusive` – jedna akcja
+                  naraz; `completeIonEvent`), forms/ (`validators`: `notBlank`, `cents`, `minLengthIfPresent`),
+                  pipes/ (`price`, `distance` – km z API, `timeAgo` – „2 h temu”), text/ (`pluralPl` – „1 ocena / 2 oceny / 5 ocen”,
+                  `rating-texts`, `announcement-fields` – nazwy pól ogłoszenia, `capitalize`)
+features/<obszar>/ strony i serwisy obszaru: auth (`/login`, `/register` – poza zakładkami, `?returnUrl=`; `sign-up-form.ts` –
+                  reguły, formularz i komenda rejestracji),
+                  announcements („Szukaj”: fraza, kafelki kategorii, lista ↔ mapa: `list/` – store, filtry, karta;
+                  `details/` – `/announcements/:announcementId`: `AnnouncementDetailsStore` (dane + rola czytającego, `providers`
+                  strony), sekcje `app-announcement-content` / `-owner` / `-negotiations`, `announcement-footer.ts`
+                  (`footerMode` – która stopka), strona = akcje i stopka; `announcement-negotiations.ts` – negocjacje per
+                  pomocnik i „Historia ogłoszenia” właściciela;
+                  `form/` – formularz ogłoszenia (pola, miejsce, zdjęcia + `resizeImage`, `syncPhotos`; `AnnouncementFormState` –
+                  stan trzymany przez stronę: `validated()`, `fill()`, `clear()`), wspólny dla `add-announcement.page` (`/add`,
+                  `?copyOf=<id>` – „Wystaw ponownie” po przerwaniu, bez zdjęć) i `edit/` (`/announcements/:id/edit`);
+                  `likes/` – `LikesService`; `testing/` – dane i zaślepki do specs),
+                  offers (wspólne dla wątku i szczegółów; `OffersService` – negocjacje: okno → potwierdzenie → API → toast;
+                  `JobService` – realizacja: krok zlecenia `run`, wyjście `exit`, `respondToExit`, ocena `rate`;
+                  `offer-labels` – teksty, `offerStateLabel` (bez „nieaktualna”) i `offerActions` = reguły domeny;
+                  `offer-view` (`OfferView` – oferta gotowa do narysowania + przyciski) + `app-offer-card`;
                   `offer-changes` + `OfferChangesModalComponent` – podgląd zmian ogłoszenia było → jest i decyzja autora
-                  oferty (`OffersService.reviewChanges`: podtrzymaj / zmień / wycofaj), `job-step` – krok realizacji zlecenia
-                  (Rozpocznij / Zgłoś wykonanie / Potwierdź wykonanie + notka; wątek i szczegóły; F11 E: `exit` – Zrezygnuj /
-                  Przerwij zlecenie), `job-exit` (powody, teksty wpisów, `reliabilityLabel`) + `JobExitModalComponent`
-                  (powód + opis → `OffersService.exitJob`), `offer-form` – formularz oferty /
-                  kontroferty, okna `OfferFormModalComponent` i `RatingModalComponent`, `OffersService` – okno → potwierdzenie
-                  → API → toast, wspólny dla wątku i szczegółów; `testing/offer-fixtures`),
+                  oferty (`OffersService.reviewChanges`: podtrzymaj / zmień / wycofaj); `job-step` – `jobStep` (reguły kroku:
+                  Rozpocznij / Zgłoś wykonanie / Potwierdź wykonanie, wyjście) i `jobStepView` (teksty, ikony, kolory);
+                  `job-exit` (powody, `jobExitView` – wpis o rezygnacji / przerwaniu, `reliabilityLabel`) +
+                  `JobExitModalComponent`; `offer-form` – formularz oferty / kontroferty, okna `OfferFormModalComponent`
+                  i `RatingModalComponent`; `testing/offer-fixtures`),
                   orders (zakładka „Zlecenia” `/conversations`: Zlecam = moje ogłoszenia, Pomagam = moje wątki pomocnika,
                   grupy po statusie – `order-groups.ts`; „Zakończone” zwinięte na dole, wyszarzone),
                   conversations (`/conversations/all` – wszystkie wątki z filtrem roli, `conversation-item` – wiersz wątku,
                   `/conversations/:conversationId` – wątek: wiadomości, oferty z akcjami, zmiany ogłoszenia, bez ofert =
-                  „Pytania i odpowiedzi”; `conversation-timeline.ts` – wpisy + `threadNotice` (zobacz zmiany / aktualną ofertę)),
+                  „Pytania i odpowiedzi”; `conversation-timeline.ts` – wpisy + `threadNotice` (zobacz zmiany / aktualną ofertę),
+                  `conversation-thread.ts` – reguły wątku (`canMakeOffer`, `threadJobStep`, `readOnlyReason`),
+                  `app-conversation-subject` – karta ogłoszenia u góry),
                   notifications (`/notifications` – lista, „Oznacz wszystkie”, nowe z huba na górze),
-                  profile (zakładka „Konto”, bez logowania: „Zaloguj się”; `liked-announcements` = zakładka „Ulubione” `/liked`;
-                  `my-announcements` – bez trasy od F11 B, do usunięcia),
-                  profile/user-profile (`/users/:userId`, publiczny profil F11 G: Pomagam / Zlecam, przerwane zlecenia),
-                  ratings (`/profile/ratings` – „Do wystawienia” · „Jako pomocnik” · „Jako zleceniodawca”, `api/me/ratings`),
+                  profile (zakładka „Konto”, bez logowania: „Zaloguj się”; `liked-announcements` = zakładka „Ulubione” `/liked`),
+                  profile/user-profile (`/users/:userId`, publiczny profil F11 G: Pomagam / Zlecam, przerwane zlecenia;
+                  `profile-stats.ts` – teksty statystyk),
+                  ratings (`/profile/ratings` – „Do wystawienia” · „Jako pomocnik” · „Jako zleceniodawca”, `api/me/ratings`;
+                  `rating-groups.ts` – grupowanie po oceniającym, `app-rating-stars`),
                   alerts (`/profile/alerts` – lista, `/profile/alerts/new?kind=Area|Route`, `/profile/alerts/:alertId` – edycja
-                  + „Pasujące teraz”; `alert-form.ts` – stan, walidacja, `WeekDays` ↔ maska; `route-picker` – start/cel → trasa)
+                  + „Pasujące teraz”; `alert-form.ts` – stan, walidacja, `WeekDays` ↔ maska; `route-picker` – start/cel → trasa;
+                  `AlertRemovalService` – usunięcie po potwierdzeniu, wspólne dla listy i edycji)
 tabs/             TabsPage – dolny pasek zakładek, rejestruje ikony zakładek (`addIcons`), uruchamia `NotificationsService`
                   i push; stuknięcie zakładki = jej korzeń (`openTabRoot`, nie ostatni ekran). Strony używające `NotificationsService` – w specs obiekt z `received$` (Subject)
 ```
@@ -77,7 +97,8 @@ Mapy: Leaflet (`import * as L from 'leaflet'`, style w `global.scss`, kolory pin
 W specs stron z mapą podmieniamy `MapComponent` zaślepką (`TestBed.overrideComponent`) – jsdom nie rysuje map; strony z formularzem
 ogłoszenia – `AnnouncementFormStubComponent` (`features/announcements/testing/announcement-form.stub.ts`).
 Okna (Ionic modal) dostają dane przez `componentProps` → w komponentach okien zwykłe `@Input()`, nie `input()`; w specs
-`ModalController` / `AlertController` zastępujemy obiektem z `create()` (wynik `onWillDismiss` / `onDidDismiss` ustawia test).
+`ModalController` / `AlertController` zastępujemy obiektem z `create()` (wynik `onWillDismiss` / `onDidDismiss` ustawia test;
+`DialogService` i `ModalService` zostają prawdziwe).
 `src/environments/environment*.ts`: `apiUrl` – pusty = ta sama domena (dev przez proxy, produkcja: API serwuje frontend, F10);
 `firebase` + `vapidKey` – publiczna konfiguracja FCM (puste = push wyłączony); `openRouteServiceKey` – trasy alertów (pusty =
 linia prosta).
@@ -95,6 +116,12 @@ w `public/`. W `ng serve` service worker jest wyłączony – PWA i push sprawdz
 7. Interfejs po polsku (`pl-PL`), nazwy w kodzie po angielsku, komentarze mogą być po polsku.
 8. Lint wymusza m.in. `import type` dla typów, kolejność importów (zewnętrzne / `../` / `./`, alfabetycznie), typy zwracane
    w publicznych metodach i eksportowanych funkcjach. Nowe strony: `*.page.ts` + `*.page.html`, selektor z prefiksem `app-`.
+9. Wspólne klocki zamiast kopiowania (R2): lista z API – `RemoteList` / `PagedList` + `<app-loading>` / `<app-load-failed>`;
+   ekran jednego zasobu – `RemoteItem`; akcja z przycisku – `runExclusive(busy, …)`; pytanie – `DialogService.confirm`;
+   okno z komponentem – `ModalService.open`; komenda API z komunikatem – `ApiCommands.run`; przeładowanie po
+   powiadomieniu – `reloadOnActivity`. Duża strona = store (`providers` strony) + sekcje-komponenty + czyste funkcje
+   (reguły, teksty – z własnym spec); akcje użytkownika i stopka z przyciskami zostają na stronie.
+   `ion-header` zostaje w szablonie strony – przejścia iOS w Ionic szukają go jako bezpośredniego dziecka strony.
 
 ## Komendy (w folderze `ICanHelp.Web`)
 ```bash

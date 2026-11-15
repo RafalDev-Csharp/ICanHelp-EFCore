@@ -2,7 +2,7 @@ using ICanHelp.Core.Exceptions;
 
 namespace ICanHelp.Application.Exceptions;
 
-public class UserNameAlreadyInUseException : CustomExceptions
+public class UserNameAlreadyInUseException : AlreadyExistsException
 {
     public string UserName { get; }
 

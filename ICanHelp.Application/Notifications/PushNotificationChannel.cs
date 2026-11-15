@@ -9,29 +9,19 @@ namespace ICanHelp.Application.Notifications;
 /// Tokens that FCM rejected as invalid (app removed, token expired) → those devices are removed.
 /// Quiet hours stay where they were: an alert in quiet hours is not delivered live at all, so not by push either.
 /// </summary>
-internal sealed class PushNotificationChannel : INotificationChannel
+internal sealed class PushNotificationChannel(IUserDeviceRepository devices, IUnitOfWork unitOfWork, IPushSender push)
+    : INotificationChannel
 {
-    private readonly IUserDeviceRepository _devices;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IPushSender _push;
-
-    public PushNotificationChannel(IUserDeviceRepository devices, IUnitOfWork unitOfWork, IPushSender push)
-    {
-        _devices = devices;
-        _unitOfWork = unitOfWork;
-        _push = push;
-    }
-
     public async Task SendAsync(Guid userId, NotificationDto notification, CancellationToken cancellationToken = default)
     {
         var recipient = new UserId(userId);
-        var tokens = (await _devices.GetByUserAsync(recipient, cancellationToken)).Select(d => d.Token).ToList();
+        var tokens = (await devices.GetByUserAsync(recipient, cancellationToken)).Select(d => d.Token).ToList();
         if (tokens.Count == 0)
         {
             return;
         }
 
-        var result = await _push.SendAsync(tokens, ToMessage(notification), cancellationToken);
+        var result = await push.SendAsync(tokens, ToMessage(notification), cancellationToken);
         if (result.InvalidTokens.Count == 0)
         {
             return;
@@ -39,13 +29,13 @@ internal sealed class PushNotificationChannel : INotificationChannel
 
         var invalid = result.InvalidTokens.ToHashSet(StringComparer.Ordinal);
 
-        await _unitOfWork.ExecuteAsync(async () =>
+        await unitOfWork.ExecuteAsync(async () =>
         {
-            foreach (var device in await _devices.GetByUserAsync(recipient, cancellationToken))
+            foreach (var device in await devices.GetByUserAsync(recipient, cancellationToken))
             {
                 if (invalid.Contains(device.Token))
                 {
-                    _devices.Remove(device);
+                    devices.Remove(device);
                 }
             }
         }, cancellationToken);

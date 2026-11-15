@@ -6,9 +6,6 @@ namespace ICanHelp.Application.DTO;
 /// </summary>
 public sealed record MyConversationDto
 {
-    /// <summary>Length of <see cref="LastMessagePreview"/> (longer messages are cut and end with "…").</summary>
-    public const int PreviewLength = 100;
-
     public Guid ConversationId { get; init; }
     public Guid AnnouncementId { get; init; }
     public string Title { get; init; } = string.Empty;
@@ -23,7 +20,7 @@ public sealed record MyConversationDto
     /// <summary>The newest offer in this conversation (also a counter-offer of the owner); null = no offer yet.</summary>
     public LastOfferDto? LastOffer { get; init; }
 
-    /// <summary>The beginning of the newest message (of either side); null = no messages yet.</summary>
+    /// <summary>The beginning of the newest message of either side (<c>TextPreview</c>); null = no messages yet.</summary>
     public string? LastMessagePreview { get; init; }
 
     /// <summary>
@@ -40,26 +37,6 @@ public sealed record MyConversationDto
     /// after it started) – show a warning sign. Only for the helper; always false for the owner (he made the edit).
     /// </summary>
     public bool AnnouncementChangedSinceLastRead { get; init; }
-
-    /// <summary>The first <see cref="PreviewLength"/> characters of the text (whole words if possible) + "…".</summary>
-    public static string ToPreview(string text)
-    {
-        var trimmed = text.Trim();
-        if (trimmed.Length <= PreviewLength)
-        {
-            return trimmed;
-        }
-
-        var cut = trimmed[..PreviewLength];
-        var lastSpace = cut.LastIndexOf(' ');
-        // Nie tniemy w połowie słowa, chyba że to jedno bardzo długie „słowo”.
-        if (lastSpace > PreviewLength / 2)
-        {
-            cut = cut[..lastSpace];
-        }
-
-        return cut.TrimEnd() + "…";
-    }
 }
 
 /// <summary>The other participant of the conversation (public data only).</summary>

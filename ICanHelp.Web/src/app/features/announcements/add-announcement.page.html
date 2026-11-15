@@ -18,17 +18,17 @@
   </ion-header>
 
   <app-announcement-form
-    [form]="form"
-    [(location)]="location"
-    [(photos)]="photos"
-    [submitted]="submitted()"
+    [form]="draft.form"
+    [(location)]="draft.location"
+    [(photos)]="draft.photos"
+    [submitted]="draft.submitted()"
   ></app-announcement-form>
 </ion-content>
 
 <ion-footer>
   <ion-toolbar>
-    <ion-button class="submit page-column" expand="block" (click)="submit()" [disabled]="saving()">
-      @if (saving()) {
+    <ion-button class="submit page-column" expand="block" (click)="submit()" [disabled]="draft.saving()">
+      @if (draft.saving()) {
       <ion-spinner name="crescent" slot="start"></ion-spinner> Zapisuję… } @else { Opublikuj ogłoszenie }
     </ion-button>
   </ion-toolbar>

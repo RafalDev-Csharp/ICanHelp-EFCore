@@ -6,21 +6,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ICanHelp.Infrastructure.DAL.Handlers;
 
-internal sealed class GetLikedAnnouncementsHandler : IQueryHandler<GetLikedAnnouncements, IReadOnlyList<LikedAnnouncementDto>>
+internal sealed class GetLikedAnnouncementsHandler(ICanHelpDbContext db)
+    : IQueryHandler<GetLikedAnnouncements, IReadOnlyList<LikedAnnouncementDto>>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetLikedAnnouncementsHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<IReadOnlyList<LikedAnnouncementDto>> HandleAsync(GetLikedAnnouncements query,
         CancellationToken cancellationToken = default)
     {
         var id = new UserId(query.UserId);
 
-        var likes = await _db.LikedAnnouncements
+        var likes = await db.LikedAnnouncements
             .AsNoTracking()
             .Where(l => l.UserId == id)
             .OrderByDescending(l => l.LikedAt)

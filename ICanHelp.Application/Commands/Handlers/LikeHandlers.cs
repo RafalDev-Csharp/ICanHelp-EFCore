@@ -8,59 +8,36 @@ namespace ICanHelp.Application.Commands.Handlers;
 
 // Polubienie = istnienie wiersza (UserId, AnnouncementId). Obie komendy są idempotentne (PUT/DELETE).
 
-internal sealed class LikeAnnouncementHandler : ICommandHandler<LikeAnnouncement>
+internal sealed class LikeAnnouncementHandler(ILikedAnnouncementRepository likes, IAnnouncementRepository announcements,
+    IUserRepository users, IUnitOfWork unitOfWork, IClock clock) : ICommandHandler<LikeAnnouncement>
 {
-    private readonly ILikedAnnouncementRepository _likes;
-    private readonly IAnnouncementRepository _announcements;
-    private readonly IUserRepository _users;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IClock _clock;
-
-    public LikeAnnouncementHandler(ILikedAnnouncementRepository likes, IAnnouncementRepository announcements,
-        IUserRepository users, IUnitOfWork unitOfWork, IClock clock)
-    {
-        _likes = likes;
-        _announcements = announcements;
-        _users = users;
-        _unitOfWork = unitOfWork;
-        _clock = clock;
-    }
-
     public Task HandleAsync(LikeAnnouncement command, CancellationToken cancellationToken = default)
-        => _unitOfWork.ExecuteAsync(async () =>
+        => unitOfWork.ExecuteAsync(async () =>
         {
-            await _users.GetActiveOrThrowAsync(command.UserId, cancellationToken);
-            var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
+            await users.GetActiveOrThrowAsync(command.UserId, cancellationToken);
+            var announcement = await announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
 
             var userId = new UserId(command.UserId);
-            if (await _likes.GetAsync(userId, announcement.Id, cancellationToken) is not null)
+            if (await likes.GetAsync(userId, announcement.Id, cancellationToken) is not null)
             {
                 return;
             }
 
-            await _likes.AddAsync(new LikedAnnouncement(userId, announcement.Id, _clock.UtcNow), cancellationToken);
+            await likes.AddAsync(new LikedAnnouncement(userId, announcement.Id, clock.UtcNow), cancellationToken);
         }, cancellationToken);
 }
 
-internal sealed class UnlikeAnnouncementHandler : ICommandHandler<UnlikeAnnouncement>
+internal sealed class UnlikeAnnouncementHandler(ILikedAnnouncementRepository likes, IUnitOfWork unitOfWork)
+    : ICommandHandler<UnlikeAnnouncement>
 {
-    private readonly ILikedAnnouncementRepository _likes;
-    private readonly IUnitOfWork _unitOfWork;
-
-    public UnlikeAnnouncementHandler(ILikedAnnouncementRepository likes, IUnitOfWork unitOfWork)
-    {
-        _likes = likes;
-        _unitOfWork = unitOfWork;
-    }
-
     public Task HandleAsync(UnlikeAnnouncement command, CancellationToken cancellationToken = default)
-        => _unitOfWork.ExecuteAsync(async () =>
+        => unitOfWork.ExecuteAsync(async () =>
         {
-            var like = await _likes.GetAsync(new UserId(command.UserId), new Id(command.AnnouncementId),
+            var like = await likes.GetAsync(new UserId(command.UserId), new Id(command.AnnouncementId),
                 cancellationToken);
             if (like is not null)
             {
-                _likes.Remove(like);
+                likes.Remove(like);
             }
         }, cancellationToken);
 }

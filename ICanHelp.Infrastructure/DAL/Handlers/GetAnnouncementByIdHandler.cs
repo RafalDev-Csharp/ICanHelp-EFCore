@@ -6,21 +6,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ICanHelp.Infrastructure.DAL.Handlers;
 
-internal sealed class GetAnnouncementByIdHandler : IQueryHandler<GetAnnouncementById, AnnouncementDetailsDto?>
+internal sealed class GetAnnouncementByIdHandler(ICanHelpDbContext db)
+    : IQueryHandler<GetAnnouncementById, AnnouncementDetailsDto?>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetAnnouncementByIdHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<AnnouncementDetailsDto?> HandleAsync(GetAnnouncementById query,
         CancellationToken cancellationToken = default)
     {
         var id = new Id(query.AnnouncementId);
 
-        var announcement = await _db.Announcements
+        var announcement = await db.Announcements
             .AsNoTracking()
             .Include(a => a.Offers)
             .Include(a => a.Images)
@@ -35,7 +29,7 @@ internal sealed class GetAnnouncementByIdHandler : IQueryHandler<GetAnnouncement
         }
 
         var viewerId = query.ViewerId is { } viewer ? new UserId(viewer) : null;
-        var isLiked = viewerId is not null && await _db.LikedAnnouncements
+        var isLiked = viewerId is not null && await db.LikedAnnouncements
             .AnyAsync(l => l.UserId == viewerId && l.AnnouncementId == id, cancellationToken);
 
         return announcement.AsDetailsDto(viewerId, isLiked);

@@ -15,14 +15,12 @@ import {
   IonRefresherContent,
   IonSegment,
   IonSegmentButton,
-  IonSpinner,
   IonTitle,
   IonToolbar,
 } from '@ionic/angular';
 import type { ViewWillEnter } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { chatbubblesOutline, cloudOfflineOutline } from 'ionicons/icons';
-import type { Observable } from 'rxjs';
+import { chatbubblesOutline } from 'ionicons/icons';
 import { filter } from 'rxjs';
 
 import type { MyConversationDto, OfferParty } from '../../core/api/api-client';
@@ -31,7 +29,10 @@ import { concernsConversation } from '../../core/notifications/notification-text
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { LoadFailedComponent } from '../../shared/components/load-state/load-failed.component';
+import { LoadingComponent } from '../../shared/components/load-state/loading.component';
 import { NotificationsBellComponent } from '../../shared/components/notifications-bell/notifications-bell.component';
+import { PagedList } from '../../shared/data/remote-list';
 
 import { ConversationItemComponent } from './conversation-item.component';
 
@@ -39,10 +40,6 @@ import { ConversationItemComponent } from './conversation-item.component';
 export const CONVERSATIONS_PAGE_SIZE = 20;
 
 type RoleFilter = 'all' | OfferParty;
-
-interface CompletableTarget {
-  complete(): Promise<void>;
-}
 
 /**
  * „Wszystkie rozmowy” (`/conversations/all`, z nagłówka zakładki „Zlecenia”; tylko zalogowani): wątki od ostatniej
@@ -69,11 +66,12 @@ interface CompletableTarget {
     IonRefresherContent,
     IonList,
     IonLabel,
-    IonSpinner,
     IonButton,
     IonInfiniteScroll,
     IonInfiniteScrollContent,
     EmptyStateComponent,
+    LoadingComponent,
+    LoadFailedComponent,
     ConversationItemComponent,
   ],
 })
@@ -81,76 +79,40 @@ export class ConversationsPage implements ViewWillEnter {
   private readonly client = inject(ConversationsClient);
 
   readonly role = signal<RoleFilter>('all');
-  readonly items = signal<MyConversationDto[]>([]);
-  readonly state = signal<'loading' | 'ready' | 'failed'>('loading');
-  readonly complete = signal(false);
-  private page = 1;
+  protected readonly list = new PagedList<MyConversationDto>(
+    (page) => {
+      const role = this.role();
+      return this.client.getMine(
+        role === 'all' ? undefined : role,
+        undefined,
+        undefined,
+        page,
+        CONVERSATIONS_PAGE_SIZE,
+      );
+    },
+    (item) => item.conversationId,
+    CONVERSATIONS_PAGE_SIZE,
+  );
 
   constructor() {
-    addIcons({ chatbubblesOutline, cloudOfflineOutline });
+    addIcons({ chatbubblesOutline });
 
     // Nowa wiadomość / oferta (SignalR) – lista od razu z nowym podglądem i licznikiem.
     inject(NotificationsService)
       .received$.pipe(filter(concernsConversation), takeUntilDestroyed())
-      .subscribe(() => this.reload());
+      .subscribe(() => this.list.reload());
   }
 
   ionViewWillEnter(): void {
-    this.reload();
+    this.list.reload();
   }
 
   setRole(value: unknown): void {
     const role = value === 'Client' || value === 'Helper' ? value : 'all';
     if (role !== this.role()) {
       this.role.set(role);
-      this.items.set([]);
-      this.reload();
+      this.list.items.set([]);
+      this.list.reload();
     }
-  }
-
-  reload(done?: () => void): void {
-    if (this.items().length === 0) {
-      this.state.set('loading');
-    }
-    this.fetch(1).subscribe({
-      next: (items) => {
-        this.page = 1;
-        this.items.set(items);
-        this.complete.set(items.length < CONVERSATIONS_PAGE_SIZE);
-        this.state.set('ready');
-        done?.();
-      },
-      error: () => {
-        if (this.items().length === 0) {
-          this.state.set('failed');
-        }
-        done?.();
-      },
-    });
-  }
-
-  refresh(event: Event): void {
-    this.reload(() => void (event.target as unknown as CompletableTarget).complete());
-  }
-
-  loadMore(event: Event): void {
-    const target = event.target as unknown as CompletableTarget;
-    this.fetch(this.page + 1).subscribe({
-      next: (items) => {
-        this.page += 1;
-        this.items.update((current) => [
-          ...current,
-          ...items.filter((item) => !current.some((c) => c.conversationId === item.conversationId)),
-        ]);
-        this.complete.set(items.length < CONVERSATIONS_PAGE_SIZE);
-        void target.complete();
-      },
-      error: () => void target.complete(),
-    });
-  }
-
-  private fetch(page: number): Observable<MyConversationDto[]> {
-    const role = this.role();
-    return this.client.getMine(role === 'all' ? undefined : role, undefined, undefined, page, CONVERSATIONS_PAGE_SIZE);
   }
 }

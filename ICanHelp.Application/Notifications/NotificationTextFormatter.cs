@@ -1,4 +1,3 @@
-using System.Globalization;
 using ICanHelp.Core.Enums;
 
 namespace ICanHelp.Application.Notifications;
@@ -10,13 +9,10 @@ public sealed record NotificationText(string Title, string Body);
 /// Krok 15: the text of a notification from <see cref="NotificationType"/> + parameters
 /// (<see cref="NotificationPayload"/>). One place for the push message and <c>NotificationDto.Title/Body</c>,
 /// so the app does not have to build the texts itself. The texts are the same as the ones the web app had
-/// (<c>notification-texts.ts</c>), e.g. „Nowa oferta: 150 zł” + „Cieknący kran”.
+/// (<c>notification-texts.ts</c>), e.g. „Nowa oferta: 150 zł” + „Cieknący kran”. Numbers: <see cref="PolishFormat"/>.
 /// </summary>
 public static class NotificationTextFormatter
 {
-    // No grouping below 10 000 – the same as Intl.NumberFormat("pl-PL") in the browser ("1500 zł", "12 500 zł").
-    private const char NonBreakingSpace = ' ';
-
     private static readonly Dictionary<string, string> FieldLabels = new()
     {
         ["Category"] = "kategoria",
@@ -31,7 +27,7 @@ public static class NotificationTextFormatter
     public static NotificationText Format(NotificationType type, IReadOnlyDictionary<string, string> parameters)
     {
         var title = Get(parameters, NotificationPayload.AnnouncementTitle);
-        var price = FormatPrice(Get(parameters, NotificationPayload.Price));
+        var price = PolishFormat.Price(Get(parameters, NotificationPayload.Price));
 
         switch (type)
         {
@@ -84,7 +80,7 @@ public static class NotificationTextFormatter
                 var alertName = Get(parameters, NotificationPayload.AlertName);
                 var details = string.Join(" · ", new[]
                 {
-                    FormatDistance(Get(parameters, NotificationPayload.DistanceKm)),
+                    PolishFormat.Distance(Get(parameters, NotificationPayload.DistanceKm)),
                     Get(parameters, NotificationPayload.CategoryName),
                     alertName.Length > 0 ? $"alert „{alertName}”" : string.Empty
                 }.Where(part => part.Length > 0));
@@ -116,72 +112,6 @@ public static class NotificationTextFormatter
             NotificationType.NewAnnouncementsDigest => "/announcements",
             _ => conversationId is { } c ? $"/conversations/{c}" : announcement
         };
-    }
-
-    /// <summary><c>"120.00 PLN"</c> (<c>Price.ToString()</c>) → „120 zł”, „99,50 zł”; another currency – as it is.</summary>
-    public static string FormatPrice(string value)
-    {
-        var parts = value.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 0
-            || !decimal.TryParse(parts[0], NumberStyles.Number, CultureInfo.InvariantCulture, out var amount)
-            || (parts.Length > 1 && parts[1] != "PLN"))
-        {
-            return value.Trim();
-        }
-
-        var number = amount == decimal.Truncate(amount)
-            ? FormatNumber(amount, "0")
-            : FormatNumber(amount, "0.00");
-
-        return $"{number}{NonBreakingSpace}zł";
-    }
-
-    /// <summary>Kilometres (<c>"2.46"</c>) → „2,5 km”; below 1 km – metres („350 m”), from 10 km – whole km.</summary>
-    public static string FormatDistance(string value)
-    {
-        if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var km)
-            || !double.IsFinite(km) || km < 0)
-        {
-            return string.Empty;
-        }
-
-        var meters = Math.Max(10, Math.Round(km * 1000 / 10, MidpointRounding.AwayFromZero) * 10);
-        if (meters < 1000)
-        {
-            return $"{meters.ToString("0", CultureInfo.InvariantCulture)} m";
-        }
-
-        var shown = km < 10 ? Math.Round(km, 1, MidpointRounding.AwayFromZero) : Math.Round(km, MidpointRounding.AwayFromZero);
-        return $"{FormatNumber((decimal)shown, "0.#")} km";
-    }
-
-    private static string FormatNumber(decimal value, string format)
-    {
-        var text = value.ToString(format, CultureInfo.InvariantCulture).Replace('.', ',');
-        if (Math.Abs(value) < 10_000)
-        {
-            return text;
-        }
-
-        // Thousands separated by a non-breaking space (pl-PL), e.g. "12 500".
-        var negative = text.StartsWith('-');
-        var digits = negative ? text[1..] : text;
-        var comma = digits.IndexOf(',');
-        var whole = comma < 0 ? digits : digits[..comma];
-        var fraction = comma < 0 ? string.Empty : digits[comma..];
-
-        var grouped = new System.Text.StringBuilder();
-        for (var i = 0; i < whole.Length; i++)
-        {
-            if (i > 0 && (whole.Length - i) % 3 == 0)
-            {
-                grouped.Append(NonBreakingSpace);
-            }
-
-            grouped.Append(whole[i]);
-        }
-
-        return (negative ? "-" : string.Empty) + grouped + fraction;
     }
 
     /// <summary>F11 E: the reasons as in the web app (<c>job-exit.ts</c>).</summary>

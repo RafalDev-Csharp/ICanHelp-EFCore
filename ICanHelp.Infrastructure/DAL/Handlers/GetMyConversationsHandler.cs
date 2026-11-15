@@ -2,6 +2,7 @@ using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.DTO;
 using ICanHelp.Application.Queries;
 using ICanHelp.Core.Enums;
+using ICanHelp.Core.Services;
 using ICanHelp.Core.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,21 +18,15 @@ namespace ICanHelp.Infrastructure.DAL.Handlers;
 /// zdenormalizowana kolumna <c>Conversations.LastActivityAt</c> aktualizowana przy zapisie.
 /// </para>
 /// </summary>
-internal sealed class GetMyConversationsHandler : IQueryHandler<GetMyConversations, IReadOnlyList<MyConversationDto>>
+internal sealed class GetMyConversationsHandler(ICanHelpDbContext db)
+    : IQueryHandler<GetMyConversations, IReadOnlyList<MyConversationDto>>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetMyConversationsHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<IReadOnlyList<MyConversationDto>> HandleAsync(GetMyConversations query,
         CancellationToken cancellationToken = default)
     {
         var userId = new UserId(query.UserId);
 
-        var conversations = _db.Conversations.AsNoTracking();
+        var conversations = db.Conversations.AsNoTracking();
         conversations = query.Role switch
         {
             OfferParty.Client => conversations.Where(c => c.ClientId == userId),
@@ -44,7 +39,7 @@ internal sealed class GetMyConversationsHandler : IQueryHandler<GetMyConversatio
             conversations = conversations.Where(c => c.AnnouncementId == announcementId);
         }
 
-        var announcements = _db.Announcements.AsNoTracking();
+        var announcements = db.Announcements.AsNoTracking();
         if (query.Status is { } status)
         {
             announcements = announcements.Where(a => a.Status == status);
@@ -53,8 +48,8 @@ internal sealed class GetMyConversationsHandler : IQueryHandler<GetMyConversatio
         var rows = await (
                 from c in conversations
                 join a in announcements on c.AnnouncementId equals a.Id
-                join client in _db.Users.AsNoTracking() on c.ClientId equals client.Id
-                join helper in _db.Users.AsNoTracking() on c.HelperId equals helper.Id
+                join client in db.Users.AsNoTracking() on c.ClientId equals client.Id
+                join helper in db.Users.AsNoTracking() on c.HelperId equals helper.Id
                 select new
                 {
                     // Bez Include(Messages) – encja służy tylko do GetParty/GetLastReadAt.
@@ -72,7 +67,7 @@ internal sealed class GetMyConversationsHandler : IQueryHandler<GetMyConversatio
                         m.SenderId == c.HelperId && (c.ClientLastReadAt == null || m.SentAt > c.ClientLastReadAt)),
                     HelperUnread = c.Messages.Count(m =>
                         m.SenderId == c.ClientId && (c.HelperLastReadAt == null || m.SentAt > c.HelperLastReadAt)),
-                    LastOffer = _db.Offers
+                    LastOffer = db.Offers
                         .Where(o => o.AnnouncementId == c.AnnouncementId && o.HelperId == c.HelperId)
                         .OrderByDescending(o => o.CreatedAt)
                         // Same skalary (bez materializacji encji z typem złożonym Price w opcjonalnym podzapytaniu).
@@ -87,13 +82,11 @@ internal sealed class GetMyConversationsHandler : IQueryHandler<GetMyConversatio
                             o.CreatedAt
                         })
                         .FirstOrDefault(),
-                    LastChangeAt = _db.AnnouncementChanges
+                    LastChangeAt = db.AnnouncementChanges
                         .Where(ch => ch.AnnouncementId == c.AnnouncementId)
                         .Max(ch => (DateTime?)ch.ChangedAt)
                 })
             .ToListAsync(cancellationToken);
-
-        var (skip, take) = Extensions.ToSkipTake(query.Page, query.PageSize);
 
         return rows
             .Select(r =>
@@ -108,9 +101,7 @@ internal sealed class GetMyConversationsHandler : IQueryHandler<GetMyConversatio
                     ConversationId = conversation.Id,
                     AnnouncementId = conversation.AnnouncementId,
                     Title = r.Title,
-                    ThumbnailUrl = r.ThumbnailId is null
-                        ? null
-                        : ImageDto.GetUrl(conversation.AnnouncementId, r.ThumbnailId),
+                    ThumbnailUrl = AnnouncementMapping.ThumbnailUrl(conversation.AnnouncementId, r.ThumbnailId),
                     AnnouncementStatus = r.AnnouncementStatus.ToString(),
                     MyRole = myRole.ToString(),
                     OtherParty = isClient
@@ -127,7 +118,7 @@ internal sealed class GetMyConversationsHandler : IQueryHandler<GetMyConversatio
                             CreatedAt = offer.CreatedAt
                         }
                         : null,
-                    LastMessagePreview = r.LastMessageText is { } text ? MyConversationDto.ToPreview(text) : null,
+                    LastMessagePreview = r.LastMessageText is { } text ? TextPreview.Of(text) : null,
                     LastActivityAt = Latest(conversation.CreatedAt, r.LastMessageAt, r.LastOffer?.CreatedAt, r.LastChangeAt),
                     UnreadCount = isClient ? r.ClientUnread : r.HelperUnread,
                     // Ostrzeżenie dla pomocnika – właściciel edytował sam. Nigdy nieczytany wątek: liczą się zmiany
@@ -138,8 +129,7 @@ internal sealed class GetMyConversationsHandler : IQueryHandler<GetMyConversatio
             })
             .OrderByDescending(x => x.LastActivityAt)
             .ThenBy(x => x.ConversationId)
-            .Skip(skip)
-            .Take(take)
+            .TakePage(query.Page, query.PageSize)
             .ToList();
     }
 

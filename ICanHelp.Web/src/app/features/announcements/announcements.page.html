@@ -152,13 +152,7 @@
     }
   </ion-list>
   } @else if (store.failed()) {
-  <app-empty-state
-    icon="cloud-offline-outline"
-    heading="Nie udało się wczytać ogłoszeń"
-    message="Sprawdź połączenie z internetem i spróbuj ponownie."
-  >
-    <ion-button (click)="store.reload()">Spróbuj ponownie</ion-button>
-  </app-empty-state>
+  <app-load-failed heading="Nie udało się wczytać ogłoszeń" (retry)="store.reload()"></app-load-failed>
   } @else if (hasFilters()) {
   <app-empty-state
     icon="search-outline"

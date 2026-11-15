@@ -103,8 +103,8 @@ public class AnnouncementOfferTests
         var announcement = CreateAnnouncement();
         var start = Now.AddDays(1);
 
-        Should.Throw<DomainRuleException>(() => announcement.AddOffer(Id.New(), Helper, Price.Pln(100),
-            start, start.AddHours(endOffsetHours), null, Now));
+        Should.Throw<DomainRuleException>(() => announcement.AddOffer(Id.New(), Helper,
+            new OfferTerms(Price.Pln(100), start, start.AddHours(endOffsetHours)), Now));
 
         announcement.Offers.ShouldBeEmpty();
     }
@@ -114,8 +114,8 @@ public class AnnouncementOfferTests
     {
         var announcement = CreateAnnouncement();
 
-        Should.Throw<DomainRuleException>(() => announcement.AddOffer(Id.New(), Helper, Price.Pln(100),
-            Now.AddMinutes(-1), Now.AddHours(2), null, Now));
+        Should.Throw<DomainRuleException>(() => announcement.AddOffer(Id.New(), Helper,
+            new OfferTerms(Price.Pln(100), Now.AddMinutes(-1), Now.AddHours(2)), Now));
 
         announcement.Offers.ShouldBeEmpty();
     }
@@ -125,7 +125,7 @@ public class AnnouncementOfferTests
     {
         var announcement = CreateAnnouncement();
 
-        var offer = announcement.AddOffer(Id.New(), Helper, Price.Pln(100), Now, Now.AddHours(1), null, Now);
+        var offer = announcement.AddOffer(Id.New(), Helper, new OfferTerms(Price.Pln(100), Now, Now.AddHours(1)), Now);
 
         offer.Status.ShouldBe(OfferStatus.Pending);
     }
@@ -233,7 +233,7 @@ public class AnnouncementOfferTests
         var unknownId = Id.New();
 
         var exception = Should.Throw<OfferNotFoundException>(() => announcement.CounterOffer(unknownId, Id.New(),
-            OwnerId, Price.Pln(100), Now.AddDays(2), Now.AddDays(2).AddHours(1), null, Now));
+            OwnerId, new OfferTerms(Price.Pln(100), Now.AddDays(2), Now.AddDays(2).AddHours(1)), Now));
 
         exception.OfferId.ShouldBe(unknownId.Value);
     }
@@ -246,7 +246,7 @@ public class AnnouncementOfferTests
 
         // Koniec przed początkiem – nowa oferta jest nieprawidłowa.
         Should.Throw<DomainRuleException>(() => announcement.CounterOffer(original.Id, Id.New(), OwnerId,
-            Price.Pln(100), Now.AddDays(2), Now.AddDays(1), null, Now));
+            new OfferTerms(Price.Pln(100), Now.AddDays(2), Now.AddDays(1)), Now));
 
         original.Status.ShouldBe(OfferStatus.Pending);
         announcement.Offers.ShouldHaveSingleItem();

@@ -1,4 +1,3 @@
-using ICanHelp.Api.Security;
 using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.Commands;
 using ICanHelp.Application.DTO;
@@ -14,10 +13,9 @@ namespace ICanHelp.Api.Controllers;
 /// polilinia z serwisu routingu, np. OSRM, po stronie aplikacji). Pasujące ogłoszenie → powiadomienie
 /// <c>NewAnnouncementNearby</c> w <c>api/me/notifications</c>. Max 10 alertów; cudze alerty → 404.
 /// </summary>
-[ApiController]
 [Route("api/me/alerts")]
 [Authorize]
-public sealed class AlertsController : ControllerBase
+public sealed class AlertsController : ApiController
 {
     /// <summary>Moje alerty, od najnowszych.</summary>
     [HttpGet]
@@ -26,14 +24,7 @@ public sealed class AlertsController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<AlertDto>>> GetMine(
         [FromServices] IQueryHandler<GetMyAlerts, IReadOnlyList<AlertDto>> handler,
         CancellationToken cancellationToken)
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        return Ok(await handler.HandleAsync(new GetMyAlerts { UserId = userId }, cancellationToken));
-    }
+        => Ok(await handler.HandleAsync(new GetMyAlerts { UserId = CurrentUserId }, cancellationToken));
 
     [HttpGet("{alertId:guid}")]
     [ProducesResponseType<AlertDto>(StatusCodes.Status200OK)]
@@ -43,15 +34,8 @@ public sealed class AlertsController : ControllerBase
         Guid alertId,
         [FromServices] IQueryHandler<GetMyAlert, AlertDto?> handler,
         CancellationToken cancellationToken)
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        var alert = await handler.HandleAsync(new GetMyAlert { AlertId = alertId, UserId = userId }, cancellationToken);
-        return alert is null ? NotFound() : Ok(alert);
-    }
+        => OkOrNotFound(await handler.HandleAsync(
+            new GetMyAlert { AlertId = alertId, UserId = CurrentUserId }, cancellationToken));
 
     /// <summary>
     /// Podgląd: otwarte ogłoszenia, które pasują do alertu teraz (od najnowszych, z <c>distanceKm</c> od punktu / trasy).
@@ -66,17 +50,8 @@ public sealed class AlertsController : ControllerBase
         [FromServices] IQueryHandler<GetAlertPreview, IReadOnlyList<AnnouncementDto>?> handler,
         CancellationToken cancellationToken,
         [FromQuery] int limit = 20)
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        var announcements = await handler.HandleAsync(
-            new GetAlertPreview { AlertId = alertId, UserId = userId, Limit = limit }, cancellationToken);
-
-        return announcements is null ? NotFound() : Ok(announcements);
-    }
+        => OkOrNotFound(await handler.HandleAsync(
+            new GetAlertPreview { AlertId = alertId, UserId = CurrentUserId, Limit = limit }, cancellationToken));
 
     /// <summary>
     /// Nowy alert (włączony). Promień 0,5–50 km, trasa 2–1000 punktów, puste <c>subcategoryIds</c> = cała kategoria,
@@ -94,13 +69,8 @@ public sealed class AlertsController : ControllerBase
         [FromServices] ICommandHandler<CreateAlert> handler,
         CancellationToken cancellationToken)
     {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
         var alertId = Guid.NewGuid();
-        await handler.HandleAsync(command with { AlertId = alertId, UserId = userId }, cancellationToken);
+        await handler.HandleAsync(command with { AlertId = alertId, UserId = CurrentUserId }, cancellationToken);
 
         return CreatedAtAction(nameof(GetById), new { alertId }, new CreatedDto(alertId));
     }
@@ -114,38 +84,22 @@ public sealed class AlertsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Update(
+    public Task<IActionResult> Update(
         Guid alertId,
         [FromBody] UpdateAlert command,
         [FromServices] ICommandHandler<UpdateAlert> handler,
         CancellationToken cancellationToken)
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        await handler.HandleAsync(command with { AlertId = alertId, UserId = userId }, cancellationToken);
-        return NoContent();
-    }
+        => Send(command with { AlertId = alertId, UserId = CurrentUserId }, handler, cancellationToken);
 
     [HttpDelete("{alertId:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete(
+    public Task<IActionResult> Delete(
         Guid alertId,
         [FromServices] ICommandHandler<DeleteAlert> handler,
         CancellationToken cancellationToken)
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        await handler.HandleAsync(new DeleteAlert(alertId, userId), cancellationToken);
-        return NoContent();
-    }
+        => Send(new DeleteAlert(alertId, CurrentUserId), handler, cancellationToken);
 
     /// <summary>Włącza alert (ponownie – bez zmian).</summary>
     [HttpPost("{alertId:guid}/enable")]
@@ -156,7 +110,7 @@ public sealed class AlertsController : ControllerBase
         Guid alertId,
         [FromServices] ICommandHandler<SetAlertEnabled> handler,
         CancellationToken cancellationToken)
-        => SetEnabledAsync(alertId, true, handler, cancellationToken);
+        => Send(new SetAlertEnabled(alertId, CurrentUserId, IsEnabled: true), handler, cancellationToken);
 
     /// <summary>Wyłącza alert – zostaje na liście, ale nie wysyła powiadomień.</summary>
     [HttpPost("{alertId:guid}/disable")]
@@ -167,17 +121,5 @@ public sealed class AlertsController : ControllerBase
         Guid alertId,
         [FromServices] ICommandHandler<SetAlertEnabled> handler,
         CancellationToken cancellationToken)
-        => SetEnabledAsync(alertId, false, handler, cancellationToken);
-
-    private async Task<IActionResult> SetEnabledAsync(Guid alertId, bool isEnabled,
-        ICommandHandler<SetAlertEnabled> handler, CancellationToken cancellationToken)
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        await handler.HandleAsync(new SetAlertEnabled(alertId, userId, isEnabled), cancellationToken);
-        return NoContent();
-    }
+        => Send(new SetAlertEnabled(alertId, CurrentUserId, IsEnabled: false), handler, cancellationToken);
 }

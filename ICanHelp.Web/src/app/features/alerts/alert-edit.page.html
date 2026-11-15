@@ -10,9 +10,7 @@
 
 <ion-content class="ion-padding page-column">
   @switch (state()) { @case ('loading') {
-  <div class="ion-text-center ion-padding" aria-busy="true">
-    <ion-spinner name="crescent"></ion-spinner>
-  </div>
+  <app-loading></app-loading>
   } @case ('missing') {
   <app-empty-state
     icon="notifications-off-outline"
@@ -20,13 +18,7 @@
     message="Mógł zostać usunięty – wróć do listy alertów."
   ></app-empty-state>
   } @case ('failed') {
-  <app-empty-state
-    icon="cloud-offline-outline"
-    heading="Nie udało się wczytać alertu"
-    message="Sprawdź połączenie z internetem i spróbuj ponownie."
-  >
-    <ion-button (click)="retry()">Spróbuj ponownie</ion-button>
-  </app-empty-state>
+  <app-load-failed heading="Nie udało się wczytać alertu" (retry)="retry()"></app-load-failed>
   } @case ('ready') { @let value = form(); @let error = visibleErrors();
   <div class="fields">
     <section>
@@ -97,7 +89,7 @@
       @if (value.kind === 'Area') {
       <app-location-picker
         [point]="value.center"
-        (pointChange)="setCenter($event)"
+        (pointChange)="patch({ center: $event })"
         markerTitle="Środek alertu"
         [radiusKm]="value.radiusKm"
         hint="Szukamy ogłoszeń w zaznaczonym okręgu."
@@ -105,11 +97,11 @@
       } @else {
       <app-route-picker
         [start]="value.routeStart"
-        (startChange)="setRouteStart($event)"
+        (startChange)="patch({ routeStart: $event })"
         [end]="value.routeEnd"
-        (endChange)="setRouteEnd($event)"
+        (endChange)="patch({ routeEnd: $event })"
         [points]="value.routePoints"
-        (pointsChange)="setRoutePoints($event)"
+        (pointsChange)="patch({ routePoints: $event })"
         [radiusKm]="value.radiusKm"
       ></app-route-picker>
       } @if (error.place) {
@@ -140,7 +132,7 @@
       <h2>Kiedy?</h2>
       <div class="chips">
         @for (preset of presets; track preset.mask) {
-        <ion-chip [outline]="value.days !== preset.mask" (click)="setDays(preset.mask)">
+        <ion-chip [outline]="value.days !== preset.mask" (click)="patch({ days: preset.mask })">
           <ion-label>{{ preset.label }}</ion-label>
         </ion-chip>
         }
@@ -201,12 +193,12 @@
       } @else { {{ alertId() ? 'Zapisz zmiany' : 'Zapisz alert' }} }
     </ion-button>
 
-    @if (alertId()) {
+    @if (alertId(); as savedId) {
     <section class="preview" data-testid="alert-preview">
       <h2>Pasujące teraz</h2>
       <ion-note class="hint">Otwarte ogłoszenia w strefie zapisanego alertu (bez godzin i dni).</ion-note>
       @if (previewFailed()) {
-      <ion-button fill="clear" (click)="retryPreview()">Spróbuj ponownie</ion-button>
+      <ion-button fill="clear" (click)="loadPreview(savedId)">Spróbuj ponownie</ion-button>
       } @else { @let items = preview(); @if (items === null) {
       <div class="ion-text-center ion-padding"><ion-spinner name="crescent"></ion-spinner></div>
       } @else if (items.length === 0) {

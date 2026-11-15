@@ -30,10 +30,10 @@ import {
   appsOutline,
   close,
   closeCircle,
-  cloudOfflineOutline,
   listOutline,
   locateOutline,
   mapOutline,
+  megaphoneOutline,
   searchOutline,
 } from 'ionicons/icons';
 
@@ -43,9 +43,11 @@ import { GeolocationError, GeolocationService } from '../../core/geo/geolocation
 import { ToastService } from '../../core/ui/toast.service';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { LoadFailedComponent } from '../../shared/components/load-state/load-failed.component';
 import type { MapCircle, MapMarker } from '../../shared/components/map/map.component';
 import { MapComponent } from '../../shared/components/map/map.component';
 import { NotificationsBellComponent } from '../../shared/components/notifications-bell/notifications-bell.component';
+import { completeIonEvent } from '../../shared/data/ion-events';
 import { formatPrice } from '../../shared/pipes/price.pipe';
 import { pluralPl } from '../../shared/text/plural';
 
@@ -56,9 +58,9 @@ import { AnnouncementListStore } from './list/announcement-list.store';
 
 export type AnnouncementsView = 'list' | 'map';
 
-/** Ionic: `ion-refresher` i `ion-infinite-scroll` trzeba „zamknąć” po wczytaniu danych. */
-interface CompletableTarget {
-  complete(): Promise<void>;
+/** Id z pola wyboru (`$event.detail.value` ma typ nieznany): pusty tekst albo coś innego = „bez filtra”. */
+function optionalId(value: unknown): string | undefined {
+  return typeof value === 'string' && value !== '' ? value : undefined;
 }
 
 /**
@@ -95,6 +97,7 @@ interface CompletableTarget {
     IonButton,
     IonChip,
     EmptyStateComponent,
+    LoadFailedComponent,
     AnnouncementCardComponent,
     MapComponent,
   ],
@@ -145,10 +148,10 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
       appsOutline,
       close,
       closeCircle,
-      cloudOfflineOutline,
       listOutline,
       locateOutline,
       mapOutline,
+      megaphoneOutline,
       searchOutline,
     });
     registerCategoryIcons();
@@ -181,7 +184,7 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
   }
 
   setCategory(value: unknown): void {
-    const categoryId = typeof value === 'string' && value !== '' ? value : undefined;
+    const categoryId = optionalId(value);
     if (categoryId !== this.filters().categoryId) {
       void this.store.setFilters({ categoryId, subcategoryId: undefined });
     }
@@ -204,7 +207,7 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
   }
 
   setSubcategory(value: unknown): void {
-    const subcategoryId = typeof value === 'string' && value !== '' ? value : undefined;
+    const subcategoryId = optionalId(value);
     if (subcategoryId !== this.filters().subcategoryId) {
       void this.store.setFilters({ subcategoryId });
     }
@@ -245,11 +248,11 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
   }
 
   refresh(event: Event): void {
-    void this.store.reload().then(() => (event.target as unknown as CompletableTarget).complete());
+    void this.store.reload().then(() => completeIonEvent(event));
   }
 
   loadMore(event: Event): void {
-    void this.store.loadMore().then(() => (event.target as unknown as CompletableTarget).complete());
+    void this.store.loadMore().then(() => completeIonEvent(event));
   }
 
   selectMarker(id: string): void {

@@ -5,24 +5,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ICanHelp.Infrastructure.DAL.Handlers;
 
-internal sealed class GetUsersHandler : IQueryHandler<GetUsers, IReadOnlyList<UserDto>>
+internal sealed class GetUsersHandler(ICanHelpDbContext db) : IQueryHandler<GetUsers, IReadOnlyList<UserDto>>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetUsersHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<IReadOnlyList<UserDto>> HandleAsync(GetUsers query, CancellationToken cancellationToken = default)
     {
-        var (skip, take) = Extensions.ToSkipTake(query.Page, query.PageSize);
-
-        var users = await _db.Users
+        var users = await db.Users
             .AsNoTracking()
             .OrderBy(u => u.CreatedAt)
-            .Skip(skip)
-            .Take(take)
+            .TakePage(query.Page, query.PageSize)
             .ToListAsync(cancellationToken);
 
         return users.Select(u => u.AsDto()).ToList();

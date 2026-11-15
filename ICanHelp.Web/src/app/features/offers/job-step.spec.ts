@@ -1,4 +1,4 @@
-import { jobStep } from './job-step';
+import { jobStep, jobStepView } from './job-step';
 
 describe('jobStep', () => {
   it('lets only the helper start an accepted job; the client waits but can still confirm', () => {
@@ -35,6 +35,24 @@ describe('jobStep', () => {
     expect(jobStep('Accepted', 'Helper', undefined).exit).toBe('abandon');
     expect(jobStep('InProgress', 'Client', undefined).exit).toBe('interrupt');
     expect(jobStep('InProgress', 'Helper', '2026-11-13T10:00:00Z').exit).toBe('interrupt');
+  });
+
+  it('turns a step into texts, icons and colors for the screen', () => {
+    expect(jobStepView(jobStep('Accepted', 'Helper', undefined))).toEqual({
+      note: null,
+      action: { label: 'Rozpocznij zlecenie', icon: 'play-outline', color: 'primary', fill: 'solid' },
+      exit: { label: 'Zrezygnuj', icon: 'exit-outline' },
+    });
+    // Zleceniodawca przed zgłoszeniem: potwierdzenie awaryjne (obrys), spokojna notka.
+    expect(jobStepView(jobStep('InProgress', 'Client', undefined))).toEqual({
+      note: { text: 'W realizacji – pomocnik zgłosi wykonanie.', icon: 'hourglass-outline', highlight: false },
+      action: { label: 'Potwierdź wykonanie', icon: 'checkmark-done-outline', color: 'success', fill: 'outline' },
+      exit: { label: 'Przerwij zlecenie', icon: 'stop-circle-outline' },
+    });
+    const reported = jobStepView(jobStep('InProgress', 'Client', '2026-11-13T10:00:00Z'));
+    expect(reported.note).toMatchObject({ icon: 'flag-outline', highlight: true });
+    expect(reported.action?.fill).toBe('solid');
+    expect(jobStepView(jobStep('Completed', 'Client', undefined))).toEqual({ note: null, action: null, exit: null });
   });
 
   it('has nothing to do outside of the job', () => {

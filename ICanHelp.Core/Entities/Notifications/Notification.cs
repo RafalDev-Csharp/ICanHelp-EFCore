@@ -47,10 +47,7 @@ public class Notification
             throw new DomainRuleException($"Notification type: {type} is invalid.");
         }
 
-        if (string.IsNullOrWhiteSpace(payload) || payload.Length > MaxPayloadLength)
-        {
-            throw new DomainRuleException($"Notification payload must have 1–{MaxPayloadLength} characters.");
-        }
+        EnsurePayload(payload);
 
         if (sourceEventId == Guid.Empty)
         {
@@ -73,10 +70,7 @@ public class Notification
     /// </summary>
     public void Renew(string payload, DateTime renewedAtUtc)
     {
-        if (string.IsNullOrWhiteSpace(payload) || payload.Length > MaxPayloadLength)
-        {
-            throw new DomainRuleException($"Notification payload must have 1–{MaxPayloadLength} characters.");
-        }
+        EnsurePayload(payload);
 
         Payload = payload;
         CreatedAt = renewedAtUtc;
@@ -92,5 +86,13 @@ public class Notification
         }
 
         ReadAt ??= readAtUtc;
+    }
+
+    private static void EnsurePayload(string payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload) || payload.Length > MaxPayloadLength)
+        {
+            throw new DomainRuleException($"Notification payload must have 1–{MaxPayloadLength} characters.");
+        }
     }
 }

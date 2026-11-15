@@ -5,43 +5,17 @@ import type {
   MessageDto,
   OfferDto,
 } from '../../core/api/api-client';
-import { canRespondToExit, jobExitReasonText, jobExitTitle } from '../offers/job-exit';
-import type { OfferActions } from '../offers/offer-labels';
-import {
-  changedFieldsLabel,
-  offerActions,
-  offerKindLabel,
-  offerStateColor,
-  offerStateLabel,
-  partyLabel,
-  pendingOffer,
-} from '../offers/offer-labels';
+import type { JobExitView } from '../offers/job-exit';
+import { jobExitView } from '../offers/job-exit';
+import { changedFieldsLabel, partyLabel, pendingOffer } from '../offers/offer-labels';
+import type { OfferView } from '../offers/offer-view';
+import { offerView } from '../offers/offer-view';
 
 /** Wpis osi czasu wątku gotowy do wyświetlenia (typy wpisów jak `ConversationEntryDto.type` w API). */
 export type TimelineItem =
   | { kind: 'message'; key: string; at: string; message: MessageDto; mine: boolean }
-  | {
-      kind: 'offer';
-      key: string;
-      at: string;
-      offer: OfferDto;
-      mine: boolean;
-      /** „Oferta” / „Kontroferta” / „Zaktualizowana oferta” (`offerKindLabel`). */
-      kindLabel: string;
-      /** Etykieta statusu bez „nieaktualna” (`offerStateLabel`) i jej kolor. */
-      stateLabel: string;
-      stateColor: string;
-      actions: OfferActions;
-      /** „budżet, opis” – co zmieniło się w ogłoszeniu od złożenia oferty (tylko oczekujące sprzed edycji). */
-      changedSince: string;
-      /**
-       * Oczekująca oferta sprzed edycji ogłoszenia (F11 F): `respond` – jestem jej autorem, mam ją podtrzymać, zmienić
-       * albo wycofać (najpierw podgląd zmian); `wait` – druga strona ma odpowiedzieć na zmiany (spokojna notka).
-       */
-      changes: 'respond' | 'wait' | null;
-      /** Poprzednia wersja oferty zastąpiona przez autora (`Revised`) – zwinięta. */
-      previous: boolean;
-    }
+  /** Oferta / kontroferta – rysuje ją `app-offer-card` (`OfferView`). */
+  | ({ kind: 'offer'; key: string; at: string } & OfferView)
   | {
       kind: 'change';
       key: string;
@@ -53,22 +27,8 @@ export type TimelineItem =
       /** Edytował czytający (zleceniodawca) – „Edytowałeś ogłoszenie”, inaczej „Zleceniodawca zmienił ogłoszenie”. */
       mine: boolean;
     }
-  | {
-      /** F11 E: rezygnacja / przerwanie zlecenia tego pomocnika. */
-      kind: 'exit';
-      key: string;
-      at: string;
-      exit: JobExitDto;
-      /** „Zrezygnowałeś ze zlecenia” / „Pomocnik przerwał zlecenie” (`jobExitTitle`). */
-      title: string;
-      /** Powód z opisem (`jobExitReasonText`). */
-      reason: string;
-      mine: boolean;
-      /** F11 G: czytający jest drugą stroną i jeszcze nie dodał stanowiska. */
-      canRespond: boolean;
-      /** „Stanowisko pomocnika / zleceniodawcy” – druga strona niż ta, która wyszła. */
-      responseAuthor: string;
-    };
+  /** F11 E: rezygnacja / przerwanie zlecenia tego pomocnika (`JobExitView`). */
+  | ({ kind: 'exit'; key: string; at: string } & JobExitView);
 
 /**
  * Oś czasu od najstarszych (kolejność z API). Wpisy z nieznanym `type` pomijamy – nowsza wersja backendu
@@ -87,22 +47,11 @@ export function toTimelineItems(conversation: ConversationDto, myId: string | un
         mine: entry.message.senderId === myId,
       });
     } else if (entry.type === 'Offer' && entry.offer) {
-      const offer = entry.offer;
-      const mine = offer.proposedBy === conversation.myRole;
-      const outdated = offer.isOutdated && offer.status === 'Pending' && conversation.announcementStatus === 'Open';
       items.push({
         kind: 'offer',
-        key: `o-${offer.id}`,
+        key: `o-${entry.offer.id}`,
         at: entry.at,
-        offer,
-        mine,
-        kindLabel: offerKindLabel(offer, offers),
-        stateLabel: offerStateLabel(offer),
-        stateColor: offerStateColor(offer),
-        actions: offerActions(offer, conversation.myRole, conversation.announcementStatus),
-        changedSince: outdated ? changedFieldsLabel(offer.changesSinceOffer) : '',
-        changes: outdated ? (mine ? 'respond' : 'wait') : null,
-        previous: offer.status === 'Revised',
+        ...offerView(entry.offer, offers, conversation.myRole, conversation.announcementStatus),
       });
     } else if (entry.type === 'AnnouncementChanged' && entry.change) {
       items.push({
@@ -115,17 +64,11 @@ export function toTimelineItems(conversation: ConversationDto, myId: string | un
         mine: conversation.myRole === 'Client',
       });
     } else if (entry.type === 'JobExit' && entry.jobExit) {
-      const exit = entry.jobExit;
       items.push({
         kind: 'exit',
-        key: `x-${exit.number}`,
+        key: `x-${entry.jobExit.number}`,
         at: entry.at,
-        exit,
-        title: jobExitTitle(exit, myId ?? ''),
-        reason: jobExitReasonText(exit),
-        mine: exit.actorId === myId,
-        canRespond: canRespondToExit(exit, myId ?? '', conversation.clientId),
-        responseAuthor: exit.actorRole === 'Client' ? 'Stanowisko pomocnika' : 'Stanowisko zleceniodawcy',
+        ...jobExitView(entry.jobExit, myId, conversation.clientId),
       });
     }
   }

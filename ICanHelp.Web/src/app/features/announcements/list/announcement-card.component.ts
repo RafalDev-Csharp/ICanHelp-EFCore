@@ -10,8 +10,7 @@ import { CategoriesService } from '../../../core/categories/categories.service';
 import { DistancePipe } from '../../../shared/pipes/distance.pipe';
 import { PricePipe } from '../../../shared/pipes/price.pipe';
 import { TimeAgoPipe } from '../../../shared/pipes/time-ago.pipe';
-import { pluralPl } from '../../../shared/text/plural';
-import { statusColor, statusLabel } from '../announcement-labels';
+import { offersCountLabel, statusColor, statusLabel } from '../announcement-labels';
 
 /**
  * Ogłoszenie na liście (i w podglądzie na mapie): miniatura, tytuł, budżet, kategoria, odległość, wiek,
@@ -49,12 +48,12 @@ export class AnnouncementCardComponent {
   protected readonly thumbnailUrl = computed(() => apiResourceUrl(this.announcement().thumbnailUrl));
   protected readonly category = computed(() => {
     const { categoryId, subcategoryId } = this.announcement();
-    return [this.categories.name(categoryId), this.categories.name(subcategoryId)].filter(Boolean).join(' · ');
+    return this.categories.path(categoryId, subcategoryId);
   });
 
   protected readonly offers = computed(() => {
     const count = this.announcement().helperCount;
-    return count > 0 ? `${count} ${pluralPl(count, 'oferta', 'oferty', 'ofert')}` : '';
+    return count > 0 ? offersCountLabel(count) : '';
   });
 
   constructor() {

@@ -10,17 +10,13 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ToastService } from '../ui/toast.service';
 
 import { InstallPromptService } from './install-prompt.service';
+import { PUSH_CLICKED, PUSH_RECEIVED } from './push-messages';
 import type { PushMessaging } from './push-messaging';
 import { PUSH_MESSAGING } from './push-messaging';
-import type { PushPlatform } from './push.service';
-import {
-  BRAVE_PUSH_HINT,
-  PUSH_CLICKED,
-  PUSH_PLATFORM,
-  PUSH_RECEIVED,
-  PUSH_STORAGE_KEY,
-  PushService,
-} from './push.service';
+import type { PushPlatform } from './push-platform';
+import { BRAVE_PUSH_HINT, PUSH_PLATFORM } from './push-platform';
+import { PUSH_STORAGE_KEY } from './push-storage';
+import { PushService } from './push.service';
 
 /** Fałszywy `navigator.serviceWorker`: gotowa rejestracja i wiadomości „z workera”. */
 class FakeContainer extends EventTarget {

@@ -7,33 +7,15 @@ using ICanHelp.Core.Repositories;
 
 namespace ICanHelp.Application.Commands.Handlers;
 
-internal sealed class RefreshSessionHandler : ICommandHandler<RefreshSession>
+internal sealed class RefreshSessionHandler(IRefreshTokenRepository refreshTokens, IUserRepository users,
+    IUnitOfWork unitOfWork, IRefreshTokenService refreshTokenService, SessionTokenIssuer tokenIssuer,
+    ITokenStorage tokenStorage, IClock clock) : ICommandHandler<RefreshSession>
 {
     /// <summary>
     /// Ponowne użycie tokenu tuż po rotacji to zwykle wyścig (dwie karty odświeżają naraz) – wtedy tylko 401.
     /// Później oznacza wyciek: unieważniamy wszystkie sesje użytkownika.
     /// </summary>
     public static readonly TimeSpan ReuseGracePeriod = TimeSpan.FromMinutes(1);
-
-    private readonly IRefreshTokenRepository _refreshTokens;
-    private readonly IUserRepository _users;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IRefreshTokenService _refreshTokenService;
-    private readonly IAuthenticator _authenticator;
-    private readonly ITokenStorage _tokenStorage;
-    private readonly IClock _clock;
-
-    public RefreshSessionHandler(IRefreshTokenRepository refreshTokens, IUserRepository users, IUnitOfWork unitOfWork,
-        IRefreshTokenService refreshTokenService, IAuthenticator authenticator, ITokenStorage tokenStorage, IClock clock)
-    {
-        _refreshTokens = refreshTokens;
-        _users = users;
-        _unitOfWork = unitOfWork;
-        _refreshTokenService = refreshTokenService;
-        _authenticator = authenticator;
-        _tokenStorage = tokenStorage;
-        _clock = clock;
-    }
 
     public async Task HandleAsync(RefreshSession command, CancellationToken cancellationToken = default)
     {
@@ -42,14 +24,14 @@ internal sealed class RefreshSessionHandler : ICommandHandler<RefreshSession>
             throw new InvalidRefreshTokenException();
         }
 
-        var now = _clock.UtcNow;
-        var hash = _refreshTokenService.Hash(command.RefreshToken);
+        var now = clock.UtcNow;
+        var hash = refreshTokenService.Hash(command.RefreshToken);
         JwtDto? jwt = null;
 
         // Unieważnienie sesji po wykryciu wycieku musi się zapisać – dlatego wyjątek rzucamy dopiero po transakcji.
-        await _unitOfWork.ExecuteAsync(async () =>
+        await unitOfWork.ExecuteAsync(async () =>
         {
-            var token = await _refreshTokens.GetByHashAsync(hash, cancellationToken);
+            var token = await refreshTokens.GetByHashAsync(hash, cancellationToken);
             if (token is null)
             {
                 return;
@@ -61,7 +43,7 @@ internal sealed class RefreshSessionHandler : ICommandHandler<RefreshSession>
                                           && now - token.RevokedAt!.Value > ReuseGracePeriod;
                 if (reusedAfterRotation)
                 {
-                    foreach (var active in await _refreshTokens.GetActiveAsync(token.UserId, now, cancellationToken))
+                    foreach (var active in await refreshTokens.GetActiveAsync(token.UserId, now, cancellationToken))
                     {
                         active.Revoke(now);
                     }
@@ -76,9 +58,8 @@ internal sealed class RefreshSessionHandler : ICommandHandler<RefreshSession>
             }
 
             // Zablokowany użytkownik → 403, usunięty → 404 (transakcja się wycofuje, token zostaje bez zmian).
-            var user = await _users.GetActiveOrThrowAsync(token.UserId, cancellationToken);
-            jwt = await _refreshTokens.IssueAsync(_refreshTokenService, _authenticator, user, now, cancellationToken,
-                replaced: token);
+            var user = await users.GetActiveOrThrowAsync(token.UserId, cancellationToken);
+            jwt = await tokenIssuer.IssueAsync(user, now, cancellationToken, replaced: token);
         }, cancellationToken);
 
         if (jwt is null)
@@ -86,26 +67,13 @@ internal sealed class RefreshSessionHandler : ICommandHandler<RefreshSession>
             throw new InvalidRefreshTokenException();
         }
 
-        _tokenStorage.Set(jwt);
+        tokenStorage.Set(jwt);
     }
 }
 
-internal sealed class EndSessionHandler : ICommandHandler<EndSession>
+internal sealed class EndSessionHandler(IRefreshTokenRepository refreshTokens, IUnitOfWork unitOfWork,
+    IRefreshTokenService refreshTokenService, IClock clock) : ICommandHandler<EndSession>
 {
-    private readonly IRefreshTokenRepository _refreshTokens;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IRefreshTokenService _refreshTokenService;
-    private readonly IClock _clock;
-
-    public EndSessionHandler(IRefreshTokenRepository refreshTokens, IUnitOfWork unitOfWork,
-        IRefreshTokenService refreshTokenService, IClock clock)
-    {
-        _refreshTokens = refreshTokens;
-        _unitOfWork = unitOfWork;
-        _refreshTokenService = refreshTokenService;
-        _clock = clock;
-    }
-
     public async Task HandleAsync(EndSession command, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(command.RefreshToken))
@@ -113,12 +81,12 @@ internal sealed class EndSessionHandler : ICommandHandler<EndSession>
             return;
         }
 
-        var hash = _refreshTokenService.Hash(command.RefreshToken);
+        var hash = refreshTokenService.Hash(command.RefreshToken);
 
-        await _unitOfWork.ExecuteAsync(async () =>
+        await unitOfWork.ExecuteAsync(async () =>
         {
-            var token = await _refreshTokens.GetByHashAsync(hash, cancellationToken);
-            token?.Revoke(_clock.UtcNow);
+            var token = await refreshTokens.GetByHashAsync(hash, cancellationToken);
+            token?.Revoke(clock.UtcNow);
         }, cancellationToken);
     }
 }

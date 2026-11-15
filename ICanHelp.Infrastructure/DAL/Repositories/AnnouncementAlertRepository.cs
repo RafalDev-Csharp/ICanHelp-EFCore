@@ -8,20 +8,13 @@ using Location = ICanHelp.Core.ValueObjects.Location;
 
 namespace ICanHelp.Infrastructure.DAL.Repositories;
 
-internal sealed class AnnouncementAlertRepository : IAnnouncementAlertRepository
+internal sealed class AnnouncementAlertRepository(ICanHelpDbContext db) : IAnnouncementAlertRepository
 {
-    private readonly ICanHelpDbContext _db;
-
-    public AnnouncementAlertRepository(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public Task<AnnouncementAlert?> GetByIdAsync(Id id, CancellationToken cancellationToken = default)
-        => _db.AnnouncementAlerts.SingleOrDefaultAsync(a => a.Id == id, cancellationToken);
+        => db.AnnouncementAlerts.SingleOrDefaultAsync(a => a.Id == id, cancellationToken);
 
     public Task<int> CountByUserAsync(UserId userId, CancellationToken cancellationToken = default)
-        => _db.AnnouncementAlerts.CountAsync(a => a.UserId == userId, cancellationToken);
+        => db.AnnouncementAlerts.CountAsync(a => a.UserId == userId, cancellationToken);
 
     public async Task<IReadOnlyList<AlertCandidate>> FindCandidatesAsync(Id categoryId, UserId excludedUserId,
         Location point, CancellationToken cancellationToken = default)
@@ -30,7 +23,7 @@ internal sealed class AnnouncementAlertRepository : IAnnouncementAlertRepository
 
         // Zone.STIntersects(@point) = 1 – can use the spatial index IX_AnnouncementAlerts_Zone (the radius is already
         // in the zone, so it does not differ per row in the condition). Distance from the shape: centre or route line.
-        var rows = await _db.AnnouncementAlerts
+        var rows = await db.AnnouncementAlerts
             .Where(a => a.IsEnabled
                         && a.CategoryId == categoryId
                         && a.UserId != excludedUserId
@@ -46,7 +39,7 @@ internal sealed class AnnouncementAlertRepository : IAnnouncementAlertRepository
     }
 
     public async Task AddAsync(AnnouncementAlert alert, CancellationToken cancellationToken = default)
-        => await _db.AnnouncementAlerts.AddAsync(alert, cancellationToken);
+        => await db.AnnouncementAlerts.AddAsync(alert, cancellationToken);
 
-    public void Remove(AnnouncementAlert alert) => _db.AnnouncementAlerts.Remove(alert);
+    public void Remove(AnnouncementAlert alert) => db.AnnouncementAlerts.Remove(alert);
 }

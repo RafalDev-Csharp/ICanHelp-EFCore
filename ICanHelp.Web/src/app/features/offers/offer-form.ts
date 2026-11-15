@@ -9,6 +9,7 @@ import type {
 import { Validators } from '@angular/forms';
 
 import type { MakeOffer, OfferDto } from '../../core/api/api-client';
+import { cents, minLengthIfPresent } from '../../shared/forms/validators';
 import { parseApiDate } from '../../shared/pipes/time-ago.pipe';
 import { ANNOUNCEMENT_RULES, DEFAULT_CURRENCY } from '../announcements/form/announcement-form';
 
@@ -48,16 +49,6 @@ export function fromLocalInput(value: string): Date | null {
   }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function cents(control: AbstractControl<number | null>): ValidationErrors | null {
-  const value = control.value;
-  return value !== null && Math.round(value * 100) !== value * 100 ? { cents: true } : null;
-}
-
-function messageLength(control: AbstractControl<string>): ValidationErrors | null {
-  const length = control.value.trim().length;
-  return length > 0 && length < OFFER_RULES.message.min ? { minlength: true } : null;
 }
 
 /** Początek nie w przeszłości (backend odrzuci), koniec po początku. `now` – do testów. */
@@ -111,7 +102,7 @@ export function createOfferForm(
       ]),
       start: [toLocalInput(term.start), Validators.required],
       end: [toLocalInput(term.end), Validators.required],
-      message: ['', [Validators.maxLength(message.max), messageLength]],
+      message: ['', [Validators.maxLength(message.max), minLengthIfPresent(message.min)]],
     },
     { validators: offerDatesValidator(now) },
   );

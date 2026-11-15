@@ -20,20 +20,9 @@ internal sealed record NotificationDraft(
 /// (retry from the outbox) does not create a second one (<see cref="INotificationRepository.ExistsAsync"/> +
 /// unique index UserId + SourceEventId). Delivery only after the commit and only of the new ones.
 /// </summary>
-internal sealed class NotificationPublisher
+internal sealed class NotificationPublisher(INotificationRepository notifications, IUnitOfWork unitOfWork,
+    INotificationSender sender)
 {
-    private readonly INotificationRepository _notifications;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly INotificationSender _sender;
-
-    public NotificationPublisher(INotificationRepository notifications, IUnitOfWork unitOfWork,
-        INotificationSender sender)
-    {
-        _notifications = notifications;
-        _unitOfWork = unitOfWork;
-        _sender = sender;
-    }
-
     public async Task PublishAsync(Guid eventId, UserId actorId, DateTime occurredAtUtc,
         IEnumerable<NotificationDraft> drafts, CancellationToken cancellationToken)
     {
@@ -49,13 +38,13 @@ internal sealed class NotificationPublisher
 
         var created = new List<Notification>();
 
-        await _unitOfWork.ExecuteAsync(async () =>
+        await unitOfWork.ExecuteAsync(async () =>
         {
             created.Clear();
 
             foreach (var draft in toCreate)
             {
-                if (await _notifications.ExistsAsync(draft.RecipientId, eventId, cancellationToken))
+                if (await notifications.ExistsAsync(draft.RecipientId, eventId, cancellationToken))
                 {
                     continue;
                 }
@@ -64,14 +53,14 @@ internal sealed class NotificationPublisher
                     NotificationPayload.Serialize(draft.Parameters), draft.AnnouncementId, draft.ConversationId,
                     eventId, occurredAtUtc);
 
-                await _notifications.AddAsync(notification, cancellationToken);
+                await notifications.AddAsync(notification, cancellationToken);
                 created.Add(notification);
             }
         }, cancellationToken);
 
         foreach (var notification in created)
         {
-            await _sender.SendAsync(notification.UserId, notification.ToDto(), cancellationToken);
+            await sender.SendAsync(notification.UserId, notification.ToDto(), cancellationToken);
         }
     }
 }

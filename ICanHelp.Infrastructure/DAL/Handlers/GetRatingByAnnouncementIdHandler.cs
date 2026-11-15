@@ -6,21 +6,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ICanHelp.Infrastructure.DAL.Handlers;
 
-internal sealed class GetRatingByAnnouncementIdHandler : IQueryHandler<GetRatingByAnnouncementId, IReadOnlyList<RatingDto>>
+internal sealed class GetRatingByAnnouncementIdHandler(ICanHelpDbContext db)
+    : IQueryHandler<GetRatingByAnnouncementId, IReadOnlyList<RatingDto>>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetRatingByAnnouncementIdHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<IReadOnlyList<RatingDto>> HandleAsync(GetRatingByAnnouncementId query,
         CancellationToken cancellationToken = default)
     {
         var id = new Id(query.AnnouncementId);
 
-        var ratings = await _db.Ratings
+        var ratings = await db.Ratings
             .AsNoTracking()
             .Where(r => r.AnnouncementId == id)
             .ToListAsync(cancellationToken);

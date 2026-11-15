@@ -1,6 +1,6 @@
 namespace ICanHelp.Core.Exceptions;
 
-public class OfferNotFoundException : CustomExceptions
+public class OfferNotFoundException : NotFoundException
 {
     public Guid OfferId { get; }
 

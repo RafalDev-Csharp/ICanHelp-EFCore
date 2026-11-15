@@ -15,7 +15,7 @@ import {
 } from '@ionic/angular';
 import type { ViewWillEnter } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { alertCircleOutline, cloudOfflineOutline, lockClosedOutline } from 'ionicons/icons';
+import { alertCircleOutline, lockClosedOutline } from 'ionicons/icons';
 import type { Observable } from 'rxjs';
 import { map, of, switchMap } from 'rxjs';
 
@@ -25,14 +25,14 @@ import { errorCode, errorStatus } from '../../../core/api/api-errors';
 import { apiResourceUrl } from '../../../core/api/api.providers';
 import { AuthService } from '../../../core/auth/auth.service';
 import { CategoriesService } from '../../../core/categories/categories.service';
-import type { GeoPoint } from '../../../core/geo/geo-point';
 import { ToastService } from '../../../core/ui/toast.service';
 import { BrandComponent } from '../../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
-import type { PhotoItem } from '../form/announcement-form';
-import { createAnnouncementForm, formValueOf, hasChanges, photosOf, toUpdateCommand } from '../form/announcement-form';
+import { LoadFailedComponent } from '../../../shared/components/load-state/load-failed.component';
+import { LoadingComponent } from '../../../shared/components/load-state/loading.component';
+import { hasChanges, photosOf, toUpdateCommand } from '../form/announcement-form';
+import { AnnouncementFormState } from '../form/announcement-form-state';
 import { AnnouncementFormComponent } from '../form/announcement-form.component';
-import { releasePhotos } from '../form/photo-picker.component';
 import { removedImageIds, syncPhotos } from '../form/photo-upload';
 
 type EditState = 'loading' | 'ready' | 'not-owner' | 'locked' | 'not-found' | 'failed';
@@ -68,6 +68,8 @@ type EditState = 'loading' | 'ready' | 'not-owner' | 'locked' | 'not-found' | 'f
     IonButton,
     IonSpinner,
     EmptyStateComponent,
+    LoadingComponent,
+    LoadFailedComponent,
     AnnouncementFormComponent,
   ],
 })
@@ -82,18 +84,15 @@ export class EditAnnouncementPage implements ViewWillEnter {
   /** Z adresu `/announcements/:announcementId/edit`. */
   readonly announcementId = input.required<string>();
 
-  readonly form = createAnnouncementForm(inject(NonNullableFormBuilder));
+  /** Pola, miejsce i zdjęcia edytowanego ogłoszenia. */
+  readonly draft = new AnnouncementFormState(inject(NonNullableFormBuilder));
   readonly state = signal<EditState>('loading');
   readonly original = signal<AnnouncementDetailsDto | null>(null);
-  readonly location = signal<GeoPoint | null>(null);
-  readonly photos = signal<PhotoItem[]>([]);
-  readonly submitted = signal(false);
-  readonly saving = signal(false);
 
   protected readonly detailsUrl = computed(() => `/announcements/${this.announcementId()}`);
 
   constructor() {
-    addIcons({ alertCircleOutline, cloudOfflineOutline, lockClosedOutline });
+    addIcons({ alertCircleOutline, lockClosedOutline });
   }
 
   ionViewWillEnter(): void {
@@ -126,20 +125,18 @@ export class EditAnnouncementPage implements ViewWillEnter {
   }
 
   save(): void {
-    this.submitted.set(true);
     const original = this.original();
-    const location = this.location();
-    if (!original || this.form.invalid || !location) {
-      this.form.markAllAsTouched();
+    const input = this.draft.validated();
+    if (!original || !input) {
       void this.toast.error('Uzupełnij zaznaczone pola.');
       return;
     }
-    if (this.saving()) {
+    if (this.draft.saving()) {
       return;
     }
 
-    const patch = toUpdateCommand(original, this.form.getRawValue(), location);
-    const photos = this.photos();
+    const patch = toUpdateCommand(original, input.value, input.location);
+    const photos = this.draft.photos();
     const removed = removedImageIds(
       original.images.map((image) => image.id),
       photos,
@@ -151,21 +148,21 @@ export class EditAnnouncementPage implements ViewWillEnter {
       return;
     }
 
-    this.saving.set(true);
+    this.draft.saving.set(true);
     // PATCH idzie zawsze (także przy samych zdjęciach): bez zmian pól nie tworzy rewizji, a sprawdza `expectedRevision`.
     this.update(patch)
       .pipe(switchMap(() => syncPhotos(this.client, original.id, photos, removed)))
       .subscribe({
         next: (failed) => {
-          this.saving.set(false);
+          this.draft.saving.set(false);
           void (failed > 0
             ? this.toast.info('Zmiany zapisane, ale nie wszystkie zdjęcia – spróbuj jeszcze raz.')
             : this.toast.success('Zmiany zapisane.'));
-          releasePhotos(this.photos());
+          this.draft.releasePhotos();
           this.leave();
         },
         error: (error: unknown) => {
-          this.saving.set(false);
+          this.draft.saving.set(false);
           if (errorCode(error) === 'ConcurrencyConflict') {
             void this.offerReload();
           }
@@ -179,12 +176,11 @@ export class EditAnnouncementPage implements ViewWillEnter {
   }
 
   private fill(announcement: AnnouncementDetailsDto): void {
-    releasePhotos(this.photos());
     this.original.set(announcement);
-    this.form.reset(formValueOf(announcement));
-    this.location.set(announcement.location);
-    this.photos.set(photosOf(announcement.images, (url) => apiResourceUrl(url) ?? url));
-    this.submitted.set(false);
+    this.draft.fill(
+      announcement,
+      photosOf(announcement.images, (url) => apiResourceUrl(url) ?? url),
+    );
   }
 
   /** Ktoś (np. ta sama osoba w drugiej karcie) zmienił ogłoszenie – nie nadpisujemy, tylko proponujemy odświeżenie. */

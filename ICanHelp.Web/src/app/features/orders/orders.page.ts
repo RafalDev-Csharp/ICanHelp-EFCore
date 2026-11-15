@@ -1,5 +1,4 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import {
   IonButton,
@@ -17,92 +16,42 @@ import {
   IonRefresherContent,
   IonSegment,
   IonSegmentButton,
-  IonSpinner,
   IonTitle,
   IonToolbar,
 } from '@ionic/angular';
 import type { ViewWillEnter } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import {
-  briefcaseOutline,
-  chatbubblesOutline,
-  chevronDown,
-  chevronUp,
-  cloudOfflineOutline,
-  handLeftOutline,
-} from 'ionicons/icons';
+import { briefcaseOutline, chatbubblesOutline, chevronDown, chevronUp, handLeftOutline } from 'ionicons/icons';
 import type { Observable } from 'rxjs';
-import { filter, of, switchMap } from 'rxjs';
+import { of, switchMap } from 'rxjs';
 
 import type { AnnouncementDto, MyConversationDto, OfferParty } from '../../core/api/api-client';
 import { AnnouncementsClient, ConversationsClient } from '../../core/api/api-client';
 import { AuthService } from '../../core/auth/auth.service';
 import { CategoriesService } from '../../core/categories/categories.service';
-import { NotificationsService } from '../../core/notifications/notifications.service';
+import { reloadOnActivity } from '../../core/notifications/reload-on-activity';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { LoadFailedComponent } from '../../shared/components/load-state/load-failed.component';
+import { LoadingComponent } from '../../shared/components/load-state/loading.component';
 import { NotificationsBellComponent } from '../../shared/components/notifications-bell/notifications-bell.component';
+import { PagedList } from '../../shared/data/remote-list';
 import { AnnouncementCardComponent } from '../announcements/list/announcement-card.component';
 import { ConversationItemComponent } from '../conversations/conversation-item.component';
 
+import type { OrderGroupKey } from './order-groups';
 import { clientOrderGroup, groupOrders, helperOrderGroup } from './order-groups';
 
 /** Elementów na stronę (moje ogłoszenia / moje wątki pomocnika). */
 export const ORDERS_PAGE_SIZE = 50;
 
-type LoadState = 'loading' | 'ready' | 'failed';
-
-interface CompletableTarget {
-  complete(): Promise<void>;
-}
-
-/** Lista doładowywana stronami – osobna dla „Zlecam” i „Pomagam”. */
-class PagedList<T> {
-  readonly items = signal<T[]>([]);
-  readonly state = signal<LoadState>('loading');
-  readonly complete = signal(false);
-  private page = 1;
-
-  constructor(
-    private readonly fetch: (page: number) => Observable<T[]>,
-    private readonly key: (item: T) => string,
-  ) {}
-
-  reload(done?: () => void): void {
-    if (this.items().length === 0) {
-      this.state.set('loading');
-    }
-    this.fetch(1).subscribe({
-      next: (items) => {
-        this.page = 1;
-        this.items.set(items);
-        this.complete.set(items.length < ORDERS_PAGE_SIZE);
-        this.state.set('ready');
-        done?.();
-      },
-      error: () => {
-        if (this.items().length === 0) {
-          this.state.set('failed');
-        }
-        done?.();
-      },
-    });
-  }
-
-  loadMore(done: () => void): void {
-    this.fetch(this.page + 1).subscribe({
-      next: (items) => {
-        this.page += 1;
-        this.items.update((current) => {
-          const keys = new Set(current.map(this.key));
-          return [...current, ...items.filter((item) => !keys.has(this.key(item)))];
-        });
-        this.complete.set(items.length < ORDERS_PAGE_SIZE);
-        done();
-      },
-      error: () => done(),
-    });
-  }
+/** Grupa aktywnej listy do narysowania: w „Zlecam” – ogłoszenia, w „Pomagam” – wątki (druga lista pusta). */
+interface OrderGroupView {
+  key: OrderGroupKey;
+  label: string;
+  count: number;
+  announcements: AnnouncementDto[];
+  conversations: MyConversationDto[];
 }
 
 /**
@@ -135,10 +84,11 @@ class PagedList<T> {
     IonList,
     IonItemGroup,
     IonItemDivider,
-    IonSpinner,
     IonInfiniteScroll,
     IonInfiniteScrollContent,
     EmptyStateComponent,
+    LoadingComponent,
+    LoadFailedComponent,
     AnnouncementCardComponent,
     ConversationItemComponent,
   ],
@@ -154,35 +104,44 @@ export class OrdersPage implements ViewWillEnter {
   readonly mine = new PagedList<AnnouncementDto>(
     (page) => this.fetchMyAnnouncements(page),
     (item) => item.id,
+    ORDERS_PAGE_SIZE,
   );
   readonly helping = new PagedList<MyConversationDto>(
     (page) => this.conversationsClient.getMine('Helper', undefined, undefined, page, ORDERS_PAGE_SIZE),
     (item) => item.conversationId,
+    ORDERS_PAGE_SIZE,
   );
 
+  /** Lista wybranej roli – osobno wczytywana i doładowywana. */
   readonly current = computed(() => (this.role() === 'Client' ? this.mine : this.helping));
-  readonly clientGroups = computed(() => groupOrders(this.mine.items(), clientOrderGroup));
-  readonly helperGroups = computed(() => groupOrders(this.helping.items(), helperOrderGroup));
+  readonly groups = computed<OrderGroupView[]>(() =>
+    this.role() === 'Client'
+      ? groupOrders(this.mine.items(), clientOrderGroup).map(({ key, label, items }) => ({
+          key,
+          label,
+          count: items.length,
+          announcements: items,
+          conversations: [],
+        }))
+      : groupOrders(this.helping.items(), helperOrderGroup).map(({ key, label, items }) => ({
+          key,
+          label,
+          count: items.length,
+          announcements: [],
+          conversations: items,
+        })),
+  );
   /** Sekcja „Zakończone” (zakończone, anulowane, wybrano innego) – domyślnie zwinięta, aktywne są na górze. */
   readonly finishedOpen = signal(false);
 
   constructor() {
-    addIcons({
-      briefcaseOutline,
-      chatbubblesOutline,
-      chevronDown,
-      chevronUp,
-      cloudOfflineOutline,
-      handLeftOutline,
-    });
+    addIcons({ briefcaseOutline, chatbubblesOutline, chevronDown, chevronUp, handLeftOutline });
 
     // Nowa wiadomość / oferta / krok zlecenia (hub albo push) – lista od razu z nowym stanem.
-    inject(NotificationsService)
-      .activity$.pipe(
-        filter((activity) => !!activity.conversationId),
-        takeUntilDestroyed(),
-      )
-      .subscribe(() => this.current().reload());
+    reloadOnActivity(
+      (activity) => !!activity.conversationId,
+      () => this.current().reload(),
+    );
   }
 
   toggleFinished(): void {
@@ -201,14 +160,6 @@ export class OrdersPage implements ViewWillEnter {
       this.role.set(role);
       this.current().reload();
     }
-  }
-
-  refresh(event: Event): void {
-    this.current().reload(() => void (event.target as unknown as CompletableTarget).complete());
-  }
-
-  loadMore(event: Event): void {
-    this.current().loadMore(() => void (event.target as unknown as CompletableTarget).complete());
   }
 
   private fetchMyAnnouncements(page: number): Observable<AnnouncementDto[]> {

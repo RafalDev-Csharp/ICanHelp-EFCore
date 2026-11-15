@@ -1,8 +1,9 @@
-using ICanHelp.Application.DTO;
+using System.Globalization;
 using ICanHelp.Application.Events;
 using ICanHelp.Core.Enums;
 using ICanHelp.Core.Events;
 using ICanHelp.Core.Repositories;
+using ICanHelp.Core.Services;
 using ICanHelp.Core.ValueObjects;
 
 namespace ICanHelp.Application.Notifications;
@@ -20,7 +21,8 @@ namespace ICanHelp.Application.Notifications;
 /// </list>
 /// Ogłoszenia już nie ma (usunięte) → nic nie wysyłamy.
 /// </summary>
-internal sealed class TransactionNotificationHandler :
+internal sealed class TransactionNotificationHandler(IAnnouncementRepository announcements,
+    IConversationRepository conversations, NotificationPublisher publisher) :
     IDomainEventHandler<OfferMade>,
     IDomainEventHandler<OfferCountered>,
     IDomainEventHandler<OfferRevised>,
@@ -36,47 +38,28 @@ internal sealed class TransactionNotificationHandler :
     IDomainEventHandler<JobInterrupted>,
     IDomainEventHandler<JobExitResponded>
 {
-    private readonly IAnnouncementRepository _announcements;
-    private readonly IConversationRepository _conversations;
-    private readonly NotificationPublisher _publisher;
-
-    public TransactionNotificationHandler(IAnnouncementRepository announcements,
-        IConversationRepository conversations, NotificationPublisher publisher)
-    {
-        _announcements = announcements;
-        _conversations = conversations;
-        _publisher = publisher;
-    }
+    // ---------- oferty ----------
 
     public Task HandleAsync(Guid eventId, OfferMade e, CancellationToken cancellationToken = default)
-        => OfferAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.HelperId, recipient: e.OwnerId,
-            NotificationType.OfferReceived, e.OccurredAt,
-            new() { [NotificationPayload.Price] = new Price(e.Amount, e.Currency).ToString() }, cancellationToken);
+        => NotifyAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.HelperId, recipient: e.OwnerId,
+            NotificationType.OfferReceived, e.OccurredAt, PriceParameters(e.Amount, e.Currency), cancellationToken);
 
     public Task HandleAsync(Guid eventId, OfferCountered e, CancellationToken cancellationToken = default)
-        => OfferAsync(eventId, e.AnnouncementId, e.HelperId,
+        => NotifyAsync(eventId, e.AnnouncementId, e.HelperId,
             actor: SideOf(e.ProposedBy, e.OwnerId, e.HelperId),
             recipient: OtherSideOf(e.ProposedBy, e.OwnerId, e.HelperId),
-            NotificationType.OfferCountered, e.OccurredAt,
-            new()
-            {
-                [NotificationPayload.Price] = new Price(e.Amount, e.Currency).ToString(),
-                [NotificationPayload.ProposedBy] = e.ProposedBy.ToString()
-            }, cancellationToken);
+            NotificationType.OfferCountered, e.OccurredAt, PriceParameters(e.Amount, e.Currency, e.ProposedBy),
+            cancellationToken);
 
     public Task HandleAsync(Guid eventId, OfferRevised e, CancellationToken cancellationToken = default)
-        => OfferAsync(eventId, e.AnnouncementId, e.HelperId,
+        => NotifyAsync(eventId, e.AnnouncementId, e.HelperId,
             actor: SideOf(e.ProposedBy, e.OwnerId, e.HelperId),
             recipient: OtherSideOf(e.ProposedBy, e.OwnerId, e.HelperId),
-            NotificationType.OfferRevised, e.OccurredAt,
-            new()
-            {
-                [NotificationPayload.Price] = new Price(e.Amount, e.Currency).ToString(),
-                [NotificationPayload.ProposedBy] = e.ProposedBy.ToString()
-            }, cancellationToken);
+            NotificationType.OfferRevised, e.OccurredAt, PriceParameters(e.Amount, e.Currency, e.ProposedBy),
+            cancellationToken);
 
     public Task HandleAsync(Guid eventId, OfferAccepted e, CancellationToken cancellationToken = default)
-        => OfferAsync(eventId, e.AnnouncementId, e.HelperId,
+        => NotifyAsync(eventId, e.AnnouncementId, e.HelperId,
             actor: OtherSideOf(e.ProposedBy, e.OwnerId, e.HelperId),
             recipient: SideOf(e.ProposedBy, e.OwnerId, e.HelperId),
             NotificationType.OfferAccepted, e.OccurredAt, new(), cancellationToken);
@@ -84,19 +67,21 @@ internal sealed class TransactionNotificationHandler :
     public Task HandleAsync(Guid eventId, OfferRejected e, CancellationToken cancellationToken = default)
         => e.AnotherOfferAccepted
             // Właściciel wybrał innego pomocnika – dowiaduje się ten pomocnik (także gdy czekała kontroferta właściciela).
-            ? OfferAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.OwnerId, recipient: e.HelperId,
+            ? NotifyAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.OwnerId, recipient: e.HelperId,
                 NotificationType.OfferRejected, e.OccurredAt,
                 new() { [NotificationPayload.Reason] = NotificationPayload.AnotherOfferAccepted }, cancellationToken)
-            : OfferAsync(eventId, e.AnnouncementId, e.HelperId,
+            : NotifyAsync(eventId, e.AnnouncementId, e.HelperId,
                 actor: OtherSideOf(e.ProposedBy, e.OwnerId, e.HelperId),
                 recipient: SideOf(e.ProposedBy, e.OwnerId, e.HelperId),
                 NotificationType.OfferRejected, e.OccurredAt, new(), cancellationToken);
 
     public Task HandleAsync(Guid eventId, OfferWithdrawn e, CancellationToken cancellationToken = default)
-        => OfferAsync(eventId, e.AnnouncementId, e.HelperId,
+        => NotifyAsync(eventId, e.AnnouncementId, e.HelperId,
             actor: SideOf(e.ProposedBy, e.OwnerId, e.HelperId),
             recipient: OtherSideOf(e.ProposedBy, e.OwnerId, e.HelperId),
             NotificationType.OfferWithdrawn, e.OccurredAt, new(), cancellationToken);
+
+    // ---------- wiadomości i edycja ogłoszenia ----------
 
     public async Task HandleAsync(Guid eventId, MessageSent e, CancellationToken cancellationToken = default)
     {
@@ -108,13 +93,13 @@ internal sealed class TransactionNotificationHandler :
 
         var recipient = e.SenderId == e.ClientId ? e.HelperId : e.ClientId;
 
-        await _publisher.PublishAsync(eventId, new UserId(e.SenderId), e.OccurredAt,
+        await publisher.PublishAsync(eventId, new UserId(e.SenderId), e.OccurredAt,
         [
             new NotificationDraft(new UserId(recipient), NotificationType.MessageReceived, new Id(e.AnnouncementId),
                 new Id(e.ConversationId), new Dictionary<string, string>
                 {
                     [NotificationPayload.AnnouncementTitle] = title,
-                    [NotificationPayload.MessagePreview] = MyConversationDto.ToPreview(e.Text)
+                    [NotificationPayload.MessagePreview] = TextPreview.Of(e.Text)
                 })
         ], cancellationToken);
     }
@@ -127,46 +112,48 @@ internal sealed class TransactionNotificationHandler :
             return;
         }
 
-        var participants = await _conversations.GetParticipantsAsync(new Id(e.AnnouncementId), cancellationToken);
+        var participants = await conversations.GetParticipantsAsync(new Id(e.AnnouncementId), cancellationToken);
         var parameters = new Dictionary<string, string>
         {
             [NotificationPayload.AnnouncementTitle] = title,
-            [NotificationPayload.Revision] = e.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            [NotificationPayload.Revision] = e.Revision.ToString(CultureInfo.InvariantCulture),
             [NotificationPayload.ChangedFields] = e.ChangedFields.ToString()
         };
 
-        await _publisher.PublishAsync(eventId, new UserId(e.OwnerId), e.OccurredAt,
+        await publisher.PublishAsync(eventId, new UserId(e.OwnerId), e.OccurredAt,
             participants.Select(p => new NotificationDraft(p.HelperId, NotificationType.AnnouncementEdited,
                 new Id(e.AnnouncementId), p.ConversationId, parameters)),
             cancellationToken);
     }
 
+    // ---------- realizacja zlecenia ----------
+
     public Task HandleAsync(Guid eventId, JobStarted e, CancellationToken cancellationToken = default)
-        => OfferAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.HelperId, recipient: e.OwnerId,
+        => NotifyAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.HelperId, recipient: e.OwnerId,
             NotificationType.JobStarted, e.OccurredAt, new(), cancellationToken);
 
     public Task HandleAsync(Guid eventId, JobDoneReported e, CancellationToken cancellationToken = default)
-        => OfferAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.HelperId, recipient: e.OwnerId,
+        => NotifyAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.HelperId, recipient: e.OwnerId,
             NotificationType.JobDoneReported, e.OccurredAt, new(), cancellationToken);
 
     public Task HandleAsync(Guid eventId, JobCompleted e, CancellationToken cancellationToken = default)
-        => OfferAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.OwnerId, recipient: e.HelperId,
+        => NotifyAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.OwnerId, recipient: e.HelperId,
             NotificationType.JobCompleted, e.OccurredAt, new(), cancellationToken);
 
     public Task HandleAsync(Guid eventId, JobAbandoned e, CancellationToken cancellationToken = default)
-        => OfferAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.ActorId,
+        => NotifyAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.ActorId,
             recipient: OtherSideOf(e.ActorParty, e.OwnerId, e.HelperId),
             NotificationType.JobAbandoned, e.OccurredAt, ExitParameters(e.ActorParty, e.Reason, e.Note),
             cancellationToken);
 
     public Task HandleAsync(Guid eventId, JobInterrupted e, CancellationToken cancellationToken = default)
-        => OfferAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.ActorId,
+        => NotifyAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.ActorId,
             recipient: OtherSideOf(e.ActorParty, e.OwnerId, e.HelperId),
             NotificationType.JobInterrupted, e.OccurredAt, ExitParameters(e.ActorParty, e.Reason, e.Note),
             cancellationToken);
 
     public Task HandleAsync(Guid eventId, JobExitResponded e, CancellationToken cancellationToken = default)
-        => OfferAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.ResponderId, recipient: e.ExitActorId,
+        => NotifyAsync(eventId, e.AnnouncementId, e.HelperId, actor: e.ResponderId, recipient: e.ExitActorId,
             NotificationType.JobExitResponded, e.OccurredAt, new()
             {
                 [NotificationPayload.ActorRole] =
@@ -175,6 +162,23 @@ internal sealed class TransactionNotificationHandler :
             }, cancellationToken);
 
     // ---------- helpers ----------
+
+    // The price as "120.00 PLN" (Price.ToString()); the text formatter turns it into „120 zł”.
+    private static Dictionary<string, string> PriceParameters(decimal amount, string currency,
+        OfferParty? proposedBy = null)
+    {
+        var parameters = new Dictionary<string, string>
+        {
+            [NotificationPayload.Price] = new Price(amount, currency).ToString()
+        };
+
+        if (proposedBy is { } party)
+        {
+            parameters[NotificationPayload.ProposedBy] = party.ToString();
+        }
+
+        return parameters;
+    }
 
     private static Dictionary<string, string> ExitParameters(OfferParty actorParty, JobExitReason reason, string? note)
     {
@@ -186,7 +190,7 @@ internal sealed class TransactionNotificationHandler :
 
         if (!string.IsNullOrWhiteSpace(note))
         {
-            parameters[NotificationPayload.Note] = MyConversationDto.ToPreview(note);
+            parameters[NotificationPayload.Note] = TextPreview.Of(note);
         }
 
         return parameters;
@@ -199,7 +203,11 @@ internal sealed class TransactionNotificationHandler :
     private static Guid OtherSideOf(OfferParty party, Guid ownerId, Guid helperId)
         => party == OfferParty.Client ? helperId : ownerId;
 
-    private async Task OfferAsync(Guid eventId, Guid announcementId, Guid helperId, Guid actor, Guid recipient,
+    /// <summary>
+    /// One notification about the negotiation of this helper (an offer or a step of the job): never to the one who
+    /// acted, with the announcement title, opening the helper's conversation.
+    /// </summary>
+    private async Task NotifyAsync(Guid eventId, Guid announcementId, Guid helperId, Guid actor, Guid recipient,
         NotificationType type, DateTime occurredAtUtc, Dictionary<string, string> parameters,
         CancellationToken cancellationToken)
     {
@@ -215,17 +223,17 @@ internal sealed class TransactionNotificationHandler :
         }
 
         // Every offer lives in the conversation of this helper – the notification opens it.
-        var conversation = await _conversations.GetByParticipantsAsync(new Id(announcementId), new UserId(helperId),
+        var conversation = await conversations.GetByParticipantsAsync(new Id(announcementId), new UserId(helperId),
             cancellationToken);
 
         parameters[NotificationPayload.AnnouncementTitle] = title;
 
-        await _publisher.PublishAsync(eventId, new UserId(actor), occurredAtUtc,
+        await publisher.PublishAsync(eventId, new UserId(actor), occurredAtUtc,
         [
             new NotificationDraft(new UserId(recipient), type, new Id(announcementId), conversation?.Id, parameters)
         ], cancellationToken);
     }
 
     private async Task<string?> GetTitleAsync(Guid announcementId, CancellationToken cancellationToken)
-        => (await _announcements.GetByIdAsync(new Id(announcementId), cancellationToken))?.Title.Value;
+        => (await announcements.GetByIdAsync(new Id(announcementId), cancellationToken))?.Title.Value;
 }

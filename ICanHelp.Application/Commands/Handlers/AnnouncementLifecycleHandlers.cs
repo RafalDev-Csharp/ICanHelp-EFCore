@@ -7,169 +7,102 @@ namespace ICanHelp.Application.Commands.Handlers;
 
 // Proste handlery: wczytaj agregat, wywołaj metodę domenową, zapisz. Reguły (kto, w jakim statusie) są w Announcement.
 
-internal sealed class CancelAnnouncementHandler : ICommandHandler<CancelAnnouncement>
+internal sealed class CancelAnnouncementHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork)
+    : ICommandHandler<CancelAnnouncement>
 {
-    private readonly IAnnouncementRepository _announcements;
-    private readonly IUnitOfWork _unitOfWork;
-
-    public CancelAnnouncementHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork)
-    {
-        _announcements = announcements;
-        _unitOfWork = unitOfWork;
-    }
-
     public Task HandleAsync(CancelAnnouncement command, CancellationToken cancellationToken = default)
-        => _unitOfWork.ExecuteAsync(async () =>
+        => unitOfWork.ExecuteAsync(async () =>
         {
-            var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
+            var announcement = await announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
             announcement.Cancel(new UserId(command.ActorId));
         }, cancellationToken);
 }
 
-internal sealed class StartAnnouncementHandler : ICommandHandler<StartAnnouncement>
+internal sealed class StartAnnouncementHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork,
+    IClock clock) : ICommandHandler<StartAnnouncement>
 {
-    private readonly IAnnouncementRepository _announcements;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IClock _clock;
-
-    public StartAnnouncementHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
-    {
-        _announcements = announcements;
-        _unitOfWork = unitOfWork;
-        _clock = clock;
-    }
-
     public Task HandleAsync(StartAnnouncement command, CancellationToken cancellationToken = default)
-        => _unitOfWork.ExecuteAsync(async () =>
+        => unitOfWork.ExecuteAsync(async () =>
         {
-            var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
-            announcement.Start(new UserId(command.ActorId), _clock.UtcNow);
+            var announcement = await announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
+            announcement.Start(new UserId(command.ActorId), clock.UtcNow);
         }, cancellationToken);
 }
 
-internal sealed class ReportAnnouncementDoneHandler : ICommandHandler<ReportAnnouncementDone>
+internal sealed class ReportAnnouncementDoneHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork,
+    IClock clock) : ICommandHandler<ReportAnnouncementDone>
 {
-    private readonly IAnnouncementRepository _announcements;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IClock _clock;
-
-    public ReportAnnouncementDoneHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
-    {
-        _announcements = announcements;
-        _unitOfWork = unitOfWork;
-        _clock = clock;
-    }
-
     public Task HandleAsync(ReportAnnouncementDone command, CancellationToken cancellationToken = default)
-        => _unitOfWork.ExecuteAsync(async () =>
+        => unitOfWork.ExecuteAsync(async () =>
         {
-            var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
-            announcement.ReportDone(new UserId(command.ActorId), _clock.UtcNow);
+            var announcement = await announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
+            announcement.ReportDone(new UserId(command.ActorId), clock.UtcNow);
+        }, cancellationToken);
+}
+
+internal sealed class CompleteAnnouncementHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork,
+    IClock clock) : ICommandHandler<CompleteAnnouncement>
+{
+    public Task HandleAsync(CompleteAnnouncement command, CancellationToken cancellationToken = default)
+        => unitOfWork.ExecuteAsync(async () =>
+        {
+            var announcement = await announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
+            announcement.Complete(new UserId(command.ActorId), clock.UtcNow);
         }, cancellationToken);
 }
 
 /// <summary>F11 E: „Zrezygnuj” (Accepted → Open). Reguły (kto, status, powód) – <c>Announcement.Abandon</c>.</summary>
-internal sealed class AbandonJobHandler : ICommandHandler<AbandonJob>
+internal sealed class AbandonJobHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
+    : ICommandHandler<AbandonJob>
 {
-    private readonly IAnnouncementRepository _announcements;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IClock _clock;
-
-    public AbandonJobHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
+    public async Task HandleAsync(AbandonJob command, CancellationToken cancellationToken = default)
     {
-        _announcements = announcements;
-        _unitOfWork = unitOfWork;
-        _clock = clock;
-    }
+        var note = command.ToNote();
 
-    public Task HandleAsync(AbandonJob command, CancellationToken cancellationToken = default)
-    {
-        var note = JobExitNote.From(command.Note);
-
-        return _unitOfWork.ExecuteAsync(async () =>
+        await unitOfWork.ExecuteAsync(async () =>
         {
-            var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
-            announcement.Abandon(new UserId(command.ActorId), command.Reason, note, _clock.UtcNow);
+            var announcement = await announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
+            announcement.Abandon(new UserId(command.ActorId), command.Reason, note, clock.UtcNow);
         }, cancellationToken);
     }
 }
 
 /// <summary>F11 E: „Przerwij zlecenie” (InProgress → Interrupted). Reguły – <c>Announcement.Interrupt</c>.</summary>
-internal sealed class InterruptJobHandler : ICommandHandler<InterruptJob>
+internal sealed class InterruptJobHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
+    : ICommandHandler<InterruptJob>
 {
-    private readonly IAnnouncementRepository _announcements;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IClock _clock;
-
-    public InterruptJobHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
+    public async Task HandleAsync(InterruptJob command, CancellationToken cancellationToken = default)
     {
-        _announcements = announcements;
-        _unitOfWork = unitOfWork;
-        _clock = clock;
-    }
+        var note = command.ToNote();
 
-    public Task HandleAsync(InterruptJob command, CancellationToken cancellationToken = default)
-    {
-        var note = JobExitNote.From(command.Note);
-
-        return _unitOfWork.ExecuteAsync(async () =>
+        await unitOfWork.ExecuteAsync(async () =>
         {
-            var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
-            announcement.Interrupt(new UserId(command.ActorId), command.Reason, note, _clock.UtcNow);
+            var announcement = await announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
+            announcement.Interrupt(new UserId(command.ActorId), command.Reason, note, clock.UtcNow);
         }, cancellationToken);
     }
 }
 
 /// <summary>F11 G: stanowisko drugiej strony (reguły – <c>Announcement.RespondToJobExit</c>).</summary>
-internal sealed class RespondToJobExitHandler : ICommandHandler<RespondToJobExit>
+internal sealed class RespondToJobExitHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork,
+    IClock clock) : ICommandHandler<RespondToJobExit>
 {
-    private readonly IAnnouncementRepository _announcements;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IClock _clock;
-
-    public RespondToJobExitHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
-    {
-        _announcements = announcements;
-        _unitOfWork = unitOfWork;
-        _clock = clock;
-    }
-
-    public Task HandleAsync(RespondToJobExit command, CancellationToken cancellationToken = default)
+    public async Task HandleAsync(RespondToJobExit command, CancellationToken cancellationToken = default)
     {
         var text = new Description(command.Text.Trim());
 
-        return _unitOfWork.ExecuteAsync(async () =>
+        await unitOfWork.ExecuteAsync(async () =>
         {
-            var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
-            announcement.RespondToJobExit(command.Number, new UserId(command.ActorId), text, _clock.UtcNow);
+            var announcement = await announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
+            announcement.RespondToJobExit(command.Number, new UserId(command.ActorId), text, clock.UtcNow);
         }, cancellationToken);
     }
 }
 
-internal static class JobExitNote
+internal static class JobExitMapping
 {
-    /// <summary>Puste / same spacje = brak opisu; inaczej przycięty tekst (walidacja długości – <see cref="Description"/>).</summary>
-    public static Description? From(string? note)
-        => string.IsNullOrWhiteSpace(note) ? null : new Description(note.Trim());
-}
-
-internal sealed class CompleteAnnouncementHandler : ICommandHandler<CompleteAnnouncement>
-{
-    private readonly IAnnouncementRepository _announcements;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IClock _clock;
-
-    public CompleteAnnouncementHandler(IAnnouncementRepository announcements, IUnitOfWork unitOfWork, IClock clock)
-    {
-        _announcements = announcements;
-        _unitOfWork = unitOfWork;
-        _clock = clock;
-    }
-
-    public Task HandleAsync(CompleteAnnouncement command, CancellationToken cancellationToken = default)
-        => _unitOfWork.ExecuteAsync(async () =>
-        {
-            var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
-            announcement.Complete(new UserId(command.ActorId), _clock.UtcNow);
-        }, cancellationToken);
+    /// <summary>
+    /// Opis powodu: pusty / same spacje = brak, inaczej przycięty tekst (walidacja długości – <see cref="Description"/>).
+    /// </summary>
+    public static Description? ToNote(this JobExitCommand command) => command.Note?.Trim().ToOptionalDescription();
 }

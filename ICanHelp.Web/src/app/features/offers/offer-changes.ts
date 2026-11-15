@@ -1,5 +1,6 @@
 import type { AnnouncementFieldChangeDto } from '../../core/api/api-client';
 import { formatPrice } from '../../shared/pipes/price.pipe';
+import { announcementFieldTitle } from '../../shared/text/announcement-fields';
 import { pluralPl } from '../../shared/text/plural';
 import { difficultyLabel } from '../announcements/announcement-labels';
 
@@ -9,16 +10,6 @@ export interface FieldChangeRow {
   before: string;
   after: string;
 }
-
-const FIELD_TITLES: Readonly<Record<string, string>> = {
-  Category: 'Kategoria',
-  Difficulty: 'Trudność',
-  Title: 'Tytuł',
-  Description: 'Opis',
-  Budget: 'Budżet',
-  Location: 'Miejsce',
-  Images: 'Zdjęcia',
-};
 
 /**
  * Wiersze „było → jest” z `AnnouncementFieldChangeDto` (tekst zapisany przez domenę – `Announcement.Update`):
@@ -30,7 +21,7 @@ export function fieldChangeRows(
   categoryName: (id: string) => string = (id) => id,
 ): FieldChangeRow[] {
   return changes.map((change) => {
-    const label = FIELD_TITLES[change.field] ?? change.field;
+    const label = announcementFieldTitle(change.field);
     const before = change.oldValue ?? '';
     const after = change.newValue ?? '';
     switch (change.field) {

@@ -6,9 +6,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace ICanHelp.Api.Controllers;
 
 /// <summary>Kategorie i podkategorie ogłoszeń.</summary>
-[ApiController]
 [Route("api/categories")]
-public sealed class CategoriesController : ControllerBase
+public sealed class CategoriesController : ApiController
 {
     /// <summary>Wszystkie kategorie razem z podkategoriami.</summary>
     [HttpGet]
@@ -25,9 +24,5 @@ public sealed class CategoriesController : ControllerBase
         Guid categoryId,
         [FromServices] IQueryHandler<GetCategoryById, CategoryDto?> handler,
         CancellationToken cancellationToken)
-    {
-        var category = await handler.HandleAsync(new GetCategoryById { CategoryId = categoryId }, cancellationToken);
-
-        return category is null ? NotFound() : Ok(category);
-    }
+        => OkOrNotFound(await handler.HandleAsync(new GetCategoryById { CategoryId = categoryId }, cancellationToken));
 }

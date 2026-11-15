@@ -1,6 +1,7 @@
 using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.Events;
 using ICanHelp.Application.Notifications;
+using ICanHelp.Application.Security;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ICanHelp.Application;
@@ -25,6 +26,7 @@ public static class Extensions
             .WithScopedLifetime());
 
         services.AddScoped<NotificationPublisher>();
+        services.AddScoped<SessionTokenIssuer>();
 
         // Krok 15: handlers call one sender, it calls every channel (SignalR from Api, push here).
         services.AddScoped<INotificationSender, CompositeNotificationSender>();

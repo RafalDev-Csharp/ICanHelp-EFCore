@@ -386,5 +386,90 @@
   13.11.2026 lokalnie (`verify.cmd`, Docker): dotnet 593/593 (Core 261, Application 218, integracyjne 114), `npm run api`,
   lint + Vitest 354/354 + build zielone; po zmianie na średnią per osoba: dotnet 594/594 (Core 262), Vitest 356/356.
   Profil i „Oceny” w przeglądarce – do sprawdzenia ręcznie.
+- [x] Refaktoryzacja (R) – porządki w kodzie bez zmiany zachowania. Część R1 (14.11.2026, backend). Kontrakt API i baza bez
+  zmian: `npm run api` – klient bez zmian, bez migracji; atrybuty, komentarze `///` i sygnatury akcji kontrolerów identyczne
+  (sprawdzone skryptem).
+  Core: `Announcement` (743 linie) jako klasa `partial` w 4 plikach wg obszaru – `Announcement.cs` (stan, treść, rewizje,
+  wspólne reguły), `.Images.cs`, `.Negotiation.cs` (oferty, wątek), `.Job.cs` (realizacja, wyjścia, ocena); `OfferTerms`
+  (cena, terminy, wiadomość) zamiast czterech parametrów w `AddOffer` / `CounterOffer` / `ReviseOffer` i w konstruktorze
+  `Offer` (11 → 8 parametrów; reguły dalej w `Offer`); `GetJobExitsVisibleTo` (reguła widoczności przeniesiona z mapowania
+  w Infrastructure – obok `GetOffersVisibleTo`), `GetImagesInOrder`; budżet i miejsce w historii zmian z `ToString()` VO
+  (zamiast drugiej kopii formatowania); `Services/TextPreview` – jedna reguła skrótu tekstu zamiast dwóch
+  (`MyConversationDto.ToPreview` i prywatnej w `Announcement`); klasy bazowe wyjątków `NotFoundException` i
+  `AlreadyExistsException`; `Notification.EnsurePayload`; stare pliki (`Email`, wyjątki `Invalid*`) w stylu reszty kodu
+  (file-scoped namespace, bez zbędnych `using`); usunięty nieużywany `Infrastructure/AppOptions`.
+  Application: konstruktory główne we wszystkich handlerach i serwisach; `CommandMapping` (`ToPrice`, `ToLocation`,
+  `ToOptionalDescription`, `ToTerms` – wcześniej to samo `new Price(...)` w pięciu handlerach i cztery wersje „tekst
+  opcjonalny”); `RepositoryExtensions`: `GetOwnedOrThrowAsync` (alert / urządzenie / powiadomienie) i `EnsureCategoryAsync`
+  (ta sama walidacja kategorii była w trzech miejscach); rekord bazowy `OfferTermsCommand` dla trzech komend ofert;
+  `SessionTokenIssuer` – klasa z DI zamiast metody rozszerzającej z sześcioma parametrami (`SignInHandler`: 8 → 6
+  zależności); powiadomienia: `PolishFormat` (cena, odległość) wydzielony z `NotificationTextFormatter`,
+  `TransactionNotificationHandler` (`NotifyAsync`, `PriceParameters`), `NewAnnouncementAlertHandler` podzielony na kroki
+  (`FindMatchesAsync`, `AddNearbyAsync`, `AddToDigestAsync`).
+  Infrastructure: konstruktory główne (handlery zapytań, repozytoria, outbox, push); mapowania w trzech plikach zamiast
+  `Handlers/Extensions.cs` – `AnnouncementMapping` (wspólne pola listy i szczegółów raz: `AsSummary<TDto>`),
+  `ConversationMapping`, `DtoMapping`; `AnnouncementListRow` + `ToListRows()` (ta sama projekcja „miniatura + liczba
+  pomocników” była w trzech zapytaniach); `Paging.TakePage`; token bez poprawnego `sub` odrzucany przy uwierzytelnianiu
+  (`OnTokenValidated`); `ClaimsPrincipalExtensions` przeniesione z Api (jedno miejsce dla uwierzytelniania i kontrolerów).
+  Api: `ApiController` (`CurrentUserId`, `CurrentUserIdOrNull`, `Send` → 204, `OkOrNotFound`) – z kontrolerów zniknęło ok. 40
+  powtórzeń `if (!User.TryGetUserId(...)) return Unauthorized();`; `DomainExceptionHandler` wybiera kod po klasie bazowej
+  wyjątku (koniec z „dopisz nowy *NotFound do listy”).
+  Jedyna zmiana widoczna dla użytkownika: podgląd stanowiska w powiadomieniu `JobExitResponded` ma najwyżej 100 znaków
+  i jest cięty między słowami (było 120 znaków na sztywno) – tak jak podgląd wiadomości.
+  Testy: Core – `TextPreviewTests` (przeniesione z Application + 1), widoczność wpisów `JobExits`; Application –
+  `CommandMappingTests` (10), dostosowane testy sesji (`SessionTokenIssuer`) i ofert (`OfferTerms`); Api –
+  `TokenIdentityTests` (4: token bez `sub` albo z nie-Guidem → 401, z poprawnym → 200, publiczny endpoint → jak anonim).
+  Liczby: kod produkcyjny C# 13 406 → 12 509 linii (Core +58, Application −438, Infrastructure −269, Api −248); największy
+  plik klasy 743 → 255 linii.
+  14.11.2026 lokalnie (`verify.cmd`, Docker): dotnet 610/610 (Core 267, Application 225, integracyjne 118), `npm run api`
+  (klient bez zmian), lint + Vitest 356/356 + build zielone.
+  Świadomie zostawione: podział `AnnouncementsController` (zmieniłby nazwy metod klienta NSwag), `ITokenStorage`, jawna
+  rejestracja repozytoriów w DI.
+  Część R2 (15.11.2026, frontend `ICanHelp.Web/src/app`) – bez zmiany zachowania i wyglądu; backend, kontrakt API
+  i `api-client.ts` nietknięte.
+  Wspólne klocki (nowe): `shared/data` – `RemoteList` / `PagedList` (lista z API ze stanem `loading | ready | failed`,
+  odświeżanie, doładowywanie bez duplikatów – ten sam kod był w pięciu stronach), `RemoteData` / `RemoteItem` (jeden zasób,
+  404 → `not-found`; trzy strony), `runExclusive` (jedna akcja naraz – sześć kopii `busy.set(true) … finally`),
+  `completeIonEvent` (osiem kopii rzutowania `event.target`); `shared/components/load-state` – `app-loading` i
+  `app-load-failed` (stan „nie udało się wczytać” z „Spróbuj ponownie” był skopiowany w 12 szablonach); `core/ui` –
+  `DialogService` (`confirm`, `prompt`) i `ModalService` (okno z komponentem); `core/api/ApiCommands` (żądanie → komunikat
+  sukcesu → `true` / `false`); `core/notifications/reloadOnActivity`; `shared/forms/validators` (`notBlank` i `cents` były
+  w dwóch plikach każdy); `shared/text` – `announcement-fields` (trzy kopie mapy nazw pól ogłoszenia), `rating-texts`,
+  `capitalize`.
+  Oferty: `OffersService` (332 linie) rozdzielony na `OffersService` (negocjacje, 184) i `JobService` (realizacja: krok
+  zlecenia z tabeli pytań `run`, `exit`, `respondToExit`, `rate`; 130) – jak `Announcement.Negotiation.cs` / `.Job.cs`
+  w backendzie; `offer-view.ts` (`OfferView` – oferta gotowa do narysowania, przyciski jako dane) + `app-offer-card`;
+  `jobStepView` (teksty, ikony i kolory kroku w jednym miejscu, `registerJobStepIcons`), `jobExitView` i
+  `jobExitResponseAuthor` (trzy kopie „Stanowisko pomocnika / zleceniodawcy”), `oppositeParty`, `changedFieldsSuffix`.
+  Szczegóły ogłoszenia (713 linii TS + 376 HTML): `AnnouncementDetailsStore` (dane + rola czytającego, 216), sekcje
+  `app-announcement-content` / `-owner` / `-negotiations` (każda ze swoimi stylami), `footerMode` (siedem wersji stopki
+  zamiast łańcucha `@if`), strona = akcje i stopka (402 + 216). Wątek rozmowy (458 + 319): `conversation-thread.ts`
+  (reguły: `canMakeOffer`, `threadJobStep`, `readOnlyReason`), `app-conversation-subject`, karta oferty z `features/offers`,
+  jedna `offerAction` zamiast sześciu metod (350 + 198).
+  Pozostałe: listy („Zlecenia” – jedna pętla grup zamiast dwóch kopii, „Wszystkie rozmowy”, „Powiadomienia”, „Alerty”,
+  „Ulubione”) na `RemoteList` / `PagedList`; „Oceny” – `rating-groups.ts` + `app-rating-stars`; profil publiczny –
+  `profile-stats.ts`; alerty – `AlertRemovalService` (to samo okno i `DELETE` były w liście i edycji), mniej setterów
+  w edycji; formularz ogłoszenia – `AnnouncementFormState` wspólny dla „Dodaj” i „Edytuj”; rejestracja –
+  `sign-up-form.ts`; `PushService` (304 → 233) + `push-platform` / `push-storage` / `push-messages`;
+  `NotificationsService` (286 → 219) + `NotificationHubClient` + `notification-model`. Martwy kod: nieużywane importy
+  i rejestracje ikon, `afterAcceptance`; `features/profile/my-announcements` usunięte już wcześniej (zniknęło z opisu).
+  Testy: żaden nie usunięty – przeniesione razem z kodem (`job.service.spec` z `offers.service.spec`), dostosowane do
+  nowych nazw (`JobService.run`, `offerAction`, `draft`); nowe specs: `remote-list`, `remote-item`, `exclusive`,
+  `load-state`, `dialog.service`, `modal.service`, `api-commands`, `reload-on-activity`, `push-messages`, `validators`,
+  `texts`, `offer-view`, `offer-card.component`, `announcement-footer`, `announcement-form-state`, `conversation-thread`,
+  `sign-up-form`; dopisane `job-step` (`jobStepView`) i `job-exit` (`jobExitView`).
+  Liczby: największy plik 713 → 402 linie; HTML 2 719 → 2 445 (−10%), SCSS 1 088 → 1 081; TS produkcyjny 9 371 → 10 274
+  (82 → 117 plików – każdy nowy plik ma własne importy i opis, stąd +10% mimo usuniętych powtórzeń); specs 6 700 → 7 792
+  (55 → 73 pliki), Vitest 356 → 425. Build: zniknęło ostrzeżenie o budżecie `conversation.page.scss`.
+  15.11.2026 lokalnie (`verify.cmd -SkipBackend`): lint + Vitest 425/425 + build zielone („WSZYSTKO OK”). Dodatkowo
+  porównanie zrzutów „przed / po” (Playwright, zaślepione API, 63 ekrany × telefon MD / komputer / iOS): 188 z 189
+  identycznych co do piksela, w jednym (stopka szczegółów na komputerze) niestabilna różnica 2 pikseli.
+  Świadomie zostawione: nagłówek strony (`ion-header` + `app-brand` + dzwonek) jako wspólny komponent – przejścia iOS
+  w Ionic szukają `:scope > ion-header`, więc opakowanie zmieniłoby animację; okna z `handler` (anulowanie ogłoszenia,
+  konflikt edycji, zachęta do pusha) – przejście na `DialogService.confirm` opóźniłoby akcję o animację zamknięcia;
+  kroku zlecenia nie da się narysować jednym komponentem bez zmiany wyglądu (inny układ w wątku i w szczegółach) – wspólne
+  są dane (`jobStepView`). Jedyna zmiana widoczna dla użytkownika (na prośbę autora, po R2): ikona megafonu na pustej
+  liście „Szukaj” zaczęła się rysować – `megaphone-outline` nie była nigdzie rejestrowana (`addIcons`).
+  Przeklikanie w przeglądarce z prawdziwym API – ręcznie.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

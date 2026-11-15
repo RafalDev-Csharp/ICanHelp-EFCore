@@ -21,6 +21,7 @@ import type { JobExitReason } from '../../core/api/api-client';
 
 import type { JobExitAction, JobExitCommand, JobExitReasonOption } from './job-exit';
 import { jobExitReasons } from './job-exit';
+import { JOB_EXIT_LABELS } from './job-step';
 import { OFFER_RULES } from './offer-form';
 
 /**
@@ -74,7 +75,7 @@ export class JobExitModalComponent {
   }
 
   protected get submitLabel(): string {
-    return this.action === 'abandon' ? 'Zrezygnuj' : 'Przerwij zlecenie';
+    return JOB_EXIT_LABELS[this.action];
   }
 
   cancel(): void {

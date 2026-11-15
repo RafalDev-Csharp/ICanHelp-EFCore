@@ -1,3 +1,5 @@
+import { pluralPl } from '../../shared/text/plural';
+
 /** Teksty enumów z API (`DifficultyLevel`, `AnnouncementStatus`) – nieznana wartość zostaje bez tłumaczenia. */
 const DIFFICULTY_LABELS: Readonly<Record<string, string>> = {
   Easy: 'Łatwe',
@@ -45,4 +47,9 @@ export function statusLabel(status: string): string {
 /** Kolor Ionic (`ion-badge [color]`) dla statusu ogłoszenia. */
 export function statusColor(status: string): string {
   return STATUS_COLORS[status] ?? 'medium';
+}
+
+/** „1 oferta” / „3 oferty” / „5 ofert” – ilu pomocników złożyło ofertę. */
+export function offersCountLabel(count: number): string {
+  return `${count} ${pluralPl(count, 'oferta', 'oferty', 'ofert')}`;
 }

@@ -1,6 +1,7 @@
-import type { AnnouncementFieldChangeDto, OfferDto } from '../../core/api/api-client';
+import type { AnnouncementFieldChangeDto, OfferDto, OfferParty } from '../../core/api/api-client';
 import { APP_LOCALE } from '../../core/config/locale';
 import { parseApiDate } from '../../shared/pipes/time-ago.pipe';
+import { announcementFieldLabel } from '../../shared/text/announcement-fields';
 
 const dayFormat = new Intl.DateTimeFormat(APP_LOCALE, { weekday: 'short', day: 'numeric', month: 'short' });
 const timeFormat = new Intl.DateTimeFormat(APP_LOCALE, { hour: '2-digit', minute: '2-digit' });
@@ -21,7 +22,7 @@ export function formatDateTime(value: string): string {
   return `${dayFormat.format(date)}, ${timeFormat.format(date)}`;
 }
 
-/** Teksty enumów ofert z API (`OfferStatus`, `OfferParty`, `AnnouncementFields`) – nieznana wartość zostaje bez tłumaczenia. */
+/** Teksty enumów ofert z API (`OfferStatus`, `OfferParty`) – nieznana wartość zostaje bez tłumaczenia. */
 const OFFER_STATUS_LABELS: Readonly<Record<string, string>> = {
   Pending: 'Czeka na odpowiedź',
   Accepted: 'Przyjęta',
@@ -45,16 +46,6 @@ const OFFER_STATUS_COLORS: Readonly<Record<string, string>> = {
 const PARTY_LABELS: Readonly<Record<string, string>> = {
   Client: 'Zleceniodawca',
   Helper: 'Pomocnik',
-};
-
-const FIELD_LABELS: Readonly<Record<string, string>> = {
-  Category: 'kategoria',
-  Difficulty: 'trudność',
-  Title: 'tytuł',
-  Description: 'opis',
-  Budget: 'budżet',
-  Location: 'miejsce',
-  Images: 'zdjęcia',
 };
 
 export function offerStatusLabel(status: string): string {
@@ -86,9 +77,25 @@ export function partyLabel(party: string): string {
   return PARTY_LABELS[party] ?? party;
 }
 
+/** Druga strona transakcji: zleceniodawca ↔ pomocnik. */
+export function oppositeParty(party: string): OfferParty {
+  return party === 'Client' ? 'Helper' : 'Client';
+}
+
+/** „pomocnika” / „zleceniodawcy” – np. „Czeka na odpowiedź pomocnika”. */
+export function partyGenitive(party: string): string {
+  return party === 'Helper' ? 'pomocnika' : 'zleceniodawcy';
+}
+
 /** „budżet, opis” – co zmieniło się w ogłoszeniu (pola rewizji albo `changesSinceOffer`). */
 export function changedFieldsLabel(fields: readonly AnnouncementFieldChangeDto[]): string {
-  return [...new Set(fields.map((change) => FIELD_LABELS[change.field] ?? change.field))].join(', ');
+  return [...new Set(fields.map((change) => announcementFieldLabel(change.field)))].join(', ');
+}
+
+/** „ (budżet, opis)” do wstawienia w zdanie o zmianach ogłoszenia; bez znanych zmian – pusty tekst. */
+export function changedFieldsSuffix(fields: readonly AnnouncementFieldChangeDto[]): string {
+  const changed = changedFieldsLabel(fields);
+  return changed ? ` (${changed})` : '';
 }
 
 /**

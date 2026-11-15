@@ -1,14 +1,10 @@
-import { DatePipe } from '@angular/common';
 import { Component, computed, inject, input, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import {
   AlertController,
   IonBackButton,
-  IonBadge,
   IonButton,
   IonButtons,
-  IonChip,
   IonContent,
   IonFooter,
   IonHeader,
@@ -17,11 +13,9 @@ import {
   IonLabel,
   IonList,
   IonListHeader,
-  IonNote,
   IonRefresher,
   IonRefresherContent,
   IonSkeletonText,
-  IonText,
   IonTitle,
   IonToolbar,
 } from '@ionic/angular';
@@ -32,95 +26,60 @@ import {
   callOutline,
   chatbubbleEllipsesOutline,
   chatbubbleOutline,
-  chatbubblesOutline,
   checkmarkDoneOutline,
   closeCircleOutline,
-  cloudOfflineOutline,
-  constructOutline,
   copyOutline,
   createOutline,
   exitOutline,
   eyeOutline,
-  flagOutline,
   heart,
   heartOutline,
   helpCircleOutline,
-  hourglassOutline,
-  locationOutline,
   mailOutline,
-  peopleOutline,
   personCircleOutline,
-  playOutline,
-  pricetagOutline,
-  star,
   starOutline,
   stopCircleOutline,
-  warningOutline,
 } from 'ionicons/icons';
-import { catchError, filter, firstValueFrom, forkJoin, of } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 
-import type {
-  AnnouncementContactDto,
-  AnnouncementDetailsDto,
-  MyConversationDto,
-  RatingDto,
-  UserPublicDto,
-  UserReliabilityDto,
-} from '../../../core/api/api-client';
-import { AnnouncementsClient, ConversationsClient, UsersClient } from '../../../core/api/api-client';
-import { errorStatus } from '../../../core/api/api-errors';
-import { apiResourceUrl } from '../../../core/api/api.providers';
+import { AnnouncementsClient } from '../../../core/api/api-client';
 import { loginUrlTree } from '../../../core/auth/auth.guard';
 import { AuthService } from '../../../core/auth/auth.service';
 import { CategoriesService } from '../../../core/categories/categories.service';
-import { openStreetMapUrl } from '../../../core/config/map';
-import { NotificationsService } from '../../../core/notifications/notifications.service';
+import { reloadOnActivity } from '../../../core/notifications/reload-on-activity';
 import { ToastService } from '../../../core/ui/toast.service';
 import { BrandComponent } from '../../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
-import type { MapMarker } from '../../../shared/components/map/map.component';
-import { MapComponent } from '../../../shared/components/map/map.component';
+import { LoadFailedComponent } from '../../../shared/components/load-state/load-failed.component';
+import { runExclusive } from '../../../shared/data/exclusive';
+import { completeIonEvent } from '../../../shared/data/ion-events';
 import { PricePipe } from '../../../shared/pipes/price.pipe';
-import { TimeAgoPipe, parseApiDate } from '../../../shared/pipes/time-ago.pipe';
-import { pluralPl } from '../../../shared/text/plural';
-import {
-  INTERRUPTED_NOTE,
-  canRespondToExit,
-  jobExitReasonText,
-  jobExitTitle,
-  reliabilityLabel,
-} from '../../offers/job-exit';
-import type { JobAction, JobStep } from '../../offers/job-step';
-import { JOB_ACTION_ICONS, JOB_ACTION_LABELS, JOB_EXIT_LABELS, jobStep } from '../../offers/job-step';
-import { formatOfferTerm, offerStateColor, offerStateLabel, pendingOffer } from '../../offers/offer-labels';
+import { INTERRUPTED_NOTE } from '../../offers/job-exit';
+import { jobStepView, registerJobStepIcons } from '../../offers/job-step';
+import { JobService } from '../../offers/job.service';
+import { oppositeParty, partyLabel } from '../../offers/offer-labels';
 import { OffersService } from '../../offers/offers.service';
-import { difficultyColor, difficultyLabel, statusColor, statusLabel } from '../announcement-labels';
+import { statusLabel } from '../announcement-labels';
 import { LikesService } from '../likes/likes.service';
 
-import type { HistoryEntry } from './announcement-negotiations';
-import { negotiationsOf, ownerHistory } from './announcement-negotiations';
-
-type LoadState = 'loading' | 'ready' | 'not-found' | 'failed';
-
-/** Ile ostatnich opinii o właścicielu pokazujemy pod ogłoszeniem. */
-const VISIBLE_RATINGS = 3;
-
-/** Wątki jednego ogłoszenia – więcej pomocników w jednym ogłoszeniu się nie spodziewamy. */
-const CONVERSATIONS_LIMIT = 50;
-
-/** Statusy po akceptacji oferty – wtedy uczestnicy widzą swoje dane kontaktowe (po przerwaniu też – rozliczenie). */
-const AFTER_ACCEPTANCE = ['Accepted', 'InProgress', 'Completed', 'Interrupted'];
+import { AnnouncementContentComponent } from './announcement-content.component';
+import { AnnouncementDetailsStore } from './announcement-details.store';
+import type { FooterMode } from './announcement-footer';
+import { footerMode } from './announcement-footer';
+import { AnnouncementNegotiationsComponent } from './announcement-negotiations.component';
+import { AnnouncementOwnerComponent } from './announcement-owner.component';
 
 /**
- * Szczegóły ogłoszenia (publiczne): zdjęcia, opis, mapa, właściciel z ocenami, serduszko. Akcje zależą od roli:
+ * Szczegóły ogłoszenia (publiczne): treść (`app-announcement-content`), właściciel z ocenami, kontakt po akceptacji,
+ * negocjacje i historia, serduszko. Dane i rola czytającego – `AnnouncementDetailsStore`; tu akcje i stopka, która
+ * zależy od roli (`footerMode`):
  * - gość: „Złóż ofertę” / „Zapytaj” → logowanie i powrót tutaj;
  * - pomocnik: „Zapytaj” (wątek przed ofertą = pytania i odpowiedzi), oferta osobno (okno), po przyjęciu jego oferty –
  *   kontakt, „Rozpocznij” → „Zgłoś wykonanie” (F11 D), ocena po zakończeniu;
- * - właściciel: „Edytuj” (Open), „Anuluj” (Open/Accepted), lista negocjacji i historia ogłoszenia (oferty,
- *   kontroferty, edycje), po akceptacji – kontakt, „Potwierdź wykonanie” (wyróżnione po zgłoszeniu), ocena po zakończeniu.
+ * - właściciel: „Edytuj” (Open), „Anuluj” (Open/Accepted), po akceptacji – kontakt, „Potwierdź wykonanie” (wyróżnione
+ *   po zgłoszeniu), ocena po zakończeniu;
  * - F11 E/G: obie strony – „Zrezygnuj” (Accepted) / „Przerwij zlecenie” (InProgress) z powodem; po przerwaniu bez ocen –
- *   druga strona „Dodaj swoje stanowisko”, notka o rozliczeniu i u właściciela „Wystaw ponownie” (`/add?copyOf=`). Liczniki rezygnacji / przerwań właściciela
- *   i (u właściciela) każdego pomocnika – `GET api/users/{id}/reliability`.
+ *   druga strona „Dodaj swoje stanowisko”, notka o rozliczeniu i u właściciela „Wystaw ponownie” (`/add?copyOf=`).
  * Powiadomienie o tym ogłoszeniu (`activity$`) przeładowuje ekran.
  * Akcje na samych ofertach (przyjmij, odrzuć, kontroferta, wycofaj) są w wątku – tam widać całą negocjację.
  */
@@ -128,9 +87,9 @@ const AFTER_ACCEPTANCE = ['Accepted', 'InProgress', 'Completed', 'Interrupted'];
   selector: 'app-announcement-details',
   templateUrl: './announcement-details.page.html',
   styleUrls: ['./announcement-details.page.scss'],
+  providers: [AnnouncementDetailsStore],
   imports: [
     BrandComponent,
-    DatePipe,
     RouterLink,
     IonHeader,
     IonToolbar,
@@ -141,198 +100,64 @@ const AFTER_ACCEPTANCE = ['Accepted', 'InProgress', 'Completed', 'Interrupted'];
     IonRefresher,
     IonRefresherContent,
     IonSkeletonText,
-    IonBadge,
-    IonChip,
-    IonText,
     IonList,
     IonListHeader,
     IonItem,
     IonIcon,
     IonLabel,
-    IonNote,
     IonButton,
     IonFooter,
     EmptyStateComponent,
-    MapComponent,
+    LoadFailedComponent,
+    AnnouncementContentComponent,
+    AnnouncementOwnerComponent,
+    AnnouncementNegotiationsComponent,
     PricePipe,
-    TimeAgoPipe,
   ],
 })
 export class AnnouncementDetailsPage implements ViewWillEnter {
   private readonly announcements = inject(AnnouncementsClient);
-  private readonly conversationsClient = inject(ConversationsClient);
-  private readonly users = inject(UsersClient);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly alerts = inject(AlertController);
   private readonly likes = inject(LikesService);
   private readonly offers = inject(OffersService);
-  private readonly notifications = inject(NotificationsService);
-  protected readonly auth = inject(AuthService);
-  protected readonly categories = inject(CategoriesService);
+  private readonly jobs = inject(JobService);
+  private readonly auth = inject(AuthService);
+  private readonly categories = inject(CategoriesService);
+  protected readonly store = inject(AnnouncementDetailsStore);
 
   /** Z adresu `/announcements/:announcementId` (`withComponentInputBinding`). */
   readonly announcementId = input.required<string>();
 
-  protected readonly state = signal<LoadState>('loading');
-  protected readonly announcement = signal<AnnouncementDetailsDto | null>(null);
-  protected readonly owner = signal<UserPublicDto | null>(null);
-  protected readonly ownerRatings = signal<RatingDto[]>([]);
-  /** Wątki zalogowanego w tym ogłoszeniu (właściciel – wszystkie, pomocnik – jego jeden). */
-  protected readonly conversations = signal<MyConversationDto[]>([]);
-  /** Dane drugiej strony – dopiero po akceptacji, tylko dla uczestników. */
-  protected readonly contact = signal<AnnouncementContactDto | null>(null);
-  /** Czy zalogowany już ocenił (po `Completed`). */
-  protected readonly rated = signal(false);
-  /** Trwa akcja (oferta, start, zakończenie, ocena) – przyciski nieaktywne. */
+  /** Trwa akcja (oferta, krok zlecenia, ocena) – przyciski nieaktywne. */
   protected readonly busy = signal(false);
-
-  protected readonly parseApiDate = parseApiDate;
-  protected readonly difficultyLabel = difficultyLabel;
-  protected readonly difficultyColor = difficultyColor;
-  protected readonly statusLabel = statusLabel;
-  protected readonly statusColor = statusColor;
-  protected readonly offerStateLabel = offerStateLabel;
-  protected readonly offerStateColor = offerStateColor;
-  protected readonly formatOfferTerm = formatOfferTerm;
-  protected readonly jobLabels = JOB_ACTION_LABELS;
-  protected readonly jobIcons = JOB_ACTION_ICONS;
-  protected readonly exitLabels = JOB_EXIT_LABELS;
-  protected readonly historyIcons: Readonly<Record<HistoryEntry['kind'], string>> = {
-    offer: 'pricetag-outline',
-    change: 'create-outline',
-    abandoned: 'exit-outline',
-    interrupted: 'stop-circle-outline',
-  };
-  protected readonly interruptedNote = INTERRUPTED_NOTE;
-  /** Licznik rezygnacji / przerwań właściciela („1 rezygnacja”, pusty = brak). */
-  protected readonly ownerReliability = signal('');
-  /** Właściciel: liczniki pomocników z listy negocjacji (helperId → tekst). */
-  protected readonly helperReliability = signal<ReadonlyMap<string, string>>(new Map());
-
-  protected readonly images = computed(() =>
-    (this.announcement()?.images ?? []).map((image) => ({ id: image.id, url: apiResourceUrl(image.url) ?? '' })),
-  );
-  protected readonly category = computed(() => {
-    const announcement = this.announcement();
-    return announcement
-      ? [this.categories.name(announcement.categoryId), this.categories.name(announcement.subcategoryId)]
-          .filter(Boolean)
-          .join(' · ')
-      : '';
-  });
-  /** „Brak ofert” / „1 oferta” / „3 oferty” – etykieta pod tytułem. */
-  protected readonly offersLabel = computed(() => {
-    const count = this.announcement()?.helperCount ?? 0;
-    return count === 0 ? 'Brak ofert' : `${count} ${pluralPl(count, 'oferta', 'oferty', 'ofert')}`;
-  });
-  protected readonly marker = computed<MapMarker[]>(() => {
-    const announcement = this.announcement();
-    return announcement ? [{ id: announcement.id, ...announcement.location }] : [];
-  });
-  protected readonly mapLink = computed(() => {
-    const announcement = this.announcement();
-    return announcement ? openStreetMapUrl(announcement.location) : '';
-  });
-  protected readonly isOwner = computed(() => {
-    const user = this.auth.currentUser();
-    return user !== null && user.id === this.announcement()?.ownerId;
-  });
-  protected readonly status = computed(() => this.announcement()?.status ?? '');
-  protected readonly isOpen = computed(() => this.status() === 'Open');
-  /** Pomocnik, którego ofertę przyjęto (pomocnik widzi tylko swoje oferty, więc wystarczy szukać przyjętej). */
-  protected readonly isAcceptedHelper = computed(() => {
-    const announcement = this.announcement();
-    const userId = this.auth.currentUser()?.id;
-    return (
-      !!announcement?.acceptedOfferId &&
-      !!userId &&
-      announcement.offers.some((offer) => offer.id === announcement.acceptedOfferId && offer.helperId === userId)
-    );
-  });
-  protected readonly isParticipant = computed(() => this.isOwner() || this.isAcceptedHelper());
-  /**
-   * F11 E/G: przerwanie zlecenia – kto, powód, stanowisko drugiej strony i czy czytający może je dodać (bez ocen).
-   */
-  protected readonly interruption = computed(() => {
-    const announcement = this.announcement();
-    const exit = announcement?.jobExits?.find((e) => e.kind === 'Interrupted');
-    const userId = this.auth.currentUser()?.id ?? '';
-    return announcement && exit
-      ? {
-          number: exit.number,
-          title: jobExitTitle(exit, userId),
-          reason: jobExitReasonText(exit).replace(/\.$/, ''),
-          response: exit.response,
-          responseAuthor: exit.actorRole === 'Client' ? 'Stanowisko pomocnika' : 'Stanowisko zleceniodawcy',
-          canRespond: canRespondToExit(exit, userId, announcement.ownerId),
-        }
-      : null;
-  });
-  /**
-   * F11 E: pomocnik, którego zlecenie zerwano przed rozpoczęciem (on albo zleceniodawca) – nie złoży już oferty,
-   * jego wątek jest tylko do odczytu.
-   */
-  protected readonly myAbandonment = computed(() => {
-    const userId = this.auth.currentUser()?.id;
-    return this.isOwner() || !userId
-      ? undefined
-      : this.announcement()?.jobExits?.find((e) => e.kind === 'Abandoned' && e.helperId === userId);
-  });
-  protected readonly afterAcceptance = computed(() => AFTER_ACCEPTANCE.includes(this.status()));
-  protected readonly negotiations = computed(() =>
-    negotiationsOf(this.announcement()?.offers ?? [], this.conversations(), this.auth.currentUser()?.id),
-  );
-  /** Pomocnik: jego oczekująca oferta (zamiast „Złóż ofertę” – „Twoja oferta”). */
-  protected readonly myPendingOffer = computed(() =>
-    this.isOwner() ? undefined : pendingOffer(this.announcement()?.offers ?? []),
-  );
-  /** Pomocnik: jego własna oczekująca oferta, która jest nieaktualna (ogłoszenie edytowano) – do aktualizacji. */
-  protected readonly myOutdatedOffer = computed(() => {
-    const offer = this.myPendingOffer();
-    return offer?.isOutdated && offer.proposedBy === 'Helper' ? offer : undefined;
-  });
-  /** Krok realizacji dla uczestnika przyjętego zlecenia (F11 D – jak w wątku). */
-  protected readonly job = computed<JobStep>(() =>
-    jobStep(this.status(), this.isOwner() ? 'Client' : 'Helper', this.announcement()?.doneReportedAt),
-  );
-  /** Pomocnik: jego wątek w tym ogłoszeniu. */
-  protected readonly myConversationId = computed(() =>
-    this.isOwner() ? undefined : this.conversations()[0]?.conversationId,
-  );
-  /** Właściciel: oferty, kontroferty i edycje od najnowszych. */
-  protected readonly history = computed(() => {
-    const announcement = this.announcement();
-    if (!announcement || !this.isOwner()) {
-      return [];
-    }
-    const names = new Map(this.negotiations().map((negotiation) => [negotiation.helperId, negotiation.userName]));
-    return ownerHistory(announcement, names);
-  });
-  protected readonly isLiked = computed(() => {
-    const announcement = this.announcement();
-    return announcement !== null && this.auth.isAuthenticated() && this.likes.isLiked(announcement.id);
-  });
   protected readonly liking = signal(false);
   protected readonly cancelling = signal(false);
-  protected readonly ratingSummary = computed(() => {
-    const ratings = this.ownerRatings();
-    if (ratings.length === 0) {
-      return null;
-    }
-    const average = ratings.reduce((sum, rating) => sum + rating.rate, 0) / ratings.length;
-    return {
-      average: average.toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
-      count: `${ratings.length} ${pluralPl(ratings.length, 'ocena', 'oceny', 'ocen')}`,
-    };
+
+  protected readonly statusLabel = statusLabel;
+
+  protected readonly isLiked = computed(() => {
+    const announcement = this.store.announcement();
+    return announcement !== null && this.auth.isAuthenticated() && this.likes.isLiked(announcement.id);
   });
-  /** Najnowsze opinie z komentarzem. */
-  protected readonly recentReviews = computed(() =>
-    this.ownerRatings()
-      .filter((rating) => !!rating.comment)
-      .sort((a, b) => parseApiDate(b.createdAt).getTime() - parseApiDate(a.createdAt).getTime())
-      .slice(0, VISIBLE_RATINGS),
+  /** Która wersja stopki (rola czytającego × status). */
+  protected readonly footer = computed<FooterMode>(() =>
+    footerMode({
+      status: this.store.status(),
+      isOwner: this.store.isOwner(),
+      isParticipant: this.store.isParticipant(),
+      interrupted: this.store.interruption() !== null,
+      abandoned: !!this.store.myAbandonment(),
+    }),
   );
+  /** Krok realizacji w stopce uczestnika (notka, przycisk kroku, wyjście). */
+  protected readonly job = computed(() => jobStepView(this.store.job()));
+  /** „Pomocnik przerwał zlecenie – Brak kontaktu. Ustalcie między sobą rozliczenie…” */
+  protected readonly interruptionNote = computed(() => {
+    const entry = this.store.interruption();
+    return entry ? `${entry.title} – ${entry.reason.replace(/\.$/, '')}. ${INTERRUPTED_NOTE}` : '';
+  });
 
   constructor() {
     addIcons({
@@ -340,40 +165,28 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
       callOutline,
       chatbubbleEllipsesOutline,
       chatbubbleOutline,
-      chatbubblesOutline,
       checkmarkDoneOutline,
       closeCircleOutline,
-      cloudOfflineOutline,
-      constructOutline,
       copyOutline,
       createOutline,
       exitOutline,
       eyeOutline,
-      flagOutline,
       heart,
       heartOutline,
       helpCircleOutline,
-      hourglassOutline,
-      locationOutline,
       mailOutline,
-      peopleOutline,
       personCircleOutline,
-      playOutline,
-      pricetagOutline,
-      star,
       starOutline,
       stopCircleOutline,
-      warningOutline,
     });
+    registerJobStepIcons();
 
     // F11 D: powiadomienie (hub albo push) o tym ogłoszeniu – np. pomocnik zgłosił wykonanie, druga strona zmieniła
     // ofertę – szczegóły przeładowane od razu.
-    this.notifications.activity$
-      .pipe(
-        filter((activity) => activity.announcementId === this.announcementId()),
-        takeUntilDestroyed(),
-      )
-      .subscribe(() => this.load());
+    reloadOnActivity(
+      (activity) => activity.announcementId === this.announcementId(),
+      () => this.load(),
+    );
   }
 
   /** Przy każdym wejściu (także po powrocie z logowania – zalogowany może widzieć swoje oferty). */
@@ -390,32 +203,11 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
   }
 
   refresh(event: Event): void {
-    this.load(() => void (event.target as unknown as { complete(): Promise<void> }).complete());
+    this.load(() => completeIonEvent(event));
   }
 
   load(done?: () => void): void {
-    this.announcements.getById(this.announcementId()).subscribe({
-      next: (announcement) => {
-        const ownerChanged = this.announcement()?.ownerId !== announcement.ownerId;
-        this.announcement.set(announcement);
-        this.likes.sync(announcement.id, announcement.isLiked);
-        this.state.set('ready');
-        if (ownerChanged) {
-          this.loadOwner(announcement.ownerId);
-        }
-        this.loadNegotiation(announcement);
-        done?.();
-      },
-      error: (error: unknown) => {
-        if (errorStatus(error) === 404) {
-          this.announcement.set(null);
-          this.state.set('not-found');
-        } else if (!this.announcement()) {
-          this.state.set('failed');
-        }
-        done?.();
-      },
-    });
+    this.store.load(this.announcementId(), done);
   }
 
   /**
@@ -424,103 +216,66 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
    * inaczej okno oferty → `POST …/offers` → wątek (oferta zakłada go sama).
    */
   async makeOffer(): Promise<void> {
-    const announcement = this.announcement();
+    const announcement = this.store.announcement();
     if (!announcement || this.busy() || !this.requireSignIn()) {
       return;
     }
-    const outdated = this.myOutdatedOffer();
+    const outdated = this.store.myOutdatedOffer();
     if (outdated) {
-      this.busy.set(true);
-      try {
+      await runExclusive(this.busy, async () => {
         if (await this.offers.reviewChanges(outdated)) {
           this.load();
         }
-      } finally {
-        this.busy.set(false);
-      }
+      });
       return;
     }
-    if (this.myPendingOffer()) {
+    if (this.store.myPendingOffer()) {
       await this.writeMessage();
       return;
     }
-    this.busy.set(true);
-    try {
+    await runExclusive(this.busy, async () => {
       const offerId = await this.offers.make(announcement.id, announcement.budget.amount);
       if (offerId) {
         await this.openOwnConversation(announcement.id);
       }
-    } finally {
-      this.busy.set(false);
-    }
+    });
   }
 
   /** „Zapytaj” / „Rozmowa” (pomocnik): istniejący wątek albo nowy (`POST …/conversations` – istniał → ten sam id). */
   async writeMessage(): Promise<void> {
-    const announcement = this.announcement();
+    const announcement = this.store.announcement();
     if (!announcement || !this.requireSignIn()) {
       return;
     }
-    const existing = this.myConversationId();
+    const existing = this.store.myConversationId();
     if (existing) {
-      void this.router.navigate(['/conversations', existing]);
+      this.openConversation(existing);
       return;
     }
     await this.openOwnConversation(announcement.id);
   }
 
-  /** Właściciel: wątek z pomocnikiem (z listy negocjacji albo przyjętym – „Rozmowa” w stopce). */
+  /** Wątek z pomocnikiem: z listy negocjacji albo – po akceptacji – przyjętego („Rozmowa” w stopce). */
   openConversation(conversationId: string | undefined): void {
     if (conversationId) {
       void this.router.navigate(['/conversations', conversationId]);
     }
   }
 
-  /** Wątek przyjętego pomocnika – dla obu stron po akceptacji. */
-  openAcceptedConversation(): void {
-    if (this.isOwner()) {
-      const acceptedOfferId = this.announcement()?.acceptedOfferId;
-      const helperId = this.announcement()?.offers.find((offer) => offer.id === acceptedOfferId)?.helperId;
-      this.openConversation(this.negotiations().find((n) => n.helperId === helperId)?.conversationId);
-    } else {
-      this.openConversation(this.myConversationId());
-    }
-  }
-
-  /** „Rozpocznij” – tylko przyjęty pomocnik (Accepted → InProgress). */
-  async start(): Promise<void> {
-    await this.lifecycle((id) => this.offers.start(id));
-  }
-
-  /** „Zgłoś wykonanie” – przyjęty pomocnik (InProgress, raz). */
-  async reportDone(): Promise<void> {
-    await this.lifecycle((id) => this.offers.reportDone(id));
-  }
-
-  /** „Potwierdź wykonanie” – tylko właściciel (Accepted / InProgress → Completed), potem obie strony mogą się ocenić. */
-  async complete(): Promise<void> {
-    await this.lifecycle((id) => this.offers.complete(id));
-  }
-
-  /** Przycisk kroku zlecenia w stopce (`job().action`). */
+  /** Przycisk kroku zlecenia w stopce: „Rozpocznij” / „Zgłoś wykonanie” (pomocnik), „Potwierdź wykonanie” (właściciel). */
   async runJobAction(): Promise<void> {
-    const actions: Record<JobAction, () => Promise<void>> = {
-      start: () => this.start(),
-      report: () => this.reportDone(),
-      complete: () => this.complete(),
-    };
-    const action = this.job().action;
+    const action = this.store.job().action;
     if (action) {
-      await actions[action]();
+      await this.lifecycle((id) => this.jobs.run(id, action));
     }
   }
 
   /** F11 E: „Zrezygnuj” / „Przerwij zlecenie” – okno z powodem (wspólne z wątkiem). */
   async exitJob(): Promise<void> {
-    const exit = this.job().exit;
+    const exit = this.store.job().exit;
     if (exit) {
-      const otherSide = this.isOwner() ? 'Pomocnik' : 'Zleceniodawca';
-      await this.lifecycle((id) => this.offers.exitJob(id, exit, otherSide));
+      const otherSide = partyLabel(oppositeParty(this.store.myRole()));
+      await this.lifecycle((id) => this.jobs.exit(id, exit, otherSide));
     }
   }
 
@@ -530,32 +285,35 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
   }
 
   /** F11 G: „Dodaj swoje stanowisko” po przerwaniu (druga strona, raz). */
-  async respondToExit(number: number): Promise<void> {
-    await this.lifecycle((id) => this.offers.respondToExit(id, number));
+  async respondToExit(): Promise<void> {
+    const number = this.store.interruption()?.exit.number;
+    if (number !== undefined) {
+      await this.lifecycle((id) => this.jobs.respondToExit(id, number));
+    }
   }
 
   /** Ocena drugiej strony po zakończeniu (po przerwaniu – bez ocen, F11 G). */
   async rate(): Promise<void> {
-    const announcement = this.announcement();
-    if (!announcement || this.busy()) {
+    const announcement = this.store.announcement();
+    if (!announcement) {
       return;
     }
-    const other = this.isOwner() ? this.contact()?.fullName : this.owner()?.fullName;
-    this.busy.set(true);
-    try {
-      if (await this.offers.rate(announcement.id, other ?? '')) {
-        this.rated.set(true);
+    const other = this.store.isOwner() ? this.store.contact()?.fullName : this.store.owner()?.fullName;
+    await runExclusive(this.busy, async () => {
+      try {
+        if (await this.jobs.rate(announcement.id, other ?? '')) {
+          this.store.rated.set(true);
+        }
+      } finally {
+        // Także po 409 `AlreadyRated` (np. ocena z innego urządzenia) – stan z serwera.
+        this.load();
       }
-    } finally {
-      this.busy.set(false);
-      // Także po 409 `AlreadyRated` (np. ocena z innego urządzenia) – stan z serwera.
-      this.load();
-    }
+    });
   }
 
   /** Serduszko: niezalogowany → logowanie i powrót. */
   toggleLike(): void {
-    const announcement = this.announcement();
+    const announcement = this.store.announcement();
     if (!announcement || this.liking() || !this.requireSignIn()) {
       return;
     }
@@ -575,7 +333,7 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
 
   /** Anulowanie (właściciel) – po potwierdzeniu, bo nie da się go cofnąć. */
   async cancel(): Promise<void> {
-    const announcement = this.announcement();
+    const announcement = this.store.announcement();
     if (!announcement || this.cancelling()) {
       return;
     }
@@ -609,19 +367,19 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     });
   }
 
-  /** Potwierdzenie, API i komunikat – w `OffersService` (wspólne z wątkiem); potem stan z serwera (także po 409). */
+  /** Jedna akcja naraz (`JobService` – potwierdzenie, API, komunikat); potem stan z serwera (także po 409). */
   private async lifecycle(action: (announcementId: string) => Promise<boolean>): Promise<void> {
-    const announcement = this.announcement();
-    if (!announcement || this.busy()) {
+    const announcement = this.store.announcement();
+    if (!announcement) {
       return;
     }
-    this.busy.set(true);
-    try {
-      await action(announcement.id);
-    } finally {
-      this.busy.set(false);
-      this.load();
-    }
+    await runExclusive(this.busy, async () => {
+      try {
+        await action(announcement.id);
+      } finally {
+        this.load();
+      }
+    });
   }
 
   private async openOwnConversation(announcementId: string): Promise<void> {
@@ -634,80 +392,11 @@ export class AnnouncementDetailsPage implements ViewWillEnter {
     }
   }
 
-  /**
-   * Dane negocjacji zalogowanego: jego wątki w tym ogłoszeniu, kontakt (po akceptacji, uczestnicy) i czy już ocenił
-   * (po zakończeniu). Dodatki – błąd nie psuje ekranu.
-   */
-  private loadNegotiation(announcement: AnnouncementDetailsDto): void {
-    if (!this.auth.isAuthenticated()) {
-      this.conversations.set([]);
-      return;
-    }
-    this.conversationsClient
-      .getMine(undefined, undefined, announcement.id, 1, CONVERSATIONS_LIMIT)
-      .pipe(catchError(() => of<MyConversationDto[]>([])))
-      .subscribe((conversations) => {
-        this.conversations.set(conversations);
-        this.loadHelperReliability();
-      });
-
-    const userId = this.auth.currentUser()?.id;
-    const participant =
-      userId !== undefined &&
-      (userId === announcement.ownerId ||
-        announcement.offers.some((offer) => offer.id === announcement.acceptedOfferId && offer.helperId === userId));
-    if (!participant || !AFTER_ACCEPTANCE.includes(announcement.status)) {
-      this.contact.set(null);
-      this.rated.set(false);
-      return;
-    }
-    this.announcements
-      .getContact(announcement.id)
-      .pipe(catchError(() => of(null)))
-      .subscribe((contact) => this.contact.set(contact));
-    if (announcement.status === 'Completed') {
-      this.announcements
-        .getRatings(announcement.id)
-        .pipe(catchError(() => of<RatingDto[]>([])))
-        .subscribe((ratings) => this.rated.set(ratings.some((rating) => rating.raterId === userId)));
-    }
-  }
-
   private requireSignIn(): boolean {
     if (this.auth.isAuthenticated()) {
       return true;
     }
     void this.router.navigateByUrl(loginUrlTree(this.router, this.router.url));
     return false;
-  }
-
-  /** Właściciel i jego oceny – dodatki: błąd nie psuje ekranu (komunikat pokazał interceptor). */
-  private loadOwner(ownerId: string): void {
-    this.owner.set(null);
-    this.ownerRatings.set([]);
-    this.ownerReliability.set('');
-    forkJoin({
-      owner: this.users.getById(ownerId).pipe(catchError(() => of(null))),
-      ratings: this.users.getRatings(ownerId).pipe(catchError(() => of<RatingDto[]>([]))),
-      reliability: this.users.getReliability(ownerId).pipe(catchError(() => of<UserReliabilityDto | null>(null))),
-    }).subscribe(({ owner, ratings, reliability }) => {
-      this.owner.set(owner);
-      this.ownerRatings.set(ratings);
-      this.ownerReliability.set(reliabilityLabel(reliability));
-    });
-  }
-
-  /** Właściciel: liczniki rezygnacji / przerwań pomocników z listy negocjacji (dodatek – błąd = bez licznika). */
-  private loadHelperReliability(): void {
-    const helperIds = this.isOwner() ? this.negotiations().map((negotiation) => negotiation.helperId) : [];
-    if (helperIds.length === 0) {
-      this.helperReliability.set(new Map());
-      return;
-    }
-    forkJoin(
-      helperIds.map((id) => this.users.getReliability(id).pipe(catchError(() => of<UserReliabilityDto | null>(null)))),
-    ).subscribe((results) =>
-      this.helperReliability.set(new Map(helperIds.map((id, index) => [id, reliabilityLabel(results[index])]))),
-    );
   }
 }

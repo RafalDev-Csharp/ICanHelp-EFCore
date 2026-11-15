@@ -8,25 +8,19 @@ using Microsoft.EntityFrameworkCore;
 namespace ICanHelp.Infrastructure.DAL.Handlers;
 
 /// <summary>Otrzymane oceny z tytułem ogłoszenia i rolą czytającego (indeks Ratings.RateeId).</summary>
-internal sealed class GetMyRatingsHandler : IQueryHandler<GetMyRatings, IReadOnlyList<MyRatingDto>>
+internal sealed class GetMyRatingsHandler(ICanHelpDbContext db)
+    : IQueryHandler<GetMyRatings, IReadOnlyList<MyRatingDto>>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetMyRatingsHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<IReadOnlyList<MyRatingDto>> HandleAsync(GetMyRatings query,
         CancellationToken cancellationToken = default)
     {
         var userId = new UserId(query.UserId);
 
         var rows = await (
-                from r in _db.Ratings.AsNoTracking()
+                from r in db.Ratings.AsNoTracking()
                 where r.RateeId == userId
-                join a in _db.Announcements.AsNoTracking() on r.AnnouncementId equals a.Id
-                join rater in _db.Users.AsNoTracking() on r.RaterId equals rater.Id
+                join a in db.Announcements.AsNoTracking() on r.AnnouncementId equals a.Id
+                join rater in db.Users.AsNoTracking() on r.RaterId equals rater.Id
                 orderby r.CreatedAt descending
                 select new { Rating = r, a.Title, a.OwnerId, RaterUserName = rater.UserName })
             .ToListAsync(cancellationToken);
@@ -52,29 +46,23 @@ internal sealed class GetMyRatingsHandler : IQueryHandler<GetMyRatings, IReadOnl
 /// F11 G: przerwanych nie oceniamy.
 /// Przyjęta oferta jest w ogłoszeniu najwyżej jedna – stąd złączenie po statusie zamiast po <c>AcceptedOfferId</c>.
 /// </summary>
-internal sealed class GetMyPendingRatingsHandler : IQueryHandler<GetMyPendingRatings, IReadOnlyList<PendingRatingDto>>
+internal sealed class GetMyPendingRatingsHandler(ICanHelpDbContext db)
+    : IQueryHandler<GetMyPendingRatings, IReadOnlyList<PendingRatingDto>>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetMyPendingRatingsHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<IReadOnlyList<PendingRatingDto>> HandleAsync(GetMyPendingRatings query,
         CancellationToken cancellationToken = default)
     {
         var userId = new UserId(query.UserId);
 
         var rows = await (
-                from a in _db.Announcements.AsNoTracking()
+                from a in db.Announcements.AsNoTracking()
                 where a.Status == AnnouncementStatus.Completed
-                join o in _db.Offers.AsNoTracking().Where(o => o.Status == OfferStatus.Accepted)
+                join o in db.Offers.AsNoTracking().Where(o => o.Status == OfferStatus.Accepted)
                     on a.Id equals o.AnnouncementId
                 where a.OwnerId == userId || o.HelperId == userId
-                where !_db.Ratings.Any(r => r.AnnouncementId == a.Id && r.RaterId == userId)
-                join owner in _db.Users.AsNoTracking() on a.OwnerId equals owner.Id
-                join helper in _db.Users.AsNoTracking() on o.HelperId equals helper.Id
+                where !db.Ratings.Any(r => r.AnnouncementId == a.Id && r.RaterId == userId)
+                join owner in db.Users.AsNoTracking() on a.OwnerId equals owner.Id
+                join helper in db.Users.AsNoTracking() on o.HelperId equals helper.Id
                 orderby a.CreatedAt descending
                 select new
                 {
@@ -97,7 +85,7 @@ internal sealed class GetMyPendingRatingsHandler : IQueryHandler<GetMyPendingRat
                 {
                     AnnouncementId = row.Id,
                     AnnouncementTitle = row.Title,
-                    ThumbnailUrl = row.ThumbnailId is null ? null : ImageDto.GetUrl(row.Id, row.ThumbnailId),
+                    ThumbnailUrl = AnnouncementMapping.ThumbnailUrl(row.Id, row.ThumbnailId),
                     MyRole = MyRatingDto.RoleOf(row.OwnerId, query.UserId),
                     OtherParty = isOwner
                         ? new ConversationPartyDto { Id = row.HelperId, UserName = row.HelperUserName }

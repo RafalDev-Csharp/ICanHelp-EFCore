@@ -1,4 +1,3 @@
-using ICanHelp.Api.Security;
 using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.Commands;
 using ICanHelp.Application.DTO;
@@ -13,10 +12,9 @@ namespace ICanHelp.Api.Controllers;
 /// Wątki negocjacji: rozmowa właściciela ogłoszenia z jednym pomocnikiem. Tylko dla tych dwóch osób.
 /// Wątek zakłada się przez <c>POST api/announcements/{id}/conversations</c> (albo automatycznie przy pierwszej ofercie).
 /// </summary>
-[ApiController]
 [Route("api/conversations")]
 [Authorize]
-public sealed class ConversationsController : ControllerBase
+public sealed class ConversationsController : ApiController
 {
     /// <summary>
     /// „Moje negocjacje”: wątki zalogowanego użytkownika (jako właściciel ogłoszenia albo pomocnik) z podglądem
@@ -38,14 +36,9 @@ public sealed class ConversationsController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
         var conversations = await handler.HandleAsync(new GetMyConversations
         {
-            UserId = userId,
+            UserId = CurrentUserId,
             Role = role,
             Status = status,
             AnnouncementId = announcementId,
@@ -68,17 +61,8 @@ public sealed class ConversationsController : ControllerBase
         Guid conversationId,
         [FromServices] IQueryHandler<GetConversation, ConversationDto?> handler,
         CancellationToken cancellationToken)
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        var conversation = await handler.HandleAsync(
-            new GetConversation { ConversationId = conversationId, UserId = userId }, cancellationToken);
-
-        return conversation is null ? NotFound() : Ok(conversation);
-    }
+        => OkOrNotFound(await handler.HandleAsync(
+            new GetConversation { ConversationId = conversationId, UserId = CurrentUserId }, cancellationToken));
 
     /// <summary>
     /// Wiadomość (2–500 znaków). Pisać można, dopóki ogłoszenie jest otwarte; po akceptacji – tylko w wątku
@@ -96,14 +80,10 @@ public sealed class ConversationsController : ControllerBase
         [FromServices] ICommandHandler<SendMessage> handler,
         CancellationToken cancellationToken)
     {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
         var messageId = Guid.NewGuid();
         await handler.HandleAsync(
-            command with { ConversationId = conversationId, MessageId = messageId, SenderId = userId }, cancellationToken);
+            command with { ConversationId = conversationId, MessageId = messageId, SenderId = CurrentUserId },
+            cancellationToken);
 
         return CreatedAtAction(nameof(GetById), new { conversationId }, new CreatedDto(messageId));
     }
@@ -114,17 +94,9 @@ public sealed class ConversationsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> MarkAsRead(
+    public Task<IActionResult> MarkAsRead(
         Guid conversationId,
         [FromServices] ICommandHandler<MarkConversationAsRead> handler,
         CancellationToken cancellationToken)
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        await handler.HandleAsync(new MarkConversationAsRead(conversationId, userId), cancellationToken);
-        return NoContent();
-    }
+        => Send(new MarkConversationAsRead(conversationId, CurrentUserId), handler, cancellationToken);
 }

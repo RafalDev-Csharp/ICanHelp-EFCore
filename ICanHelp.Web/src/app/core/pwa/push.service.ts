@@ -1,16 +1,18 @@
-import { DestroyRef, Injectable, InjectionToken, computed, effect, inject, signal, untracked } from '@angular/core';
+import { DestroyRef, Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { SwUpdate } from '@angular/service-worker';
 import { AlertController } from '@ionic/angular';
 import { firstValueFrom } from 'rxjs';
 
 import { DevicesClient } from '../api/api-client';
 import { AuthService } from '../auth/auth.service';
-import type { PushNotice } from '../notifications/notifications.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ToastService } from '../ui/toast.service';
 
 import { InstallPromptService } from './install-prompt.service';
+import { parseWorkerMessage } from './push-messages';
 import { PUSH_MESSAGING } from './push-messaging';
+import { BRAVE_PUSH_HINT, PUSH_PLATFORM } from './push-platform';
+import { readStoredPush, writeStoredPush } from './push-storage';
 
 /**
  * `unavailable` – push wyłączony w tej wersji (brak konfiguracji Firebase albo service worker wyłączony, np. `ng serve`);
@@ -20,50 +22,9 @@ import { PUSH_MESSAGING } from './push-messaging';
  */
 export type PushState = 'unavailable' | 'needs-install' | 'unsupported' | 'default' | 'denied' | 'enabled';
 
-/** Wiadomości z `public/app-sw.js` (te same nazwy). */
-export const PUSH_RECEIVED = 'icanhelp-push-received';
-export const PUSH_CLICKED = 'icanhelp-push-clicked';
-
-/** Klucz w `localStorage`: zapisane urządzenie (do `DELETE api/me/devices/{id}`) i kiedy ostatnio pytaliśmy o zgodę. */
-export const PUSH_STORAGE_KEY = 'icanhelp.push';
 /** Zachęty („Powiadomić Cię…?”) nie powtarzamy częściej niż raz na tydzień. */
 export const SUGGEST_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 const READY_TIMEOUT_MS = 40_000;
-
-/** Dostęp do API przeglądarki (Notification, service worker) – w specs zaślepka. */
-export interface PushPlatform {
-  /** `null` – przeglądarka bez service workera albo bez Push API / Notification. */
-  readonly serviceWorker: ServiceWorkerContainer | null;
-  /** Brave domyślnie blokuje push przez usługi Google (FCM) – przy błędzie pokazujemy, gdzie to włączyć. */
-  readonly isBrave?: boolean;
-  permission(): NotificationPermission;
-  requestPermission(): Promise<NotificationPermission>;
-}
-
-/** Podpowiedź dla Brave, gdy rejestracja FCM się nie uda (ustawienie nie ma adresu, który dałoby się otworzyć linkiem). */
-export const BRAVE_PUSH_HINT =
-  'Brave domyślnie blokuje powiadomienia przez usługi Google. Otwórz brave://settings/privacy, włącz ' +
-  '„Use Google services for push messaging” („Używaj usług Google do przesyłania wiadomości push”), uruchom ' +
-  'przeglądarkę ponownie i spróbuj jeszcze raz.';
-
-export const PUSH_PLATFORM = new InjectionToken<PushPlatform>('PUSH_PLATFORM', {
-  providedIn: 'root',
-  factory: () => {
-    const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
-    return {
-      serviceWorker: supported ? navigator.serviceWorker : null,
-      isBrave: 'brave' in navigator,
-      permission: () => (supported ? Notification.permission : 'denied'),
-      requestPermission: () => Notification.requestPermission(),
-    };
-  },
-});
-
-interface StoredPush {
-  deviceId?: string;
-  token?: string;
-  suggestedAt?: number;
-}
 
 /**
  * Powiadomienia push (F7, FCM). Zgoda przeglądarki tylko po akcji użytkownika: `suggest()` po złożeniu oferty /
@@ -71,6 +32,8 @@ interface StoredPush {
  * przy każdym starcie zalogowanej aplikacji ze zgodą – ponownie (token mógł się zmienić, backend robi upsert).
  * Wylogowanie: `unregister()` (DELETE w API, póki jest sesja) + unieważnienie tokenu; utrata sesji bez wylogowania –
  * samo unieważnienie. Push przy otwartej aplikacji service worker oddaje tu → toast z `NotificationsService`.
+ * Dostęp do przeglądarki – `push-platform.ts`, pamięć urządzenia – `push-storage.ts`, wiadomości workera –
+ * `push-messages.ts`.
  */
 @Injectable({ providedIn: 'root' })
 export class PushService {
@@ -148,11 +111,11 @@ export class PushService {
     if (this.state() !== 'default' || this.permission() === 'granted' || !this.auth.isAuthenticated()) {
       return;
     }
-    const stored = readStored();
+    const stored = readStoredPush();
     if (stored.suggestedAt && now - stored.suggestedAt < SUGGEST_INTERVAL_MS) {
       return;
     }
-    writeStored({ ...stored, suggestedAt: now });
+    writeStoredPush({ ...stored, suggestedAt: now });
 
     const alert = await this.alerts.create({
       header: 'Powiadomienia',
@@ -200,7 +163,7 @@ export class PushService {
 
   /** Przed wylogowaniem (póki jest token dostępu): usuwa urządzenie w API i unieważnia token FCM. */
   async unregister(): Promise<void> {
-    const deviceId = readStored().deviceId;
+    const deviceId = readStoredPush().deviceId;
     if (deviceId && this.auth.isAuthenticated()) {
       await firstValueFrom(this.devices.remove(deviceId), { defaultValue: undefined }).catch(() => undefined);
     }
@@ -224,7 +187,7 @@ export class PushService {
       }
       const token = await this.messaging.getToken(registration);
       const device = await firstValueFrom(this.devices.register({ token, platform: 'Web' }));
-      writeStored({ ...readStored(), deviceId: device.id, token });
+      writeStoredPush({ ...readStoredPush(), deviceId: device.id, token });
       this.registered.set(true);
       return true;
     } catch {
@@ -234,12 +197,12 @@ export class PushService {
 
   /** Sesja się skończyła: token FCM unieważniony lokalnie (backend usunie go przy następnej wysyłce). */
   private async forget(): Promise<void> {
-    const stored = readStored();
+    const stored = readStoredPush();
     this.registered.set(false);
     if (!stored.token) {
       return;
     }
-    writeStored({ suggestedAt: stored.suggestedAt });
+    writeStoredPush({ suggestedAt: stored.suggestedAt });
     const registration = await this.platform.serviceWorker?.getRegistration().catch(() => undefined);
     if (registration) {
       await this.messaging.deleteToken(registration).catch(() => undefined);
@@ -258,47 +221,13 @@ export class PushService {
     ]);
   }
 
-  private onWorkerMessage(message: unknown): void {
-    if (!message || typeof message !== 'object') {
-      return;
+  /** Push przy otwartej aplikacji → toast; kliknięcie w systemowe powiadomienie → właściwy ekran. */
+  private onWorkerMessage(data: unknown): void {
+    const message = parseWorkerMessage(data);
+    if (message?.kind === 'received') {
+      this.notifications.showPush(message.notice);
+    } else if (message?.kind === 'clicked') {
+      void this.notifications.openPush(message.url, message.notificationId);
     }
-    const { type, title, body, data, url, notificationId } = message as {
-      type?: string;
-      title?: string;
-      body?: string;
-      url?: string;
-      notificationId?: string;
-      data?: Record<string, string | undefined>;
-    };
-    if (type === PUSH_RECEIVED && data) {
-      const notice: PushNotice = {
-        notificationId: data['notificationId'],
-        title: title ?? 'ICanHelp',
-        body,
-        url: data['url'],
-        announcementId: data['announcementId'],
-        conversationId: data['conversationId'],
-      };
-      this.notifications.showPush(notice);
-    } else if (type === PUSH_CLICKED) {
-      void this.notifications.openPush(url, notificationId);
-    }
-  }
-}
-
-function readStored(): StoredPush {
-  try {
-    const value = JSON.parse(localStorage.getItem(PUSH_STORAGE_KEY) ?? '{}') as StoredPush | null;
-    return value && typeof value === 'object' ? value : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeStored(value: StoredPush): void {
-  try {
-    localStorage.setItem(PUSH_STORAGE_KEY, JSON.stringify(value));
-  } catch {
-    // tryb prywatny / pełny magazyn – push i tak zadziała do końca tej sesji
   }
 }

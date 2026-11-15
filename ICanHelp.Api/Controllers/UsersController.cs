@@ -4,16 +4,14 @@ using ICanHelp.Application.DTO;
 using ICanHelp.Application.Queries;
 using ICanHelp.Application.Security;
 using ICanHelp.Core.Enums;
-using ICanHelp.Infrastructure.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ICanHelp.Api.Controllers;
 
 /// <summary>Użytkownicy: rejestracja, logowanie, profil, oceny i polubienia.</summary>
-[ApiController]
 [Route("api/users")]
-public sealed class UsersController : ControllerBase
+public sealed class UsersController : ApiController
 {
     /// <summary>Rejestracja nowego konta (rola zawsze User). Zwraca adres utworzonego użytkownika.</summary>
     [HttpPost("sign-up")]
@@ -99,16 +97,7 @@ public sealed class UsersController : ControllerBase
     public async Task<ActionResult<UserDto>> Me(
         [FromServices] IQueryHandler<GetUserById, UserDto?> handler,
         CancellationToken cancellationToken)
-    {
-        if (!Guid.TryParse(User.FindFirst(AuthClaims.UserId)?.Value, out var userId))
-        {
-            return Unauthorized();
-        }
-
-        var user = await handler.HandleAsync(new GetUserById { UserId = userId }, cancellationToken);
-
-        return user is null ? NotFound() : Ok(user);
-    }
+        => OkOrNotFound(await handler.HandleAsync(new GetUserById { UserId = CurrentUserId }, cancellationToken));
 
     /// <summary>Lista wszystkich kont z pełnymi danymi – tylko dla admina.</summary>
     [HttpGet]
@@ -130,11 +119,7 @@ public sealed class UsersController : ControllerBase
         Guid userId,
         [FromServices] IQueryHandler<GetUserPublicById, UserPublicDto?> handler,
         CancellationToken cancellationToken)
-    {
-        var user = await handler.HandleAsync(new GetUserPublicById { UserId = userId }, cancellationToken);
-
-        return user is null ? NotFound() : Ok(user);
-    }
+        => OkOrNotFound(await handler.HandleAsync(new GetUserPublicById { UserId = userId }, cancellationToken));
 
     /// <summary>
     /// F11 E: publiczne liczniki – ile zleceń użytkownik sam zerwał przed rozpoczęciem (<c>abandonedCount</c>)
@@ -147,11 +132,7 @@ public sealed class UsersController : ControllerBase
         Guid userId,
         [FromServices] IQueryHandler<GetUserReliability, UserReliabilityDto?> handler,
         CancellationToken cancellationToken)
-    {
-        var reliability = await handler.HandleAsync(new GetUserReliability { UserId = userId }, cancellationToken);
-
-        return reliability is null ? NotFound() : Ok(reliability);
-    }
+        => OkOrNotFound(await handler.HandleAsync(new GetUserReliability { UserId = userId }, cancellationToken));
 
     /// <summary>
     /// F11 G: publiczny profil – dane publiczne, statystyki „Pomagam” / „Zlecam” (średnia ocen tylko z zakończonych
@@ -165,11 +146,7 @@ public sealed class UsersController : ControllerBase
         Guid userId,
         [FromServices] IQueryHandler<GetUserProfile, UserProfileDto?> handler,
         CancellationToken cancellationToken)
-    {
-        var profile = await handler.HandleAsync(new GetUserProfile { UserId = userId }, cancellationToken);
-
-        return profile is null ? NotFound() : Ok(profile);
-    }
+        => OkOrNotFound(await handler.HandleAsync(new GetUserProfile { UserId = userId }, cancellationToken));
 
     /// <summary>Oceny, które użytkownik otrzymał – podstawa jego reputacji.</summary>
     [HttpGet("{userId:guid}/ratings")]
@@ -220,6 +197,5 @@ public sealed class UsersController : ControllerBase
 
     /// <summary>Czy zalogowany użytkownik to <paramref name="userId"/> albo admin.</summary>
     private bool IsSelfOrAdmin(Guid userId)
-        => User.IsInRole(nameof(UserRole.Admin))
-           || (Guid.TryParse(User.FindFirst(AuthClaims.UserId)?.Value, out var currentUserId) && currentUserId == userId);
+        => User.IsInRole(nameof(UserRole.Admin)) || CurrentUserId == userId;
 }

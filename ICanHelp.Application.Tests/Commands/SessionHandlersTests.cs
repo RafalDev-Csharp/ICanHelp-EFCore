@@ -1,6 +1,7 @@
 using ICanHelp.Application.Commands;
 using ICanHelp.Application.Commands.Handlers;
 using ICanHelp.Application.Exceptions;
+using ICanHelp.Application.Security;
 using ICanHelp.Application.Tests.Fakes;
 
 namespace ICanHelp.Application.Tests.Commands;
@@ -22,8 +23,10 @@ public class SessionHandlersTests
             .HandleAsync(_registered).GetAwaiter().GetResult();
     }
 
+    private SessionTokenIssuer TokenIssuer() => new(_refreshTokens, _refreshTokenService, new FakeAuthenticator());
+
     private RefreshSessionHandler RefreshHandler(FakeTokenStorage? storage = null)
-        => new(_refreshTokens, _users, new FakeUnitOfWork(), _refreshTokenService, new FakeAuthenticator(),
+        => new(_refreshTokens, _users, new FakeUnitOfWork(), _refreshTokenService, TokenIssuer(),
             storage ?? _tokenStorage, _clock);
 
     private EndSessionHandler EndHandler()
@@ -33,8 +36,7 @@ public class SessionHandlersTests
     private async Task<string> SignInAsync()
     {
         var storage = new FakeTokenStorage();
-        await new SignInHandler(_users, new FakePasswordManager(), new FakeAuthenticator(), storage, _refreshTokens,
-                _refreshTokenService, new FakeUnitOfWork(), _clock)
+        await new SignInHandler(_users, new FakePasswordManager(), TokenIssuer(), storage, new FakeUnitOfWork(), _clock)
             .HandleAsync(new SignIn { Email = _registered.Email, Password = _registered.Password });
         return storage.Get()!.RefreshToken;
     }

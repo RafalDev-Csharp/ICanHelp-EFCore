@@ -1,3 +1,13 @@
+import { addIcons } from 'ionicons';
+import {
+  checkmarkDoneOutline,
+  exitOutline,
+  flagOutline,
+  hourglassOutline,
+  playOutline,
+  stopCircleOutline,
+} from 'ionicons/icons';
+
 import type { JobExitAction } from './job-exit';
 
 /** Krok realizacji zlecenia, który może zrobić zalogowany (F11 D – te same reguły co `Announcement.Start/ReportDone/Complete`). */
@@ -26,13 +36,18 @@ export const JOB_EXIT_LABELS: Readonly<Record<JobExitAction, string>> = {
   interrupt: 'Przerwij zlecenie',
 };
 
-export const JOB_ACTION_LABELS: Readonly<Record<JobAction, string>> = {
+const JOB_EXIT_ICONS: Readonly<Record<JobExitAction, string>> = {
+  abandon: 'exit-outline',
+  interrupt: 'stop-circle-outline',
+};
+
+const JOB_ACTION_LABELS: Readonly<Record<JobAction, string>> = {
   start: 'Rozpocznij zlecenie',
   report: 'Zgłoś wykonanie',
   complete: 'Potwierdź wykonanie',
 };
 
-export const JOB_ACTION_ICONS: Readonly<Record<JobAction, string>> = {
+const JOB_ACTION_ICONS: Readonly<Record<JobAction, string>> = {
   start: 'play-outline',
   report: 'flag-outline',
   complete: 'checkmark-done-outline',
@@ -74,4 +89,36 @@ export function jobStep(status: string, myRole: string, doneReportedAt: string |
         exit,
       }
     : { ...NONE, action: 'complete', note: 'W realizacji – pomocnik zgłosi wykonanie.', exit };
+}
+
+/** Krok zlecenia gotowy do narysowania – teksty, ikony i kolory w jednym miejscu (wątek i szczegóły ogłoszenia). */
+export interface JobStepView {
+  /** Notka nad przyciskami; `highlight` – wyróżniona (pomocnik zgłosił wykonanie). */
+  note: { text: string; icon: string; highlight: boolean } | null;
+  /** Przycisk kroku: „Potwierdź wykonanie” jest zielony, akcja awaryjna – w obrysie. */
+  action: { label: string; icon: string; color: 'primary' | 'success'; fill: 'solid' | 'outline' } | null;
+  /** „Zrezygnuj” / „Przerwij zlecenie”. */
+  exit: { label: string; icon: string } | null;
+}
+
+export function jobStepView(step: JobStep): JobStepView {
+  return {
+    note: step.note
+      ? { text: step.note, icon: step.highlight ? 'flag-outline' : 'hourglass-outline', highlight: step.highlight }
+      : null,
+    action: step.action
+      ? {
+          label: JOB_ACTION_LABELS[step.action],
+          icon: JOB_ACTION_ICONS[step.action],
+          color: step.action === 'complete' ? 'success' : 'primary',
+          fill: step.primary ? 'solid' : 'outline',
+        }
+      : null,
+    exit: step.exit ? { label: JOB_EXIT_LABELS[step.exit], icon: JOB_EXIT_ICONS[step.exit] } : null,
+  };
+}
+
+/** Rejestruje ikony, których używa `jobStepView` (wołane w konstruktorze ekranu z krokiem zlecenia). */
+export function registerJobStepIcons(): void {
+  addIcons({ checkmarkDoneOutline, exitOutline, flagOutline, hourglassOutline, playOutline, stopCircleOutline });
 }

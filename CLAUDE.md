@@ -21,7 +21,8 @@ porada). **Pomocnik (Helper)**, który zna się na rzeczy i najlepiej przejeżd�
 3. Kolekcje: `private readonly List<T> _items = new(); public IReadOnlyCollection<T> Items => _items.AsReadOnly();`
 4. Logika biznesowa w encjach (np. `announcement.AcceptOffer(offerId)`), nie w handlerach.
 5. VO jako `sealed record` z walidacją w konstruktorze. Wyjątki public, dziedziczą po `CustomExceptions`; łamanie reguły biznesowej →
-   `DomainRuleException` (409), złe dane → własny `Invalid*Exception` (400). Identyfikatory: VO `Id` i `UserId`.
+   `DomainRuleException` (409), złe dane → własny `Invalid*Exception` (400), brak zasobu → klasa po `NotFoundException` (404),
+   „już istnieje” → po `AlreadyExistsException` (409). Identyfikatory: VO `Id` i `UserId`.
 6. Daty `DateTime` UTC. Domena **nie woła** `DateTime.UtcNow` – czas dostaje parametrem; w Application czas daje `IClock`.
 7. Status zamiast wielu booli (`AnnouncementStatus`, `OfferStatus`).
 8. EF: każdą relację konfiguruj **raz** (wewnątrz agregatu – w konfiguracji korzenia). Konwertery VO i enumy (jako string) globalnie
@@ -30,11 +31,15 @@ porada). **Pomocnik (Helper)**, który zna się na rzeczy i najlepiej przejeżd�
 10. Async wszędzie (`CancellationToken`), repozytorium per agregat (interfejs w Core). Repozytoria **nie** wołają `SaveChanges` –
     robi to `IUnitOfWork.ExecuteAsync(...)` (`SqlUnitOfWork` = transakcja + SaveChanges + przeniesienie zdarzeń do outboksa).
 11. Nazwy w kodzie po angielsku, komentarze mogą być po polsku.
+12. Klasy z zależnościami z DI (handlery, repozytoria, serwisy): konstruktor główny `class X(IDep dep) : IFoo` – bez pól `_dep`
+    i przypisań. Powtarzalne kroki do wspólnych miejsc (niżej), nie kopiuj ich do kolejnego handlera / kontrolera.
 
 ## Model domeny (Core) – szczegóły metod i reguł: `docs/ARCHITEKTURA.md` „Model domeny”
 - `User` (+ `ContactData`), `RefreshToken` (hash, rotacja), `UserDevice` (token FCM, max 10) – `Entities/Users`
 - `Announcement` (agregat): Offers, Images (max 5), Revision (token współbieżności, +1 przy realnej edycji), Changes; `AggregateRoot`
-  z `DomainEvents`. `Category` → `Subcategory`. `Rating` (raz na ogłoszenie i oceniającego). `LikedAnnouncement`, `LikedUser`.
+  z `DomainEvents`. Klasa `partial` w 4 plikach: `Announcement.cs` (treść, rewizje), `.Images.cs`, `.Negotiation.cs` (oferty –
+  warunki w VO `OfferTerms`), `.Job.cs` (realizacja, wyjścia, ocena). `Category` → `Subcategory`. `Rating` (raz na ogłoszenie
+  i oceniającego). `LikedAnnouncement`, `LikedUser`.
 - `Conversation` (`Entities/Negotiations`): jeden wątek na (ogłoszenie, pomocnik), wiadomości, znaczniki przeczytania.
 - `Notification` (`Entities/Notifications`): powstaje w tle z outboksa. `AnnouncementAlert` (`Entities/Alerts`): obszar / trasa.
 
@@ -66,16 +71,19 @@ Api.Tests       Infrastructure/ApiFactory (kontener, RecordingPushSender), Infra
 ```
 - Zapytania (`GetX`) definiuje Application, handlery są w Infrastructure (czytają z DbContext, `AsNoTracking`). Handlery komend –
   Application (`Commands/Handlers`, repozytoria + `IUnitOfWork`). Rejestracja: Scrutor. Wspólne: `RepositoryExtensions`
-  (`GetOrThrowAsync`, `GetActiveOrThrowAsync`), `AsUtc()`.
+  (`GetOrThrowAsync`, `GetActiveOrThrowAsync`, `GetOwnedOrThrowAsync` – cudze = 404, `EnsureCategoryAsync`), `CommandMapping`
+  (DTO / tekst z komendy → VO: `ToPrice`, `ToLocation`, `ToOptionalDescription`, `ToTerms`), `AsUtc()`. Zapytania: mapowania
+  `AnnouncementMapping` / `ConversationMapping` / `DtoMapping`, lista ogłoszeń `ToListRows()`, strona `TakePage(page, pageSize)`.
 - Testy integracyjne: jeden kontener i baza na przebieg, środowisko `Testing`, config przez `UseSetting`, outbox ręcznie
   (`ProcessOutboxAsync()`). Bazy nie czyścimy – każdy test ma własnych użytkowników i filtruje po swoich danych.
 
 ## Api w skrócie (szczegóły: `docs/ARCHITEKTURA.md`)
-- Kontrolery: handler wstrzykiwany do akcji (`[FromServices] IQueryHandler<,>` / `ICommandHandler<>`, bez mediatora), `null` z query → 404.
-  Id aktora zawsze z tokenu (`User.TryGetUserId`), pola komend ustawiane przez kontroler mają `[JsonIgnore]`.
-- Błędy jako ProblemDetails (`DomainExceptionHandler`): *NotFound → 404 (nowy wyjątek dopisz do listy!), `DomainRuleException`,
-  `ConcurrencyConflict`, `AlreadyRated`, `*AlreadyInUse` → 409, inne `CustomExceptions` → 400, `InvalidCredentials` → 401,
-  `UserLocked` → 403; `errorCode` = nazwa wyjątku bez „Exception”, zawsze `traceId`.
+- Kontrolery dziedziczą po `ApiController`: handler wstrzykiwany do akcji (`[FromServices] IQueryHandler<,>` / `ICommandHandler<>`,
+  bez mediatora), `null` z query → 404 (`OkOrNotFound`), komenda bez odpowiedzi → 204 (`Send`). Id aktora zawsze z tokenu
+  (`CurrentUserId`; token bez poprawnego `sub` odrzuca uwierzytelnianie → 401), pola komend ustawiane przez kontroler mają `[JsonIgnore]`.
+- Błędy jako ProblemDetails (`DomainExceptionHandler`, wg klasy bazowej wyjątku – nowego wyjątku nie trzeba nigdzie dopisywać):
+  `NotFoundException` → 404, `DomainRuleException`, `AlreadyExistsException`, `ConcurrencyConflict` → 409, inne `CustomExceptions`
+  → 400, `InvalidCredentials` → 401, `UserLocked` → 403; `errorCode` = nazwa wyjątku bez „Exception”, zawsze `traceId`.
 - Auth: JWT HS256 (`Auth:SigningKey` ≥ 32 bajty, poza Development z env) + refresh tokeny z rotacją. Prywatność: oferty widzi właściciel
   (wszystkie) i pomocnik (swoje), kontakt po akceptacji, wątki tylko dla dwóch uczestników (obcy → 404), cudze zasoby `api/me/*` → 404.
 - Endpointy: `api/users` (+ refresh, sign-out), `api/categories`, `api/announcements` (+ offers, images, conversations, contact,
@@ -127,6 +135,9 @@ cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /ap
   bez zleceń < 30 min i powtórek z tą samą osobą w 7 dni – `Core/Services/ReputationPolicy`, „12 ocen od 9 osób”;
   `verify.cmd`: dotnet 594/594, Vitest 356/356).
   Zostało: test ręczny E + G + H, potem test z ludźmi; hosting (F10) na koniec.
+- [x] Refaktoryzacja (bez zmian zachowania i kontraktu API). **R1 backend 14.11.2026**: wspólne kroki handlerów i kontrolerów,
+  `OfferTerms`, `Announcement` w 4 plikach, wyjątki wg klasy bazowej (−900 linii; dotnet 610/610). **R2 frontend 15.11.2026**:
+  szczegóły i wątek = store + sekcje + czyste funkcje, wspólne listy / okna / komendy API (`verify.cmd -SkipBackend`: Vitest 425/425).
 - [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)

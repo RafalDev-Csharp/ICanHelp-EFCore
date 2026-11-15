@@ -8,17 +8,18 @@ import { NotificationsClient } from '../api/api-client';
 import { AuthService } from '../auth/auth.service';
 import { ToastService } from '../ui/toast.service';
 
-import type { NotificationHubConnection } from './notification-hub';
-import { NOTIFICATION_HUB_FACTORY, NOTIFICATION_METHOD, RECONNECT_DELAYS_MS } from './notification-hub';
+import { NotificationHubClient } from './notification-hub-client';
+import type { NotificationActivity, PushNotice } from './notification-model';
+import { asRead, isRead } from './notification-model';
 import { describeNotification, notificationLink } from './notification-texts';
 
 /** Ile ostatnich id powiadomień pamiętamy do odsiewania duplikatów (hub + push). */
 const SEEN_LIMIT = 200;
 
 /**
- * Powiadomienia w aplikacji (F6): połączenie z hubem SignalR, dopóki użytkownik jest zalogowany, licznik
- * nieprzeczytanych (plakietka na zakładce), toast przy nowym i strumień `received$` dla otwartych ekranów
- * (lista powiadomień, wątek, lista rozmów). Hub tylko przyspiesza – stan z API (`unread-count`) wczytujemy przy
+ * Powiadomienia w aplikacji (F6): połączenie z hubem SignalR (`NotificationHubClient`), dopóki użytkownik jest
+ * zalogowany, licznik nieprzeczytanych (plakietka na zakładce), toast przy nowym i strumień `received$` dla otwartych
+ * ekranów (lista powiadomień, wątek, lista rozmów). Hub tylko przyspiesza – stan z API (`unread-count`) wczytujemy przy
  * zalogowaniu, po wznowieniu połączenia i po powrocie do karty.
  * Nowe powiadomienie z wątku, który jest właśnie otwarty, od razu oznaczamy jako przeczytane (bez toastu).
  */
@@ -28,14 +29,11 @@ export class NotificationsService {
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
-  private readonly createConnection = inject(NOTIFICATION_HUB_FACTORY);
+  private readonly hub = inject(NotificationHubClient);
 
   private readonly started = signal(false);
   private readonly receivedSubject = new Subject<NotificationDto>();
   private readonly activitySubject = new Subject<NotificationActivity>();
-  private connection: NotificationHubConnection | null = null;
-  private retryTimer: ReturnType<typeof setTimeout> | null = null;
-  private retryCount = 0;
   /** Wątek otwarty na ekranie (`ConversationPage`). */
   private activeConversationId: string | null = null;
   /**
@@ -50,8 +48,8 @@ export class NotificationsService {
   readonly received$: Observable<NotificationDto> = this.receivedSubject.asObservable();
   /**
    * F11 D: czego dotyczy nowe powiadomienie – z huba **i** z pusha przy otwartej aplikacji (gdy hub nie działa albo
-   * push był pierwszy). Otwarte ekrany (wątek, szczegóły ogłoszenia) przeładowują dane, jeśli to ich ogłoszenie / wątek.
-   * To samo zdarzenie może przyjść dwa razy (hub + push) – przeładowanie jest bezpieczne.
+   * push był pierwszy). Otwarte ekrany (wątek, szczegóły ogłoszenia) przeładowują dane, jeśli to ich ogłoszenie / wątek
+   * (`reloadOnActivity`). To samo zdarzenie może przyjść dwa razy (hub + push) – przeładowanie jest bezpieczne.
    */
   readonly activity$: Observable<NotificationActivity> = this.activitySubject.asObservable();
 
@@ -63,7 +61,7 @@ export class NotificationsService {
     });
 
     const onVisible = (): void => {
-      if (document.visibilityState === 'visible' && this.connection) {
+      if (document.visibilityState === 'visible' && this.hub.active) {
         this.refreshCount();
       }
     };
@@ -147,10 +145,7 @@ export class NotificationsService {
       return;
     }
     this.refreshCount();
-    if (!this.router.url.startsWith('/notifications')) {
-      const message = push.body ? `${push.title} – ${push.body}` : push.title;
-      void this.toast.action(message, 'Pokaż', () => void this.openPush(push.url, push.notificationId));
-    }
+    this.showToast(push.title, push.body, () => void this.openPush(push.url, push.notificationId));
   }
 
   /** Kliknięcie w push (albo toast z pusha): przeczytane + ekran z `data.url`. */
@@ -162,61 +157,18 @@ export class NotificationsService {
   }
 
   private connect(): void {
-    if (this.connection) {
-      return;
-    }
-    const connection = this.createConnection(() => this.accessToken());
-    connection.on(NOTIFICATION_METHOD, (notification) => this.onNotification(notification as NotificationDto));
-    connection.onreconnected(() => this.refreshCount());
-    this.connection = connection;
-    this.retryCount = 0;
-    this.refreshCount();
-    this.startConnection(connection);
-  }
-
-  /** Pierwsze połączenie nie wznawia się samo (`withAutomaticReconnect` działa po zerwaniu) – ponawiamy sami. */
-  private startConnection(connection: NotificationHubConnection): void {
-    connection.start().then(
-      () => (this.retryCount = 0),
-      () => {
-        if (this.connection !== connection) {
-          return;
-        }
-        const delay = RECONNECT_DELAYS_MS[Math.min(this.retryCount + 1, RECONNECT_DELAYS_MS.length - 1)];
-        this.retryCount += 1;
-        this.retryTimer = setTimeout(() => {
-          this.retryTimer = null;
-          if (this.connection === connection) {
-            this.startConnection(connection);
-          }
-        }, delay);
-      },
+    const connected = this.hub.connect(
+      (notification) => this.onNotification(notification),
+      () => this.refreshCount(),
     );
+    if (connected) {
+      this.refreshCount();
+    }
   }
 
   private disconnect(): void {
-    if (this.retryTimer) {
-      clearTimeout(this.retryTimer);
-      this.retryTimer = null;
-    }
-    const connection = this.connection;
-    this.connection = null;
+    this.hub.disconnect();
     this.unreadCount.set(0);
-    if (connection) {
-      void connection.stop().catch(() => undefined);
-    }
-  }
-
-  /** Token do huba – przed wygaśnięciem odświeżamy (jak `authInterceptor`). */
-  private async accessToken(): Promise<string> {
-    if (this.auth.isAccessTokenExpiring()) {
-      try {
-        return await firstValueFrom(this.auth.refreshAccessToken());
-      } catch {
-        return '';
-      }
-    }
-    return this.auth.accessToken() ?? '';
   }
 
   private onNotification(notification: NotificationDto): void {
@@ -239,12 +191,18 @@ export class NotificationsService {
     }
     this.receivedSubject.next(notification);
 
-    // Na liście powiadomień nowe pojawia się na górze – toast byłby powtórzeniem.
-    if (firstTime && !this.router.url.startsWith('/notifications')) {
+    if (firstTime) {
       const text = describeNotification(notification);
-      const message = text.body ? `${text.title} – ${text.body}` : text.title;
-      void this.toast.action(message, 'Pokaż', () => void this.open(notification));
+      this.showToast(text.title, text.body, () => void this.open(notification));
     }
+  }
+
+  /** Toast „tytuł – treść” z przyciskiem „Pokaż”; na liście powiadomień nowe pojawia się na górze – toast byłby powtórzeniem. */
+  private showToast(title: string, body: string | undefined, onShow: () => void): void {
+    if (this.router.url.startsWith('/notifications')) {
+      return;
+    }
+    void this.toast.action(body ? `${title} – ${body}` : title, 'Pokaż', onShow);
   }
 
   /** `true`, gdy to powiadomienie widzimy pierwszy raz. */
@@ -258,29 +216,4 @@ export class NotificationsService {
     }
     return true;
   }
-}
-
-/** Powiadomienie z pusha (FCM `notification` + `data`) przekazane przez service worker do otwartej aplikacji. */
-export interface PushNotice {
-  notificationId?: string;
-  title: string;
-  body?: string;
-  url?: string;
-  announcementId?: string;
-  conversationId?: string;
-}
-
-/** Czego dotyczy nowe powiadomienie (`activity$`) – do przeładowania otwartego ekranu. */
-export interface NotificationActivity {
-  announcementId?: string;
-  conversationId?: string;
-}
-
-export function isRead(notification: NotificationDto): boolean {
-  return notification.isRead || !!notification.readAt;
-}
-
-/** Kopia oznaczona jako przeczytana (lista po kliknięciu / „Oznacz wszystkie”). */
-export function asRead(notification: NotificationDto): NotificationDto {
-  return { ...notification, isRead: true, readAt: notification.readAt ?? new Date().toISOString() };
 }

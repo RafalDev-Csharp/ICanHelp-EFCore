@@ -70,9 +70,9 @@ describe('EditAnnouncementPage', () => {
     const { page } = create();
 
     expect(page.state()).toBe('ready');
-    expect(page.form.controls.title.value).toBe('Cieknący kran');
-    expect(page.location()).toEqual({ latitude: 53.84, longitude: 22.98 });
-    expect(page.photos()).toEqual([{ kind: 'existing', id: 'i1', url: '/api/x/i1' }]);
+    expect(page.draft.form.controls.title.value).toBe('Cieknący kran');
+    expect(page.draft.location()).toEqual({ latitude: 53.84, longitude: 22.98 });
+    expect(page.draft.photos()).toEqual([{ kind: 'existing', id: 'i1', url: '/api/x/i1' }]);
   });
 
   it('saves only the changed fields with the edited revision and removes a deleted photo', () => {
@@ -81,8 +81,8 @@ describe('EditAnnouncementPage', () => {
     const { page } = create();
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
 
-    page.form.controls.title.setValue('Cieknący kran w kuchni');
-    page.photos.set([]);
+    page.draft.form.controls.title.setValue('Cieknący kran w kuchni');
+    page.draft.photos.set([]);
     page.save();
 
     expect(client.update).toHaveBeenCalledWith('a1', { expectedRevision: 2, title: 'Cieknący kran w kuchni' });
@@ -95,12 +95,12 @@ describe('EditAnnouncementPage', () => {
     client.update.mockReturnValue(throwError(() => ({ status: 409, errorCode: 'ConcurrencyConflict' })));
     const { page, render } = create();
 
-    page.form.controls.title.setValue('Nowy tytuł');
+    page.draft.form.controls.title.setValue('Nowy tytuł');
     page.save();
     await render();
 
     expect(alerts.create).toHaveBeenCalledTimes(1);
-    expect(page.saving()).toBe(false);
+    expect(page.draft.saving()).toBe(false);
   });
 
   it('does not let a stranger edit', () => {

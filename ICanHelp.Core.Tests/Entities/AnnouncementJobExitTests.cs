@@ -125,6 +125,19 @@ public class AnnouncementJobExitTests
     }
 
     [Fact]
+    public void JobExits_AreVisibleToTheOwnerAndTheHelperOfThatJobOnly()
+    {
+        var announcement = InStatus(AnnouncementStatus.Accepted);
+        var exit = announcement.Abandon(Helper, JobExitReason.CannotMakeIt, null, Now.AddHours(5));
+
+        // Jak oferty: właściciel widzi wszystkie wpisy, pomocnik – swoje, pozostali (i niezalogowani) – żadnych.
+        announcement.GetJobExitsVisibleTo(OwnerId).ShouldHaveSingleItem().ShouldBe(exit);
+        announcement.GetJobExitsVisibleTo(Helper).ShouldHaveSingleItem().ShouldBe(exit);
+        announcement.GetJobExitsVisibleTo(OtherHelper).ShouldBeEmpty();
+        announcement.GetJobExitsVisibleTo(null).ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Abandon_SecondTime_GetsNextNumber()
     {
         var announcement = InStatus(AnnouncementStatus.Accepted);

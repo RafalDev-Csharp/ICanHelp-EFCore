@@ -5,7 +5,8 @@ import { of, throwError } from 'rxjs';
 import type { RoleStatsDto, UserProfileDto } from '../../core/api/api-client';
 import { UsersClient } from '../../core/api/api-client';
 
-import { UserProfilePage, completedValue, ratingLabel, statRows } from './user-profile.page';
+import { completedValue, defaultProfileRole, interruptionMeta, ratingLabel, statRows } from './profile-stats';
+import { UserProfilePage } from './user-profile.page';
 
 function stats(overrides: Partial<RoleStatsDto> = {}): RoleStatsDto {
   return {
@@ -151,6 +152,16 @@ describe('UserProfilePage', () => {
     );
     // Oceny są, ale żadna nie weszła do średniej (np. szybkie potwierdzenie) – bez sugerowania oszustwa.
     expect(ratingLabel(stats({ ratingCount: 2 }))).toBe('Średnia jeszcze niepoliczona · 2 oceny');
+  });
+
+  it('starts on the role with more jobs and describes who interrupted', () => {
+    expect(defaultProfileRole(profile())).toBe('Helper');
+    expect(defaultProfileRole(profile({ asClient: stats({ completedCount: 20 }) }))).toBe('Client');
+    expect(defaultProfileRole(profile({ asHelper: stats(), asClient: stats() }))).toBe('Helper');
+
+    expect(interruptionMeta({ role: 'Helper', byUser: true })).toBe('Pomagał · przerwał sam');
+    expect(interruptionMeta({ role: 'Helper', byUser: false })).toBe('Pomagał · przerwał zleceniodawca');
+    expect(interruptionMeta({ role: 'Client', byUser: false })).toBe('Zlecał · przerwał pomocnik');
   });
 
   it('shows the completed jobs with the number of different partners', () => {

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   IonButton,
@@ -8,13 +8,13 @@ import {
   IonList,
   IonRefresher,
   IonRefresherContent,
-  IonSpinner,
   IonTitle,
   IonToolbar,
 } from '@ionic/angular';
 import type { ViewWillEnter } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { cloudOfflineOutline, heartOutline } from 'ionicons/icons';
+import { heartOutline } from 'ionicons/icons';
+import type { Observable } from 'rxjs';
 import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
 
 import type { AnnouncementDto } from '../../core/api/api-client';
@@ -22,7 +22,10 @@ import { AnnouncementsClient } from '../../core/api/api-client';
 import { CategoriesService } from '../../core/categories/categories.service';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { LoadFailedComponent } from '../../shared/components/load-state/load-failed.component';
+import { LoadingComponent } from '../../shared/components/load-state/loading.component';
 import { NotificationsBellComponent } from '../../shared/components/notifications-bell/notifications-bell.component';
+import { RemoteList } from '../../shared/data/remote-list';
 import { LikesService } from '../announcements/likes/likes.service';
 import { AnnouncementCardComponent } from '../announcements/list/announcement-card.component';
 
@@ -48,9 +51,10 @@ export const MAX_LIKED_SHOWN = 50;
     IonRefresher,
     IonRefresherContent,
     IonList,
-    IonSpinner,
     IonButton,
     EmptyStateComponent,
+    LoadingComponent,
+    LoadFailedComponent,
     AnnouncementCardComponent,
   ],
 })
@@ -59,54 +63,32 @@ export class LikedAnnouncementsPage implements ViewWillEnter {
   private readonly categories = inject(CategoriesService);
   protected readonly likes = inject(LikesService);
 
-  private readonly loaded = signal<AnnouncementDto[]>([]);
-  readonly state = signal<'loading' | 'ready' | 'failed'>('loading');
+  protected readonly list = new RemoteList<AnnouncementDto>(() => this.fetchLiked());
   /** Odklikane serduszko w szczegółach znika z listy od razu (bez ponownego wczytania). */
-  readonly items = computed(() => this.loaded().filter((item) => this.likes.isLiked(item.id)));
+  readonly items = computed(() => this.list.items().filter((item) => this.likes.isLiked(item.id)));
 
   constructor() {
-    addIcons({ heartOutline, cloudOfflineOutline });
+    addIcons({ heartOutline });
   }
 
   ionViewWillEnter(): void {
     this.categories.load().subscribe({ error: () => undefined });
-    this.reload();
+    this.list.reload();
   }
 
-  reload(done?: () => void): void {
-    if (this.loaded().length === 0) {
-      this.state.set('loading');
-    }
-    this.likes
-      .load(true)
-      .pipe(
-        switchMap((likes) => {
-          const ids = [...likes]
-            .sort((a, b) => b.likedAt.localeCompare(a.likedAt))
-            .slice(0, MAX_LIKED_SHOWN)
-            .map((like) => like.announcementId);
-          return ids.length === 0
-            ? of([])
-            : forkJoin(ids.map((id) => this.client.getById(id).pipe(catchError(() => of(null)))));
-        }),
-        map((items) => items.filter((item): item is NonNullable<typeof item> => item !== null)),
-      )
-      .subscribe({
-        next: (items) => {
-          this.loaded.set(items);
-          this.state.set('ready');
-          done?.();
-        },
-        error: () => {
-          if (this.loaded().length === 0) {
-            this.state.set('failed');
-          }
-          done?.();
-        },
-      });
-  }
-
-  refresh(event: Event): void {
-    this.reload(() => void (event.target as unknown as { complete(): Promise<void> }).complete());
+  /** Polubienia od najnowszego → szczegóły każdego ogłoszenia (usunięte albo niedostępne pomijamy). */
+  private fetchLiked(): Observable<AnnouncementDto[]> {
+    return this.likes.load(true).pipe(
+      switchMap((likes) => {
+        const ids = [...likes]
+          .sort((a, b) => b.likedAt.localeCompare(a.likedAt))
+          .slice(0, MAX_LIKED_SHOWN)
+          .map((like) => like.announcementId);
+        return ids.length === 0
+          ? of([])
+          : forkJoin(ids.map((id) => this.client.getById(id).pipe(catchError(() => of(null)))));
+      }),
+      map((items) => items.filter((item): item is NonNullable<typeof item> => item !== null)),
+    );
   }
 }

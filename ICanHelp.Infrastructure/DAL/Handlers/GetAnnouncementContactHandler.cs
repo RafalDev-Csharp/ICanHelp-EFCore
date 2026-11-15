@@ -7,22 +7,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ICanHelp.Infrastructure.DAL.Handlers;
 
-internal sealed class GetAnnouncementContactHandler : IQueryHandler<GetAnnouncementContact, AnnouncementContactDto?>
+internal sealed class GetAnnouncementContactHandler(ICanHelpDbContext db)
+    : IQueryHandler<GetAnnouncementContact, AnnouncementContactDto?>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetAnnouncementContactHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<AnnouncementContactDto?> HandleAsync(GetAnnouncementContact query,
         CancellationToken cancellationToken = default)
     {
         var id = new Id(query.AnnouncementId);
         var userId = new UserId(query.UserId);
 
-        var announcement = await _db.Announcements
+        var announcement = await db.Announcements
             .AsNoTracking()
             .Include(a => a.Offers)
             .SingleOrDefaultAsync(a => a.Id == id, cancellationToken);
@@ -44,7 +38,7 @@ internal sealed class GetAnnouncementContactHandler : IQueryHandler<GetAnnouncem
 
         var otherId = userId == announcement.OwnerId ? announcement.GetAcceptedHelperId()! : announcement.OwnerId;
 
-        var other = await _db.Users
+        var other = await db.Users
             .AsNoTracking()
             .SingleOrDefaultAsync(u => u.Id == otherId, cancellationToken);
 

@@ -6,9 +6,10 @@ import { Subject, of, throwError } from 'rxjs';
 import type { ConversationDto, ConversationEntryDto, UserDto } from '../../core/api/api-client';
 import { AnnouncementsClient, ConversationsClient, UsersClient } from '../../core/api/api-client';
 import { AuthService } from '../../core/auth/auth.service';
-import type { NotificationActivity } from '../../core/notifications/notifications.service';
+import type { NotificationActivity } from '../../core/notifications/notification-model';
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { announcementDetails } from '../announcements/testing/announcement-fixtures';
+import { JobService } from '../offers/job.service';
 import { OffersService } from '../offers/offers.service';
 import { conversationFixture, offerFixture } from '../offers/testing/offer-fixtures';
 
@@ -26,10 +27,10 @@ describe('ConversationPage', () => {
     revise: vi.fn(() => Promise.resolve(true)),
     reviewChanges: vi.fn(() => Promise.resolve(true)),
     showChanges: vi.fn(() => Promise.resolve()),
-    start: vi.fn(() => Promise.resolve(true)),
-    reportDone: vi.fn(() => Promise.resolve(true)),
-    complete: vi.fn(() => Promise.resolve(true)),
-    exitJob: vi.fn(() => Promise.resolve(true)),
+  };
+  const jobs = {
+    run: vi.fn(() => Promise.resolve(true)),
+    exit: vi.fn(() => Promise.resolve(true)),
     respondToExit: vi.fn(() => Promise.resolve(true)),
   };
   const announcements = { getById: vi.fn() };
@@ -49,6 +50,7 @@ describe('ConversationPage', () => {
     { provide: AnnouncementsClient, useValue: announcements },
     { provide: UsersClient, useValue: users },
     { provide: OffersService, useValue: offers },
+    { provide: JobService, useValue: jobs },
     { provide: AuthService, useValue: auth },
     { provide: NotificationsService, useValue: notifications },
   ];
@@ -129,10 +131,10 @@ describe('ConversationPage', () => {
     const helper = create(conversationFixture({ announcementStatus: 'Accepted', timeline: accepted }));
     await helper.render();
 
-    expect(helper.page.jobAction()).toBe('start');
+    expect(helper.page.job()?.action).toBe('start');
     expect(helper.element.querySelector('.job-action')?.textContent).toContain('Rozpocznij zlecenie');
     await helper.page.runJobAction();
-    expect(offers.start).toHaveBeenCalledWith('a1');
+    expect(jobs.run).toHaveBeenCalledWith('a1', 'start');
     expect(conversations.getById).toHaveBeenCalledTimes(2);
     TestBed.resetTestingModule();
 
@@ -142,7 +144,7 @@ describe('ConversationPage', () => {
     await client.render();
     expect(client.element.querySelector('.job-note')?.textContent).toContain('pomocnik rozpocznie');
     expect(client.element.querySelector('.job-action')?.textContent).toContain('Potwierdź wykonanie');
-    expect(offers.start).toHaveBeenCalledTimes(1);
+    expect(jobs.run).toHaveBeenCalledTimes(1);
   });
 
   it('lets the helper report the work as done and then shows that he waits', async () => {
@@ -152,7 +154,7 @@ describe('ConversationPage', () => {
 
     expect(helper.element.querySelector('.job-action')?.textContent).toContain('Zgłoś wykonanie');
     await helper.page.runJobAction();
-    expect(offers.reportDone).toHaveBeenCalledWith('a1');
+    expect(jobs.run).toHaveBeenCalledWith('a1', 'report');
     TestBed.resetTestingModule();
 
     const waiting = create(
@@ -181,7 +183,7 @@ describe('ConversationPage', () => {
     expect(client.element.querySelector('.job-note.highlight')?.textContent).toContain('Pomocnik zgłosił wykonanie');
     expect(client.element.querySelector('.job-action')?.textContent).toContain('Potwierdź wykonanie');
     await client.page.runJobAction();
-    expect(offers.complete).toHaveBeenCalledWith('a1');
+    expect(jobs.run).toHaveBeenCalledWith('a1', 'complete');
   });
 
   it('has no job actions in a thread whose offer was not accepted', async () => {
@@ -190,7 +192,7 @@ describe('ConversationPage', () => {
     );
     await render();
 
-    expect(page.jobAction()).toBeNull();
+    expect(page.job()).toBeNull();
   });
 
   it('shows the thread, the other party and marks it as read', async () => {
@@ -337,7 +339,7 @@ describe('ConversationPage', () => {
     const buttons = [...element.querySelectorAll('.offer-actions ion-button')].map((b) => b.textContent?.trim());
     expect(buttons).toEqual(['Wycofaj', 'Zmień ofertę']);
 
-    await page.revise(pending.offer);
+    await page.offerAction('revise', pending.offer);
 
     expect(offers.revise).toHaveBeenCalledWith(pending.offer);
     expect(conversations.getById).toHaveBeenCalledTimes(2);
@@ -347,7 +349,7 @@ describe('ConversationPage', () => {
     const { page, render } = create(conversationFixture({ myRole: 'Client', timeline: [offerEntry()] }));
     await render();
 
-    await page.accept(offerFixture('o1'));
+    await page.offerAction('accept', offerFixture('o1'));
 
     expect(offers.accept).toHaveBeenCalled();
     expect(conversations.getById).toHaveBeenCalledTimes(2);
@@ -458,7 +460,7 @@ describe('ConversationPage', () => {
 
     expect(element.querySelector('.job-exit')?.textContent).toContain('Przerwij zlecenie');
     await page.exitJob();
-    expect(offers.exitJob).toHaveBeenCalledWith('a1', 'interrupt', 'Pomocnik');
+    expect(jobs.exit).toHaveBeenCalledWith('a1', 'interrupt', 'Pomocnik');
   });
 
   it('after an interruption shows the settlement note and the read-only reason', async () => {
@@ -498,7 +500,7 @@ describe('ConversationPage', () => {
 
     expect(element.querySelector('.respond-action')?.textContent).toContain('Dodaj swoje stanowisko');
     await page.respondToExit(1);
-    expect(offers.respondToExit).toHaveBeenCalledWith('a1', 1);
+    expect(jobs.respondToExit).toHaveBeenCalledWith('a1', 1);
     expect(element.querySelector('.profile-link')?.getAttribute('href')).toBe('/users/helper-1');
   });
 

@@ -1,7 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
-  AlertController,
   IonBackButton,
   IonButton,
   IonButtons,
@@ -17,27 +16,25 @@ import {
   IonNote,
   IonRefresher,
   IonRefresherContent,
-  IonSpinner,
   IonTitle,
   IonToggle,
   IonToolbar,
 } from '@ionic/angular';
 import type { ViewWillEnter } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { cloudOfflineOutline, locationOutline, navigateOutline, notificationsOutline } from 'ionicons/icons';
+import { locationOutline, navigateOutline, notificationsOutline } from 'ionicons/icons';
 
 import type { AlertDto } from '../../core/api/api-client';
 import { AlertsClient } from '../../core/api/api-client';
 import { CategoriesService } from '../../core/categories/categories.service';
-import { ToastService } from '../../core/ui/toast.service';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { LoadFailedComponent } from '../../shared/components/load-state/load-failed.component';
+import { LoadingComponent } from '../../shared/components/load-state/loading.component';
+import { RemoteList } from '../../shared/data/remote-list';
 
 import { ALERT_RULES, describeSchedule, formatRadius } from './alert-form';
-
-interface CompletableTarget {
-  complete(): Promise<void>;
-}
+import { AlertRemovalService } from './alert-removal.service';
 
 /**
  * „Moje alerty” (profil): powiadomienia o nowych ogłoszeniach w okolicy (obszar) albo po drodze (trasa).
@@ -68,57 +65,33 @@ interface CompletableTarget {
     IonNote,
     IonToggle,
     IonButton,
-    IonSpinner,
     EmptyStateComponent,
+    LoadingComponent,
+    LoadFailedComponent,
   ],
 })
 export class AlertsPage implements ViewWillEnter {
   private readonly client = inject(AlertsClient);
-  private readonly dialogs = inject(AlertController);
-  private readonly toast = inject(ToastService);
+  private readonly removal = inject(AlertRemovalService);
   protected readonly categories = inject(CategoriesService);
 
-  readonly items = signal<AlertDto[]>([]);
-  readonly state = signal<'loading' | 'ready' | 'failed'>('loading');
+  protected readonly list = new RemoteList<AlertDto>(() => this.client.getMine());
+  readonly items = this.list.items;
+  readonly state = this.list.state;
   /** Alerty, których przełącznik czeka na odpowiedź API. */
   readonly busy = signal<ReadonlySet<string>>(new Set());
   readonly limitReached = computed(() => this.items().length >= ALERT_RULES.maxPerUser);
 
   protected readonly maxPerUser = ALERT_RULES.maxPerUser;
-  protected readonly describeSchedule = describeSchedule;
-  protected readonly formatRadius = formatRadius;
 
   constructor() {
-    addIcons({ cloudOfflineOutline, locationOutline, navigateOutline, notificationsOutline });
+    addIcons({ locationOutline, navigateOutline, notificationsOutline });
   }
 
   /** Przy każdym wejściu – po zapisie albo usunięciu w edycji lista ma być aktualna. */
   ionViewWillEnter(): void {
     this.categories.load().subscribe({ error: () => undefined });
-    this.reload();
-  }
-
-  reload(done?: () => void): void {
-    if (this.items().length === 0) {
-      this.state.set('loading');
-    }
-    this.client.getMine().subscribe({
-      next: (items) => {
-        this.items.set(items);
-        this.state.set('ready');
-        done?.();
-      },
-      error: () => {
-        if (this.items().length === 0) {
-          this.state.set('failed');
-        }
-        done?.();
-      },
-    });
-  }
-
-  refresh(event: Event): void {
-    this.reload(() => void (event.target as unknown as CompletableTarget).complete());
+    this.list.reload();
   }
 
   /** Podpis: „Hydraulika · 5 km · Dni robocze, 15:00–18:00”. */
@@ -149,23 +122,9 @@ export class AlertsPage implements ViewWillEnter {
 
   async remove(alert: AlertDto, sliding?: IonItemSliding): Promise<void> {
     await sliding?.close();
-    const dialog = await this.dialogs.create({
-      header: 'Usunąć alert?',
-      message: `„${alert.name}” – nie dostaniesz już powiadomień z tego alertu.`,
-      buttons: [
-        { text: 'Anuluj', role: 'cancel' },
-        { text: 'Usuń', role: 'destructive' },
-      ],
-    });
-    await dialog.present();
-    const { role } = await dialog.onDidDismiss();
-    if (role !== 'destructive') {
-      return;
-    }
-    this.client.delete(alert.id).subscribe(() => {
+    if (await this.removal.remove(alert)) {
       this.items.update((items) => items.filter((item) => item.id !== alert.id));
-      void this.toast.success('Alert usunięty.');
-    });
+    }
   }
 
   private replace(alert: AlertDto): void {

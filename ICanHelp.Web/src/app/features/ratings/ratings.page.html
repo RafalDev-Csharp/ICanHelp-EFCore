@@ -32,17 +32,9 @@
   </ion-refresher>
 
   @switch (state()) { @case ('loading') {
-  <div class="ion-text-center ion-padding" aria-busy="true">
-    <ion-spinner name="crescent"></ion-spinner>
-  </div>
+  <app-loading></app-loading>
   } @case ('failed') {
-  <app-empty-state
-    icon="cloud-offline-outline"
-    heading="Nie udało się wczytać ocen"
-    message="Sprawdź połączenie z internetem i spróbuj ponownie."
-  >
-    <ion-button (click)="load()">Spróbuj ponownie</ion-button>
-  </app-empty-state>
+  <app-load-failed heading="Nie udało się wczytać ocen" (retry)="load()"></app-load-failed>
   } @case ('ready') { @if (tab() === 'pending') { @if (pending().length === 0) {
   <app-empty-state
     icon="star-outline"
@@ -70,7 +62,7 @@
     </ion-item>
     }
   </ion-list>
-  } } @else { @let ratings = tab() === 'Helper' ? asHelper() : asClient(); @if (ratings.length === 0) {
+  } } @else { @let received = receivedView(); @if (received.groups.length === 0) {
   <app-empty-state
     icon="star-outline"
     heading="Brak ocen"
@@ -78,35 +70,25 @@
   ></app-empty-state>
   } @else {
   <div class="summary" data-testid="ratings-summary">
-    <span class="stars" aria-hidden="true">
-      @for (index of stars; track index) {
-      <ion-icon color="warning" [name]="starIcon(index, average(ratings))"></ion-icon>
-      }
-    </span>
-    <strong>{{ summary(ratings) }}</strong>
+    <span class="stars" aria-hidden="true"><app-rating-stars [value]="received.average"></app-rating-stars></span>
+    <strong>{{ received.summary }}</strong>
   </div>
   <p class="summary-hint ion-padding-horizontal" data-testid="ratings-hint">
     Kilka ocen od tej samej osoby liczy się jako jedna – ich średnia (ocena grupowa).
   </p>
   <ion-list inset="true">
-    @for (group of groupByRater(ratings); track group.raterId; let last = $last) {
+    @for (group of received.groups; track group.raterId; let last = $last) {
     <ion-item data-testid="rater-group" [lines]="last ? 'none' : 'inset'">
       <ion-label class="ion-text-wrap">
         @if (group.ratings.length > 1) {
         <p class="group-head" data-testid="rater-group-head">
-          <span class="stars" aria-hidden="true">
-            @for (index of stars; track index) {
-            <ion-icon color="warning" [name]="starIcon(index, group.average)"></ion-icon>
-            }
-          </span>
+          <span class="stars" aria-hidden="true"><app-rating-stars [value]="group.average"></app-rating-stars></span>
           <strong>&#64;{{ group.userName }}</strong> · {{ groupLabel(group) }}
         </p>
         } @for (rating of group.ratings; track rating.id) {
         <div class="rating" [class.in-group]="group.ratings.length > 1" data-testid="received-rating">
           <p class="stars" [attr.aria-label]="rating.rate + ' na 5'">
-            @for (index of stars; track index) {
-            <ion-icon color="warning" [name]="starIcon(index, rating.rate)" aria-hidden="true"></ion-icon>
-            }
+            <app-rating-stars [value]="rating.rate"></app-rating-stars>
             <span class="when">{{ rating.createdAt | timeAgo }}</span>
           </p>
           @if (rating.comment) {

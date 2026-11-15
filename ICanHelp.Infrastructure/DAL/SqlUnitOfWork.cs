@@ -11,24 +11,17 @@ namespace ICanHelp.Infrastructure.DAL;
 /// (<see cref="OutboxMessage"/>) – in the same transaction, so a change is never saved without its event
 /// and an event never exists for a change that was rolled back. The events are sent later by the outbox processor.
 /// </summary>
-internal sealed class SqlUnitOfWork : IUnitOfWork
+internal sealed class SqlUnitOfWork(ICanHelpDbContext dbContext) : IUnitOfWork
 {
-    private readonly ICanHelpDbContext _dbContext;
-
-    public SqlUnitOfWork(ICanHelpDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
-
     public async Task ExecuteAsync(Func<Task> action, CancellationToken cancellationToken = default)
     {
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         try
         {
             await action();
             MoveDomainEventsToOutbox();
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
@@ -46,7 +39,7 @@ internal sealed class SqlUnitOfWork : IUnitOfWork
 
     private void MoveDomainEventsToOutbox()
     {
-        var aggregates = _dbContext.ChangeTracker
+        var aggregates = dbContext.ChangeTracker
             .Entries<AggregateRoot>()
             .Select(entry => entry.Entity)
             .Where(aggregate => aggregate.DomainEvents.Count > 0)
@@ -54,7 +47,7 @@ internal sealed class SqlUnitOfWork : IUnitOfWork
 
         foreach (var aggregate in aggregates)
         {
-            _dbContext.OutboxMessages.AddRange(aggregate.DomainEvents.Select(DomainEventSerializer.ToOutboxMessage));
+            dbContext.OutboxMessages.AddRange(aggregate.DomainEvents.Select(DomainEventSerializer.ToOutboxMessage));
             aggregate.ClearDomainEvents();
         }
     }

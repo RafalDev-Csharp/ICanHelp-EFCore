@@ -10,11 +10,13 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { notificationsStub, provideNotificationsStub } from '../../../core/testing/notifications-stub';
 import { ToastService } from '../../../core/ui/toast.service';
 import { MapComponent } from '../../../shared/components/map/map.component';
+import { JobService } from '../../offers/job.service';
 import { OffersService } from '../../offers/offers.service';
 import { myConversationFixture, offerFixture } from '../../offers/testing/offer-fixtures';
 import { LikesService } from '../likes/likes.service';
 import { announcementDetails } from '../testing/announcement-fixtures';
 
+import { AnnouncementContentComponent } from './announcement-content.component';
 import { AnnouncementDetailsPage } from './announcement-details.page';
 
 /** Leaflet w jsdom nie ma czego rysować – w testach strony mapę zastępuje pusta zaślepka. */
@@ -37,17 +39,8 @@ describe('AnnouncementDetailsPage', () => {
     postConversation: vi.fn(),
   };
   const conversations = { getMine: vi.fn() };
-  const offers = {
-    make: vi.fn(),
-    revise: vi.fn(),
-    reviewChanges: vi.fn(),
-    rate: vi.fn(),
-    start: vi.fn(),
-    reportDone: vi.fn(),
-    complete: vi.fn(),
-    exitJob: vi.fn(),
-    respondToExit: vi.fn(),
-  };
+  const offers = { make: vi.fn(), revise: vi.fn(), reviewChanges: vi.fn() };
+  const jobs = { run: vi.fn(), exit: vi.fn(), respondToExit: vi.fn(), rate: vi.fn() };
   let notifications = notificationsStub();
   const likes = { load: vi.fn(() => of([])), isLiked: vi.fn(() => false), sync: vi.fn(), toggle: vi.fn() };
   /** Potwierdzenie z okna: `confirm` wybiera przycisk o tej roli. */
@@ -79,6 +72,7 @@ describe('AnnouncementDetailsPage', () => {
         { provide: AnnouncementsClient, useValue: announcements },
         { provide: ConversationsClient, useValue: conversations },
         { provide: OffersService, useValue: offers },
+        { provide: JobService, useValue: jobs },
         { provide: UsersClient, useValue: users },
         { provide: CategoriesClient, useValue: { getAll: () => of([]) } },
         { provide: AuthService, useValue: auth },
@@ -88,7 +82,7 @@ describe('AnnouncementDetailsPage', () => {
         provideNotificationsStub(notifications),
       ],
     });
-    TestBed.overrideComponent(AnnouncementDetailsPage, {
+    TestBed.overrideComponent(AnnouncementContentComponent, {
       remove: { imports: [MapComponent] },
       add: { imports: [MapStubComponent] },
     });
@@ -273,7 +267,7 @@ describe('AnnouncementDetailsPage', () => {
         },
       }),
     );
-    offers.start.mockResolvedValue(true);
+    jobs.run.mockResolvedValue(true);
     const { page, element, render } = create();
     await render();
 
@@ -282,9 +276,9 @@ describe('AnnouncementDetailsPage', () => {
     expect(footer).toContain('Rozpocznij');
     expect(footer).toContain('Rozmowa');
 
-    await page.start();
+    await page.runJobAction();
 
-    expect(offers.start).toHaveBeenCalledWith('a1');
+    expect(jobs.run).toHaveBeenCalledWith('a1', 'start');
     expect(announcements.getById).toHaveBeenCalledTimes(2);
   });
 
@@ -300,7 +294,7 @@ describe('AnnouncementDetailsPage', () => {
         }),
       ),
     );
-    offers.complete.mockResolvedValue(true);
+    jobs.run.mockResolvedValue(true);
     const { page, element, render } = create();
     await render();
 
@@ -308,7 +302,7 @@ describe('AnnouncementDetailsPage', () => {
     expect(footer).toContain('W realizacji – pomocnik zgłosi wykonanie.');
     expect(footer).toContain('Potwierdź wykonanie');
     await page.runJobAction();
-    expect(offers.complete).toHaveBeenCalledWith('a1');
+    expect(jobs.run).toHaveBeenCalledWith('a1', 'complete');
 
     announcements.getById.mockReturnValue(
       of(
@@ -335,13 +329,13 @@ describe('AnnouncementDetailsPage', () => {
       offers: [offerFixture('o1', { status: 'Accepted' })],
     };
     announcements.getById.mockReturnValue(of(announcementDetails('a1', inProgress)));
-    offers.reportDone.mockResolvedValue(true);
+    jobs.run.mockResolvedValue(true);
     const { page, element, render } = create();
     await render();
 
     expect(element.querySelector('.job-action')?.textContent).toContain('Zgłoś wykonanie');
     await page.runJobAction();
-    expect(offers.reportDone).toHaveBeenCalledWith('a1');
+    expect(jobs.run).toHaveBeenCalledWith('a1', 'report');
 
     announcements.getById.mockReturnValue(
       of(announcementDetails('a1', { ...inProgress, doneReportedAt: '2026-11-13T10:00:00Z' })),
@@ -413,14 +407,14 @@ describe('AnnouncementDetailsPage', () => {
         }),
       ),
     );
-    offers.exitJob.mockResolvedValue(true);
+    jobs.exit.mockResolvedValue(true);
     const { page, element, render } = create();
     await render();
 
     expect(element.querySelector('.job-exit')?.textContent).toContain('Zrezygnuj');
     await page.exitJob();
 
-    expect(offers.exitJob).toHaveBeenCalledWith('a1', 'abandon', 'Zleceniodawca');
+    expect(jobs.exit).toHaveBeenCalledWith('a1', 'abandon', 'Zleceniodawca');
     expect(announcements.getById).toHaveBeenCalledTimes(2);
   });
 
@@ -436,13 +430,13 @@ describe('AnnouncementDetailsPage', () => {
         }),
       ),
     );
-    offers.exitJob.mockResolvedValue(true);
+    jobs.exit.mockResolvedValue(true);
     const { page, element, render } = create();
     await render();
 
     expect(element.querySelector('.job-exit')?.textContent).toContain('Przerwij zlecenie');
     await page.exitJob();
-    expect(offers.exitJob).toHaveBeenCalledWith('a1', 'interrupt', 'Pomocnik');
+    expect(jobs.exit).toHaveBeenCalledWith('a1', 'interrupt', 'Pomocnik');
   });
 
   it('after an interruption shows the reason, no rating, lets the owner respond and republish', async () => {
@@ -483,9 +477,9 @@ describe('AnnouncementDetailsPage', () => {
     expect(announcements.getContact).toHaveBeenCalledWith('a1');
     expect(announcements.getRatings).not.toHaveBeenCalled();
 
-    offers.respondToExit.mockResolvedValue(true);
-    await page.respondToExit(1);
-    expect(offers.respondToExit).toHaveBeenCalledWith('a1', 1);
+    jobs.respondToExit.mockResolvedValue(true);
+    await page.respondToExit();
+    expect(jobs.respondToExit).toHaveBeenCalledWith('a1', 1);
     expect(element.querySelector('.history')?.textContent).toContain('Przerwanie (pomocnik): Brak kontaktu');
 
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);

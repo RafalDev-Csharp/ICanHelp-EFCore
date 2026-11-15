@@ -8,19 +8,12 @@ using Microsoft.Extensions.Hosting;
 namespace ICanHelp.Infrastructure;
 
 /// <summary>On application start: applies pending migrations and seeds the categories.</summary>
-internal sealed class DbInitializer : IHostedService
+internal sealed class DbInitializer(IServiceProvider serviceProvider) : IHostedService
 {
-    private readonly IServiceProvider _serviceProvider;
-
-    public DbInitializer(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-    }
-
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         // A hosted service is a singleton, the DbContext is scoped - so we create a scope.
-        using var scope = _serviceProvider.CreateScope();
+        using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ICanHelpDbContext>();
 
         if (!db.Database.GetMigrations().Any())

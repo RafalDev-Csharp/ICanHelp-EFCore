@@ -19,23 +19,15 @@
 </ion-header>
 
 <ion-content class="page-column">
-  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+  <ion-refresher slot="fixed" (ionRefresh)="list.refresh($event)">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  @switch (state()) { @case ('loading') {
-  <div class="ion-text-center ion-padding" aria-busy="true">
-    <ion-spinner name="crescent"></ion-spinner>
-  </div>
+  @switch (list.state()) { @case ('loading') {
+  <app-loading></app-loading>
   } @case ('failed') {
-  <app-empty-state
-    icon="cloud-offline-outline"
-    heading="Nie udało się wczytać rozmów"
-    message="Sprawdź połączenie z internetem i spróbuj ponownie."
-  >
-    <ion-button (click)="reload()">Spróbuj ponownie</ion-button>
-  </app-empty-state>
-  } @case ('ready') { @if (items().length === 0) {
+  <app-load-failed heading="Nie udało się wczytać rozmów" (retry)="list.reload()"></app-load-failed>
+  } @case ('ready') { @if (list.items().length === 0) {
   <app-empty-state
     icon="chatbubbles-outline"
     heading="Brak rozmów"
@@ -45,11 +37,11 @@
   </app-empty-state>
   } @else {
   <ion-list>
-    @for (item of items(); track item.conversationId) {
+    @for (item of list.items(); track item.conversationId) {
     <app-conversation-item [conversation]="item"></app-conversation-item>
     }
   </ion-list>
-  <ion-infinite-scroll [disabled]="complete()" (ionInfinite)="loadMore($event)">
+  <ion-infinite-scroll [disabled]="list.complete()" (ionInfinite)="list.loadMore($event)">
     <ion-infinite-scroll-content></ion-infinite-scroll-content>
   </ion-infinite-scroll>
   } } }

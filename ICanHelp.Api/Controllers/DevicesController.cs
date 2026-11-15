@@ -1,4 +1,3 @@
-using ICanHelp.Api.Security;
 using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.Commands;
 using ICanHelp.Application.DTO;
@@ -13,10 +12,9 @@ namespace ICanHelp.Api.Controllers;
 /// z Firebase i zgłasza go tutaj (przy każdym starcie – to odświeża urządzenie). Przy wylogowaniu / wyłączeniu
 /// powiadomień – <c>DELETE</c>. Cudze urządzenia → 404.
 /// </summary>
-[ApiController]
 [Route("api/me/devices")]
 [Authorize]
-public sealed class DevicesController : ControllerBase
+public sealed class DevicesController : ApiController
 {
     /// <summary>Moje urządzenia, od ostatnio widzianych (bez tokenów).</summary>
     [HttpGet]
@@ -25,14 +23,7 @@ public sealed class DevicesController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<DeviceDto>>> GetMine(
         [FromServices] IQueryHandler<GetMyDevices, IReadOnlyList<DeviceDto>> handler,
         CancellationToken cancellationToken)
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        return Ok(await handler.HandleAsync(new GetMyDevices { UserId = userId }, cancellationToken));
-    }
+        => Ok(await handler.HandleAsync(new GetMyDevices { UserId = CurrentUserId }, cancellationToken));
 
     /// <summary>
     /// Rejestruje token FCM (<c>platform</c>: Web | Android | Ios). Idempotentne: ten sam token jeszcze raz – to samo
@@ -50,17 +41,11 @@ public sealed class DevicesController : ControllerBase
         [FromServices] IQueryHandler<GetMyDeviceByToken, DeviceDto?> query,
         CancellationToken cancellationToken)
     {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        await handler.HandleAsync(command with { DeviceId = Guid.NewGuid(), UserId = userId }, cancellationToken);
-
-        var device = await query.HandleAsync(new GetMyDeviceByToken { UserId = userId, Token = command.Token },
+        await handler.HandleAsync(command with { DeviceId = Guid.NewGuid(), UserId = CurrentUserId },
             cancellationToken);
 
-        return device is null ? NotFound() : Ok(device);
+        return OkOrNotFound(await query.HandleAsync(
+            new GetMyDeviceByToken { UserId = CurrentUserId, Token = command.Token }, cancellationToken));
     }
 
     /// <summary>Usuwa urządzenie (koniec push na nim). Cudze albo nieistniejące → 404.</summary>
@@ -68,17 +53,9 @@ public sealed class DevicesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Remove(
+    public Task<IActionResult> Remove(
         Guid deviceId,
         [FromServices] ICommandHandler<RemoveDevice> handler,
         CancellationToken cancellationToken)
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        await handler.HandleAsync(new RemoveDevice(deviceId, userId), cancellationToken);
-        return NoContent();
-    }
+        => Send(new RemoveDevice(deviceId, CurrentUserId), handler, cancellationToken);
 }

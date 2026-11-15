@@ -162,7 +162,7 @@ public class NotificationTextFormatterTests
     [InlineData("10.00 EUR", "10.00 EUR")]
     [InlineData("abc", "abc")]
     public void FormatPrice(string value, string expected)
-        => NotificationTextFormatter.FormatPrice(value).ShouldBe(expected);
+        => PolishFormat.Price(value).ShouldBe(expected);
 
     [Fact]
     public void Link_ConversationForOffers_AnnouncementForEditAndAlert_ListForDigest()

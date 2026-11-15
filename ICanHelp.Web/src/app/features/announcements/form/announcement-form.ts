@@ -1,4 +1,4 @@
-import type { AbstractControl, FormControl, FormGroup, NonNullableFormBuilder, ValidationErrors } from '@angular/forms';
+import type { FormControl, FormGroup, NonNullableFormBuilder } from '@angular/forms';
 import { Validators } from '@angular/forms';
 
 import type {
@@ -9,6 +9,7 @@ import type {
   UpdateAnnouncement,
 } from '../../../core/api/api-client';
 import type { GeoPoint } from '../../../core/geo/geo-point';
+import { cents, notBlank } from '../../../shared/forms/validators';
 
 /** Reguły z backendu (`StringObject`, `Description`, `Price`, `Announcement.MaxImages`); tytuł ≥ 3 – tylko w UI. */
 export const ANNOUNCEMENT_RULES = {
@@ -38,17 +39,6 @@ export type AnnouncementFormValue = ReturnType<AnnouncementForm['getRawValue']>;
 export type PhotoItem =
   | { kind: 'existing'; id: string; url: string }
   | { kind: 'new'; id: string; url: string; blob: Blob; fileName: string };
-
-/** Pole nie może być samymi spacjami (backend: `IsNullOrWhiteSpace`). */
-function notBlank(control: AbstractControl<string>): ValidationErrors | null {
-  return control.value && !control.value.trim() ? { blank: true } : null;
-}
-
-/** Najwyżej 2 miejsca po przecinku (grosze). */
-function cents(control: AbstractControl<number | null>): ValidationErrors | null {
-  const value = control.value;
-  return value !== null && Math.round(value * 100) !== value * 100 ? { cents: true } : null;
-}
 
 export function createAnnouncementForm(fb: NonNullableFormBuilder): AnnouncementForm {
   const { title, description, budget } = ANNOUNCEMENT_RULES;

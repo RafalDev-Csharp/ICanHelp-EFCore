@@ -21,35 +21,23 @@ namespace ICanHelp.Infrastructure.Outbox;
 /// (<c>UPDLOCK, READPAST</c>) – not needed yet.
 /// </para>
 /// </summary>
-internal sealed class OutboxProcessor : IOutboxProcessor
+internal sealed class OutboxProcessor(IServiceScopeFactory scopeFactory, IClock clock, IOptions<OutboxOptions> options,
+    ILogger<OutboxProcessor> logger) : IOutboxProcessor
 {
-    private readonly IServiceScopeFactory _scopeFactory;
-    private readonly IClock _clock;
-    private readonly IOptions<OutboxOptions> _options;
-    private readonly ILogger<OutboxProcessor> _logger;
     private readonly SemaphoreSlim _round = new(1, 1);
-
-    public OutboxProcessor(IServiceScopeFactory scopeFactory, IClock clock, IOptions<OutboxOptions> options,
-        ILogger<OutboxProcessor> logger)
-    {
-        _scopeFactory = scopeFactory;
-        _clock = clock;
-        _options = options;
-        _logger = logger;
-    }
 
     public async Task<int> ProcessPendingAsync(CancellationToken cancellationToken = default)
     {
         await _round.WaitAsync(cancellationToken);
         try
         {
-            var options = _options.Value;
+            var settings = options.Value;
             var total = 0;
             var tried = new HashSet<Guid>();
 
             while (true)
             {
-                var ids = await GetWaitingAsync(options, tried, cancellationToken);
+                var ids = await GetWaitingAsync(settings, tried, cancellationToken);
                 if (ids.Count == 0)
                 {
                     return total;
@@ -71,29 +59,29 @@ internal sealed class OutboxProcessor : IOutboxProcessor
     }
 
     // A message that failed in this round is not taken again in the same round (it waits for the next one).
-    private async Task<List<Guid>> GetWaitingAsync(OutboxOptions options, HashSet<Guid> tried,
+    private async Task<List<Guid>> GetWaitingAsync(OutboxOptions settings, HashSet<Guid> tried,
         CancellationToken cancellationToken)
     {
-        using var scope = _scopeFactory.CreateScope();
+        using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ICanHelpDbContext>();
 
         var ids = await db.OutboxMessages
             .AsNoTracking()
-            .Where(m => m.ProcessedAt == null && m.Attempts < options.MaxAttempts)
+            .Where(m => m.ProcessedAt == null && m.Attempts < settings.MaxAttempts)
             .OrderBy(m => m.OccurredAt)
             .ThenBy(m => m.Id)
             .Select(m => m.Id)
-            .Take(options.BatchSize + tried.Count)
+            .Take(settings.BatchSize + tried.Count)
             .ToListAsync(cancellationToken);
 
-        return ids.Where(id => !tried.Contains(id)).Take(options.BatchSize).ToList();
+        return ids.Where(id => !tried.Contains(id)).Take(settings.BatchSize).ToList();
     }
 
     private async Task ProcessAsync(Guid messageId, CancellationToken cancellationToken)
     {
         try
         {
-            using var scope = _scopeFactory.CreateScope();
+            using var scope = scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ICanHelpDbContext>();
 
             var message = await db.OutboxMessages.SingleOrDefaultAsync(m => m.Id == messageId, cancellationToken);
@@ -105,12 +93,12 @@ internal sealed class OutboxProcessor : IOutboxProcessor
             var domainEvent = DomainEventSerializer.Deserialize(message.Type, message.Payload);
             await DispatchAsync(scope.ServiceProvider, message.Id, domainEvent, cancellationToken);
 
-            message.MarkAsProcessed(_clock.UtcNow);
+            message.MarkAsProcessed(clock.UtcNow);
             await db.SaveChangesAsync(cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            _logger.LogError(exception, "Outbox message {MessageId} failed.", messageId);
+            logger.LogError(exception, "Outbox message {MessageId} failed.", messageId);
             await RecordFailureAsync(messageId, exception, cancellationToken);
         }
     }
@@ -133,7 +121,7 @@ internal sealed class OutboxProcessor : IOutboxProcessor
     {
         try
         {
-            using var scope = _scopeFactory.CreateScope();
+            using var scope = scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ICanHelpDbContext>();
 
             var message = await db.OutboxMessages.SingleOrDefaultAsync(m => m.Id == messageId, cancellationToken);
@@ -147,7 +135,7 @@ internal sealed class OutboxProcessor : IOutboxProcessor
         }
         catch (Exception recordException) when (recordException is not OperationCanceledException)
         {
-            _logger.LogError(recordException, "Could not record the failure of outbox message {MessageId}.", messageId);
+            logger.LogError(recordException, "Could not record the failure of outbox message {MessageId}.", messageId);
         }
     }
 }

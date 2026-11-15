@@ -1,21 +1,16 @@
+import type { Signal } from '@angular/core';
 import { Component, computed, inject, input, signal, viewChild } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import {
   IonBackButton,
-  IonBadge,
   IonButton,
   IonButtons,
   IonContent,
   IonFooter,
   IonHeader,
   IonIcon,
-  IonItem,
-  IonLabel,
   IonRefresher,
   IonRefresherContent,
-  IonSpinner,
   IonTextarea,
   IonTitle,
   IonToolbar,
@@ -26,45 +21,50 @@ import {
   alertCircleOutline,
   arrowDownCircleOutline,
   checkmarkDoneOutline,
-  cloudOfflineOutline,
   createOutline,
   exitOutline,
   eyeOutline,
-  flagOutline,
   helpCircleOutline,
-  hourglassOutline,
-  imageOutline,
   lockClosedOutline,
-  playOutline,
   pricetagOutline,
   send,
   stopCircleOutline,
-  warningOutline,
 } from 'ionicons/icons';
-import { catchError, filter, of } from 'rxjs';
+import { catchError, of } from 'rxjs';
 
 import type { AnnouncementFieldChangeDto, ConversationDto, OfferDto } from '../../core/api/api-client';
 import { AnnouncementsClient, ConversationsClient, UsersClient } from '../../core/api/api-client';
-import { errorStatus } from '../../core/api/api-errors';
 import { apiResourceUrl } from '../../core/api/api.providers';
 import { AuthService } from '../../core/auth/auth.service';
 import { NotificationsService } from '../../core/notifications/notifications.service';
+import { reloadOnActivity } from '../../core/notifications/reload-on-activity';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
-import { PricePipe } from '../../shared/pipes/price.pipe';
+import { LoadFailedComponent } from '../../shared/components/load-state/load-failed.component';
+import { LoadingComponent } from '../../shared/components/load-state/loading.component';
+import { runExclusive } from '../../shared/data/exclusive';
+import { RemoteItem } from '../../shared/data/remote-item';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
-import { statusColor, statusLabel } from '../announcements/announcement-labels';
 import { INTERRUPTED_NOTE, reliabilityLabel } from '../offers/job-exit';
-import type { JobAction, JobStep } from '../offers/job-step';
-import { JOB_ACTION_ICONS, JOB_ACTION_LABELS, JOB_EXIT_LABELS, jobStep } from '../offers/job-step';
+import { jobStepView, registerJobStepIcons } from '../offers/job-step';
+import { JobService } from '../offers/job.service';
+import { OfferCardComponent } from '../offers/offer-card.component';
 import { OFFER_RULES } from '../offers/offer-form';
-import { formatDateTime, formatOfferTerm, partyLabel, pendingOffer } from '../offers/offer-labels';
+import { formatDateTime, oppositeParty, partyLabel } from '../offers/offer-labels';
+import type { OfferAction } from '../offers/offer-view';
 import { OffersService } from '../offers/offers.service';
 
+import { ConversationSubjectComponent } from './conversation-subject.component';
+import {
+  canMakeOffer,
+  isQuestionsOnly,
+  messagePlaceholder,
+  otherPartyId,
+  readOnlyReason,
+  threadJobStep,
+} from './conversation-thread';
 import type { ThreadNotice } from './conversation-timeline';
-import { jobExitOf, offersOf, threadNotice, toTimelineItems } from './conversation-timeline';
-
-type LoadState = 'loading' | 'ready' | 'not-found' | 'failed';
+import { offersOf, threadNotice, toTimelineItems } from './conversation-timeline';
 
 /**
  * Wątek negocjacji (`/conversations/:conversationId`, tylko uczestnicy): wiadomości, oferty z akcjami (przyjmij /
@@ -72,8 +72,9 @@ type LoadState = 'loading' | 'ready' | 'not-found' | 'failed';
  * przeczytany (razem z jego powiadomieniami). Pisać można, dopóki API pozwala (`canWrite`) – potem wątek jest tylko
  * do odczytu. Nowa wiadomość / oferta / zmiana ogłoszenia (powiadomienie z huba albo pusha – `activity$`) – wątek
  * przeładowany od razu; także przy każdym wejściu i po przeciągnięciu w dół.
- * U góry karta ogłoszenia (miniatura, tytuł, status, „Zobacz ogłoszenie”); w wątku przyjętego pomocnika – krok
- * zlecenia (`jobStep`): „Rozpocznij” / „Zgłoś wykonanie” (pomocnik), „Potwierdź wykonanie” (zleceniodawca).
+ * U góry karta ogłoszenia (`app-conversation-subject`); w wątku przyjętego pomocnika – krok zlecenia (`jobStep`):
+ * „Rozpocznij” / „Zgłoś wykonanie” (pomocnik), „Potwierdź wykonanie” (zleceniodawca). Reguły wątku (co wolno
+ * czytającemu) – `conversation-thread.ts`, wpisy osi – `conversation-timeline.ts`.
  */
 @Component({
   selector: 'app-conversation',
@@ -82,7 +83,6 @@ type LoadState = 'loading' | 'ready' | 'not-found' | 'failed';
   imports: [
     BrandComponent,
     FormsModule,
-    RouterLink,
     IonHeader,
     IonToolbar,
     IonButtons,
@@ -91,16 +91,15 @@ type LoadState = 'loading' | 'ready' | 'not-found' | 'failed';
     IonContent,
     IonRefresher,
     IonRefresherContent,
-    IonSpinner,
-    IonItem,
-    IonLabel,
-    IonBadge,
     IonIcon,
     IonButton,
     IonFooter,
     IonTextarea,
     EmptyStateComponent,
-    PricePipe,
+    LoadingComponent,
+    LoadFailedComponent,
+    ConversationSubjectComponent,
+    OfferCardComponent,
     TimeAgoPipe,
   ],
 })
@@ -109,6 +108,7 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
   private readonly announcements = inject(AnnouncementsClient);
   private readonly users = inject(UsersClient);
   private readonly offers = inject(OffersService);
+  private readonly jobs = inject(JobService);
   private readonly auth = inject(AuthService);
   private readonly notifications = inject(NotificationsService);
   private readonly content = viewChild(IonContent);
@@ -116,149 +116,80 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
   /** Z adresu `/conversations/:conversationId` (`withComponentInputBinding`). */
   readonly conversationId = input.required<string>();
 
-  readonly state = signal<LoadState>('loading');
-  readonly conversation = signal<ConversationDto | null>(null);
+  private readonly thread = new RemoteItem<ConversationDto>(
+    () => this.conversations.getById(this.conversationId()),
+    (conversation, previous) => this.onLoaded(conversation, previous),
+  );
+  readonly state = this.thread.state;
+  readonly conversation = this.thread.value;
   /** Imię i nazwisko drugiej strony (nagłówek); do czasu wczytania – rola. */
   readonly otherName = signal('');
   /** „1 rezygnacja · 2 przerwane zlecenia” drugiej strony (pusty = brak). */
   readonly otherReliability = signal('');
+  /** Miniatura ogłoszenia w karcie u góry (pierwsze zdjęcie); brak zdjęć albo błąd – ikona. */
+  readonly thumbnailUrl = signal<string | undefined>(undefined);
   readonly busy = signal(false);
+  /** Oferta wyróżniona po „zobacz aktualną” (`notice` typu `revised`). */
+  readonly highlightedOfferId = signal<string | null>(null);
   draft = '';
 
   protected readonly maxMessage = OFFER_RULES.message.max;
-  protected readonly statusLabel = statusLabel;
-  protected readonly statusColor = statusColor;
-  protected readonly partyLabel = partyLabel;
-  protected readonly formatOfferTerm = formatOfferTerm;
   protected readonly formatDateTime = formatDateTime;
-  /** Oferta wyróżniona po „zobacz aktualną” (`notice` typu `revised`). */
-  readonly highlightedOfferId = signal<string | null>(null);
-  protected readonly jobLabels = JOB_ACTION_LABELS;
-  protected readonly jobIcons = JOB_ACTION_ICONS;
-  protected readonly exitLabels = JOB_EXIT_LABELS;
   protected readonly interruptedNote = INTERRUPTED_NOTE;
 
-  readonly items = computed(() => {
-    const conversation = this.conversation();
-    return conversation ? toTimelineItems(conversation, this.auth.currentUser()?.id) : [];
-  });
+  readonly items = this.fromThread((conversation) => toTimelineItems(conversation, this.auth.currentUser()?.id), []);
   readonly title = computed(() => {
     const conversation = this.conversation();
     if (!conversation) {
       return 'Rozmowa';
     }
-    return this.otherName() || partyLabel(conversation.myRole === 'Client' ? 'Helper' : 'Client');
+    return this.otherName() || partyLabel(oppositeParty(conversation.myRole));
   });
   /** Wątek bez żadnej oferty = pytania i odpowiedzi przed ofertą (oferta to osobny przycisk). */
-  readonly questionsOnly = computed(() => {
-    const conversation = this.conversation();
-    return !!conversation && offersOf(conversation).length === 0;
+  readonly questionsOnly = this.fromThread(isQuestionsOnly, false);
+  /** Krok realizacji w wątku przyjętego pomocnika (`threadJobStep`) – jak w szczegółach ogłoszenia. */
+  readonly job = this.fromThread(threadJobStep, null);
+  protected readonly jobView = computed(() => {
+    const step = this.job();
+    return step ? jobStepView(step) : null;
   });
-  /** Miniatura ogłoszenia w karcie u góry (pierwsze zdjęcie); brak zdjęć albo błąd – ikona. */
-  readonly thumbnailUrl = signal<string | undefined>(undefined);
-  /** Wątek z przyjętym pomocnikiem – tu są akcje zlecenia (jak w szczegółach ogłoszenia). */
-  readonly isAcceptedThread = computed(() => {
-    const conversation = this.conversation();
-    return !!conversation && offersOf(conversation).some((offer) => offer.status === 'Accepted');
-  });
-  /**
-   * Krok realizacji w przyjętym wątku (F11 D, `jobStep`): pomocnik – „Rozpocznij” / „Zgłoś wykonanie”, zleceniodawca –
-   * „Potwierdź wykonanie” (wyróżnione po zgłoszeniu) i notka, na co czeka.
-   */
-  readonly job = computed<JobStep | null>(() => {
-    const conversation = this.conversation();
-    if (!conversation || !this.isAcceptedThread()) {
-      return null;
-    }
-    const step = jobStep(conversation.announcementStatus, conversation.myRole, conversation.announcementDoneReportedAt);
-    return step.action || step.note || step.exit ? step : null;
-  });
-  readonly jobAction = computed<JobAction | null>(() => this.job()?.action ?? null);
   /**
    * F11 F: co czeka na czytającego – „Zleceniodawca zmienił ogłoszenie – zobacz zmiany” (autor oferty sprzed edycji)
    * albo „Pomocnik zmienił ofertę – zobacz aktualną” (odbiorca zmienionej oferty). Wyróżniony przycisk nad polem.
    */
-  readonly notice = computed<ThreadNotice | null>(() => {
-    const conversation = this.conversation();
-    return conversation ? threadNotice(conversation) : null;
-  });
-
-  /**
-   * Pomocnik w otwartym ogłoszeniu bez oczekującej oferty może złożyć nową (np. po odrzuceniu) – ale nie po zerwanym
-   * zleceniu (F11 E: rezygnacja jego albo zleceniodawcy zamyka ten wątek).
-   */
-  readonly canMakeOffer = computed(() => {
-    const conversation = this.conversation();
-    return (
-      !!conversation &&
-      conversation.myRole === 'Helper' &&
-      conversation.announcementStatus === 'Open' &&
-      !pendingOffer(offersOf(conversation)) &&
-      !jobExitOf(conversation)
-    );
-  });
-
+  readonly notice = this.fromThread(threadNotice, null);
+  /** Pomocnik może złożyć (kolejną) ofertę – „Złóż ofertę” nad polem wiadomości. */
+  readonly canMakeOffer = this.fromThread(canMakeOffer, false);
   /** F11 E: zlecenie przerwane w tym wątku – notka o rozliczeniu nad stopką. */
   readonly interrupted = computed(() => this.conversation()?.announcementStatus === 'Interrupted');
-
-  /** Dlaczego nie można pisać (`canWrite: false`) – wg reguły `Announcement.AllowsConversationWith`. */
-  readonly readOnlyReason = computed(() => {
-    const conversation = this.conversation();
-    if (
-      conversation &&
-      conversation.announcementStatus !== 'Interrupted' &&
-      jobExitOf(conversation)?.kind === 'Abandoned'
-    ) {
-      return 'Zlecenie zerwane przed rozpoczęciem – rozmowa jest tylko do odczytu.';
-    }
-    switch (conversation?.announcementStatus) {
-      case 'Accepted':
-      case 'InProgress':
-        return 'Zleceniodawca przyjął inną ofertę – rozmowa jest tylko do odczytu.';
-      case 'Completed':
-        return 'Zlecenie zakończone – rozmowa jest tylko do odczytu. Ocenę wystawisz w Koncie → Oceny.';
-      case 'Cancelled':
-        return 'Ogłoszenie anulowane – rozmowa jest tylko do odczytu.';
-      case 'Interrupted':
-        return 'Zlecenie przerwane – rozmowa jest tylko do odczytu. Bez ocen – stanowiska obu stron widać na profilach.';
-      default:
-        return 'Rozmowa jest tylko do odczytu.';
-    }
-  });
+  /** Dlaczego nie można pisać (`canWrite: false`). */
+  readonly readOnlyReason = computed(() => readOnlyReason(this.conversation()));
+  protected readonly placeholder = this.fromThread(messagePlaceholder, '');
 
   constructor() {
     addIcons({
       alertCircleOutline,
       arrowDownCircleOutline,
       checkmarkDoneOutline,
-      cloudOfflineOutline,
       createOutline,
       exitOutline,
       eyeOutline,
-      flagOutline,
       helpCircleOutline,
-      hourglassOutline,
-      imageOutline,
       lockClosedOutline,
-      playOutline,
       pricetagOutline,
       send,
       stopCircleOutline,
-      warningOutline,
     });
+    registerJobStepIcons();
 
     // Powiadomienie (hub albo push) o tym wątku albo jego ogłoszeniu – np. druga strona zmieniła ofertę, pomocnik
     // zgłosił wykonanie, ogłoszenie edytowano – wątek przeładowany od razu.
-    this.notifications.activity$
-      .pipe(
-        filter(
-          (activity) =>
-            activity.conversationId === this.conversationId() ||
-            (!!activity.announcementId && activity.announcementId === this.conversation()?.announcementId),
-        ),
-        takeUntilDestroyed(),
-      )
-      .subscribe(() => this.load());
+    reloadOnActivity(
+      (activity) =>
+        activity.conversationId === this.conversationId() ||
+        (!!activity.announcementId && activity.announcementId === this.conversation()?.announcementId),
+      () => this.load(),
+    );
   }
 
   ionViewWillEnter(): void {
@@ -274,35 +205,11 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
   }
 
   refresh(event: Event): void {
-    this.load(() => void (event.target as unknown as { complete(): Promise<void> }).complete());
+    this.thread.refresh(event);
   }
 
-  load(done?: () => void): void {
-    this.conversations.getById(this.conversationId()).subscribe({
-      next: (conversation) => {
-        const first = this.conversation()?.id !== conversation.id;
-        this.conversation.set(conversation);
-        this.state.set('ready');
-        if (first) {
-          this.loadOtherName(conversation);
-          this.loadThumbnail(conversation.announcementId);
-        }
-        if (conversation.unreadCount > 0) {
-          this.conversations.markAsRead(conversation.id).subscribe({ error: () => undefined });
-        }
-        this.scrollToBottom();
-        done?.();
-      },
-      error: (error: unknown) => {
-        if (errorStatus(error) === 404) {
-          this.conversation.set(null);
-          this.state.set('not-found');
-        } else if (!this.conversation()) {
-          this.state.set('failed');
-        }
-        done?.();
-      },
-    });
+  load(): void {
+    this.thread.load();
   }
 
   /** Wysłanie wiadomości (2–500 znaków); po sukcesie wątek z serwera (z godziną i kolejnością z API). */
@@ -332,33 +239,15 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
       return;
     }
     const last = offersOf(conversation).at(-1);
-    await this.act(() => this.offers.make(conversation.announcementId, last?.price.amount).then((id) => id !== null));
+    await this.act(() => this.offers.make(conversation.announcementId, last?.price.amount));
   }
 
-  async accept(offer: OfferDto): Promise<void> {
-    await this.act(() => this.offers.accept(offer));
-  }
-
-  async reject(offer: OfferDto): Promise<void> {
-    await this.act(() => this.offers.reject(offer));
-  }
-
-  async counter(offer: OfferDto): Promise<void> {
-    await this.act(() => this.offers.counter(offer));
-  }
-
-  async withdraw(offer: OfferDto): Promise<void> {
-    await this.act(() => this.offers.withdraw(offer));
-  }
-
-  /** Autor oczekującej oferty: nowe warunki (formularz). */
-  async revise(offer: OfferDto): Promise<void> {
-    await this.act(() => this.offers.revise(offer));
-  }
-
-  /** Autor oferty sprzed edycji ogłoszenia: podgląd zmian → podtrzymaj / zmień / wycofaj (`OffersService`). */
-  async reviewChanges(offer: OfferDto): Promise<void> {
-    await this.act(() => this.offers.reviewChanges(offer));
+  /**
+   * Przycisk pod ofertą (`app-offer-card`): przyjmij / odrzuć / kontroferta / wycofaj / zmień albo – dla autora oferty
+   * sprzed edycji ogłoszenia – podgląd zmian i decyzja. Okno, API i komunikat – `OffersService`.
+   */
+  async offerAction(action: OfferAction, offer: OfferDto): Promise<void> {
+    await this.act(() => this.offers[action](offer));
   }
 
   /** Wpis „Ogłoszenie zmienione” – sam podgląd było → jest. */
@@ -369,74 +258,77 @@ export class ConversationPage implements ViewWillEnter, ViewWillLeave {
   /** Przycisk nad polem wiadomości: podgląd zmian albo przewinięcie do aktualnej (zmienionej) oferty. */
   async openNotice(notice: ThreadNotice): Promise<void> {
     if (notice.kind === 'changes') {
-      await this.reviewChanges(notice.offer);
+      await this.offerAction('reviewChanges', notice.offer);
       return;
     }
     this.highlightedOfferId.set(notice.offer.id);
     document.getElementById(`offer-${notice.offer.id}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
   }
 
-  /** „Czeka na odpowiedź pomocnika / zleceniodawcy”. */
-  protected partyGenitive(party: string): string {
-    return party === 'Helper' ? 'pomocnika' : 'zleceniodawcy';
-  }
-
-  /** Akcja zlecenia w przyjętym wątku (potwierdzenie i komunikat – `OffersService`, wspólne ze szczegółami). */
+  /** Krok zlecenia w przyjętym wątku (potwierdzenie i komunikat – `JobService`, wspólne ze szczegółami). */
   async runJobAction(): Promise<void> {
     const conversation = this.conversation();
-    const action = this.jobAction();
-    if (!conversation || !action) {
-      return;
+    const action = this.job()?.action;
+    if (conversation && action) {
+      await this.act(() => this.jobs.run(conversation.announcementId, action));
     }
-    const id = conversation.announcementId;
-    const run: Record<JobAction, () => Promise<boolean>> = {
-      start: () => this.offers.start(id),
-      report: () => this.offers.reportDone(id),
-      complete: () => this.offers.complete(id),
-    };
-    await this.act(run[action]);
   }
 
   /** F11 G: „Dodaj swoje stanowisko” przy wpisie rezygnacji / przerwania (druga strona, raz). */
   async respondToExit(number: number): Promise<void> {
     const conversation = this.conversation();
     if (conversation) {
-      await this.act(() => this.offers.respondToExit(conversation.announcementId, number));
+      await this.act(() => this.jobs.respondToExit(conversation.announcementId, number));
     }
   }
 
-  /** F11 E: „Zrezygnuj” / „Przerwij zlecenie” – okno z powodem (`OffersService.exitJob`). */
+  /** F11 E: „Zrezygnuj” / „Przerwij zlecenie” – okno z powodem (`JobService.exit`). */
   async exitJob(): Promise<void> {
     const conversation = this.conversation();
     const exit = this.job()?.exit;
-    if (!conversation || !exit) {
-      return;
+    if (conversation && exit) {
+      const otherSide = partyLabel(oppositeParty(conversation.myRole));
+      await this.act(() => this.jobs.exit(conversation.announcementId, exit, otherSide));
     }
-    const otherSide = partyLabel(conversation.myRole === 'Client' ? 'Helper' : 'Client');
-    await this.act(() => this.offers.exitJob(conversation.announcementId, exit, otherSide));
   }
 
   /** Jedna akcja naraz; po zmianie (albo błędzie 409 – stan mógł się zmienić) przeładowanie wątku. */
-  private async act(action: () => Promise<boolean>): Promise<void> {
-    if (this.busy()) {
-      return;
-    }
-    this.busy.set(true);
-    try {
-      await action();
-    } finally {
-      this.busy.set(false);
-      this.load();
-    }
+  private async act(action: () => Promise<unknown>): Promise<void> {
+    await runExclusive(this.busy, async () => {
+      try {
+        await action();
+      } finally {
+        this.load();
+      }
+    });
   }
 
-  private loadOtherName(conversation: ConversationDto): void {
-    const otherId = conversation.myRole === 'Client' ? conversation.helperId : conversation.clientId;
+  /** Wartość wyliczona z wczytanego wątku; `empty` – dopóki go nie ma. */
+  private fromThread<T>(project: (conversation: ConversationDto) => T, empty: T): Signal<T> {
+    return computed(() => {
+      const conversation = this.conversation();
+      return conversation ? project(conversation) : empty;
+    });
+  }
+
+  private onLoaded(conversation: ConversationDto, previous: ConversationDto | null): void {
+    if (previous?.id !== conversation.id) {
+      this.loadOtherParty(conversation);
+      this.loadThumbnail(conversation.announcementId);
+    }
+    if (conversation.unreadCount > 0) {
+      this.conversations.markAsRead(conversation.id).subscribe({ error: () => undefined });
+    }
+    this.scrollToBottom();
+  }
+
+  /** Nazwa i publiczny licznik rezygnacji / przerwań drugiej strony (dodatki – błąd = bez nich). */
+  private loadOtherParty(conversation: ConversationDto): void {
+    const otherId = otherPartyId(conversation);
     this.users
       .getById(otherId)
       .pipe(catchError(() => of(null)))
       .subscribe((user) => this.otherName.set(user?.fullName ?? ''));
-    // F11 E: publiczny licznik rezygnacji / przerwań drugiej strony (dodatek – błąd = bez licznika).
     this.users
       .getReliability(otherId)
       .pipe(catchError(() => of(null)))

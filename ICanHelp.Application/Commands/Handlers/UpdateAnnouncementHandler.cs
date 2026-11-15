@@ -10,29 +10,14 @@ namespace ICanHelp.Application.Commands.Handlers;
 /// PATCH ogłoszenia: brakujące pola bierze z obecnego stanu, a całą resztę (właściciel, status, wykrycie zmian,
 /// nowa rewizja) robi <c>Announcement.Update</c>.
 /// </summary>
-internal sealed class UpdateAnnouncementHandler : ICommandHandler<UpdateAnnouncement>
+internal sealed class UpdateAnnouncementHandler(IAnnouncementRepository announcements, ICategoryRepository categories,
+    IUserRepository users, IUnitOfWork unitOfWork, IClock clock) : ICommandHandler<UpdateAnnouncement>
 {
-    private readonly IAnnouncementRepository _announcements;
-    private readonly ICategoryRepository _categories;
-    private readonly IUserRepository _users;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IClock _clock;
-
-    public UpdateAnnouncementHandler(IAnnouncementRepository announcements, ICategoryRepository categories,
-        IUserRepository users, IUnitOfWork unitOfWork, IClock clock)
-    {
-        _announcements = announcements;
-        _categories = categories;
-        _users = users;
-        _unitOfWork = unitOfWork;
-        _clock = clock;
-    }
-
-    public async Task HandleAsync(UpdateAnnouncement command, CancellationToken cancellationToken = default)
-        => await _unitOfWork.ExecuteAsync(async () =>
+    public Task HandleAsync(UpdateAnnouncement command, CancellationToken cancellationToken = default)
+        => unitOfWork.ExecuteAsync(async () =>
         {
-            await _users.GetActiveOrThrowAsync(command.ActorId, cancellationToken);
-            var announcement = await _announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
+            await users.GetActiveOrThrowAsync(command.ActorId, cancellationToken);
+            var announcement = await announcements.GetOrThrowAsync(command.AnnouncementId, cancellationToken);
 
             // Klient edytował starszą wersję – nie nadpisujemy po cichu cudzej (albo własnej z innej karty) zmiany.
             if (command.ExpectedRevision is { } expectedRevision && expectedRevision != announcement.Revision)
@@ -47,11 +32,7 @@ internal sealed class UpdateAnnouncementHandler : ICommandHandler<UpdateAnnounce
 
             if (categoryId != announcement.CategoryId || subcategoryId != announcement.SubcategoryId)
             {
-                var category = await _categories.GetByIdAsync(categoryId, cancellationToken);
-                if (category is null || !category.HasSubcategory(subcategoryId))
-                {
-                    throw new InvalidCategoryException(categoryId, subcategoryId);
-                }
+                await categories.EnsureCategoryAsync(categoryId, [subcategoryId], cancellationToken);
             }
 
             announcement.Update(
@@ -61,10 +42,8 @@ internal sealed class UpdateAnnouncementHandler : ICommandHandler<UpdateAnnounce
                 command.Difficulty ?? announcement.Difficulty,
                 command.Title is null ? announcement.Title : new StringObject(command.Title),
                 command.Description is null ? announcement.Description : new Description(command.Description),
-                command.Budget is null ? announcement.Budget : new Price(command.Budget.Amount, command.Budget.Currency),
-                command.Location is null
-                    ? announcement.Location
-                    : new Location(command.Location.Latitude, command.Location.Longitude),
-                _clock.UtcNow);
+                command.Budget?.ToPrice() ?? announcement.Budget,
+                command.Location?.ToLocation() ?? announcement.Location,
+                clock.UtcNow);
         }, cancellationToken);
 }

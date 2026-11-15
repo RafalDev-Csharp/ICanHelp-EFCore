@@ -39,21 +39,20 @@ public class Offer
     {
     }
 
-    internal Offer(Id id, Id announcementId, UserId helperId, OfferParty proposedBy, Price price,
-        DateTime proposedStart, DateTime proposedEnd, Description? message, DateTime createdAtUtc, Id? parentOfferId,
-        int announcementRevision)
+    internal Offer(Id id, Id announcementId, UserId helperId, OfferParty proposedBy, OfferTerms terms,
+        DateTime createdAtUtc, Id? parentOfferId, int announcementRevision)
     {
-        if (price.Amount <= 0)
+        if (terms.Price.Amount <= 0)
         {
             throw new DomainRuleException("Offer price must be greater than zero.");
         }
 
-        if (proposedEnd <= proposedStart)
+        if (terms.ProposedEnd <= terms.ProposedStart)
         {
             throw new DomainRuleException("Offer end must be later than its start.");
         }
 
-        if (proposedStart < createdAtUtc)
+        if (terms.ProposedStart < createdAtUtc)
         {
             throw new DomainRuleException("Offer cannot start in the past.");
         }
@@ -62,10 +61,10 @@ public class Offer
         AnnouncementId = announcementId;
         HelperId = helperId;
         ProposedBy = proposedBy;
-        Price = price;
-        ProposedStart = proposedStart;
-        ProposedEnd = proposedEnd;
-        Message = message;
+        Price = terms.Price;
+        ProposedStart = terms.ProposedStart;
+        ProposedEnd = terms.ProposedEnd;
+        Message = terms.Message;
         CreatedAt = createdAtUtc;
         ParentOfferId = parentOfferId;
         AnnouncementRevision = announcementRevision;

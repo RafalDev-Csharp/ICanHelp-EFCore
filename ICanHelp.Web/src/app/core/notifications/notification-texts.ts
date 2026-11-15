@@ -1,5 +1,6 @@
 import { formatDistance } from '../../shared/pipes/distance.pipe';
 import { formatPrice } from '../../shared/pipes/price.pipe';
+import { announcementFieldLabel } from '../../shared/text/announcement-fields';
 import type { NotificationDto } from '../api/api-client';
 
 /** Tekst powiadomienia do listy i toastu. */
@@ -9,17 +10,6 @@ export interface NotificationText {
   /** Nazwa ikony ionicons (zarejestrowana przez `NOTIFICATION_ICONS`). */
   icon: string;
 }
-
-/** Pola ogłoszenia (`AnnouncementFields` w backendzie, `changedFields` = „Title, Budget”). */
-const FIELD_LABELS: Record<string, string> = {
-  Category: 'kategoria',
-  Difficulty: 'trudność',
-  Title: 'tytuł',
-  Description: 'opis',
-  Budget: 'budżet',
-  Location: 'miejsce',
-  Images: 'zdjęcia',
-};
 
 /**
  * Tekst powiadomienia. Od Kroku 15 backend zwraca gotowe `title`/`body` (te same co w push –
@@ -185,12 +175,13 @@ function exitBody(title: string, reason: string | undefined, note: string | unde
   return (title ? `${title} – powód: ${reasonText}.` : `Powód: ${reasonText}.`) + invite;
 }
 
+/** `changedFields` z backendu („Title, Budget”) → „tytuł, budżet”. */
 function changedFields(value: string | undefined): string {
   return (value ?? '')
     .split(',')
     .map((field) => field.trim())
     .filter((field) => field && field !== 'None')
-    .map((field) => FIELD_LABELS[field] ?? field)
+    .map(announcementFieldLabel)
     .join(', ');
 }
 

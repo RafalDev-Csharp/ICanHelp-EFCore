@@ -1,5 +1,6 @@
 import type { AbandonJob, JobExitDto, JobExitReason } from '../../core/api/api-client';
 import { JOB_EXIT_REASON_LABELS } from '../../core/notifications/notification-texts';
+import { capitalize } from '../../shared/text/capitalize';
 import { pluralPl } from '../../shared/text/plural';
 
 /**
@@ -69,6 +70,41 @@ export function canRespondToExit(
   return exit.actorRole === 'Client' ? myUserId === exit.helperId : myUserId === ownerId;
 }
 
+/** „Stanowisko pomocnika / zleceniodawcy” – pisze je druga strona niż ta, która wyszła ze zlecenia. */
+export function jobExitResponseAuthor(exit: Pick<JobExitDto, 'actorRole'>): string {
+  return exit.actorRole === 'Client' ? 'Stanowisko pomocnika' : 'Stanowisko zleceniodawcy';
+}
+
+/** Wpis o rezygnacji / przerwaniu z perspektywy czytającego – ten sam w wątku i w szczegółach ogłoszenia. */
+export interface JobExitView {
+  exit: JobExitDto;
+  /** „Zrezygnowałeś ze zlecenia” / „Pomocnik przerwał zlecenie” (`jobExitTitle`). */
+  title: string;
+  /** Powód z opisem (`jobExitReasonText`). */
+  reason: string;
+  /** Wyszedł czytający. */
+  mine: boolean;
+  /** F11 G: czytający jest drugą stroną i jeszcze nie dodał stanowiska. */
+  canRespond: boolean;
+  /** „Stanowisko pomocnika / zleceniodawcy”. */
+  responseAuthor: string;
+}
+
+/**
+ * @param myUserId zalogowany (`undefined` = widz bez roli)
+ * @param ownerId właściciel ogłoszenia (zleceniodawca)
+ */
+export function jobExitView(exit: JobExitDto, myUserId: string | undefined, ownerId: string): JobExitView {
+  return {
+    exit,
+    title: jobExitTitle(exit, myUserId ?? ''),
+    reason: jobExitReasonText(exit),
+    mine: exit.actorId === myUserId,
+    canRespond: canRespondToExit(exit, myUserId ?? '', ownerId),
+    responseAuthor: jobExitResponseAuthor(exit),
+  };
+}
+
 /** Notka po przerwaniu – aplikacja nie obsługuje pieniędzy. */
 export const INTERRUPTED_NOTE = 'Ustalcie między sobą rozliczenie za wykonaną część.';
 
@@ -86,8 +122,4 @@ export function reliabilityLabel(counts: { abandonedCount: number; interruptedCo
     parts.push(`${counts.interruptedCount} ${noun}`);
   }
   return parts.join(' · ');
-}
-
-function capitalize(text: string): string {
-  return text ? text[0].toUpperCase() + text.slice(1) : text;
 }

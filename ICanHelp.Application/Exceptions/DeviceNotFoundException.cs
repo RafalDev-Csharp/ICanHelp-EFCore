@@ -2,7 +2,7 @@ using ICanHelp.Core.Exceptions;
 
 namespace ICanHelp.Application.Exceptions;
 
-public class DeviceNotFoundException : CustomExceptions
+public class DeviceNotFoundException : NotFoundException
 {
     public Guid DeviceId { get; }
 

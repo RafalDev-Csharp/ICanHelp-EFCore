@@ -3,7 +3,7 @@ import { signal } from '@angular/core';
 import { Subject } from 'rxjs';
 
 import type { NotificationDto } from '../api/api-client';
-import type { NotificationActivity } from '../notifications/notifications.service';
+import type { NotificationActivity } from '../notifications/notification-model';
 import { NotificationsService } from '../notifications/notifications.service';
 
 export interface NotificationsStub {

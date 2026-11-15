@@ -1,0 +1,59 @@
+@let item = announcement();
+@if (images().length > 0) {
+  <div class="gallery" aria-label="Zdjęcia">
+    @for (image of images(); track image.id; let index = $index) {
+      <a class="gallery-item" [href]="image.url" target="_blank" rel="noopener">
+        <img [src]="image.url" [alt]="'Zdjęcie ' + (index + 1) + ' z ' + images().length" loading="lazy" />
+      </a>
+    }
+  </div>
+}
+
+<section class="ion-padding summary">
+  <ion-badge [color]="statusColor(item.status)">{{ statusLabel(item.status) }}</ion-badge>
+  <h1>{{ item.title }}</h1>
+  <p class="budget">{{ item.budget.amount | price }}</p>
+  <p class="meta">
+    Dodane {{ item.createdAt | timeAgo }}
+    @if (item.updatedAt) {
+      · edytowane {{ item.updatedAt | timeAgo }}
+    }
+  </p>
+</section>
+
+<ul class="facts ion-padding-horizontal" role="list" aria-label="Informacje o zleceniu">
+  @if (category()) {
+    <li>
+      <ion-chip class="fact-category" color="primary" [outline]="true">
+        <ion-icon name="pricetag-outline" aria-hidden="true"></ion-icon>
+        <ion-label>{{ category() }}</ion-label>
+      </ion-chip>
+    </li>
+  }
+  <li>
+    <ion-chip class="fact-difficulty" [color]="difficultyColor(item.difficulty)">
+      <ion-icon name="construct-outline" aria-hidden="true"></ion-icon>
+      <ion-label>Trudność: {{ difficultyLabel(item.difficulty) }}</ion-label>
+    </ion-chip>
+  </li>
+  <li>
+    <ion-chip class="fact-offers" color="medium" [outline]="true">
+      <ion-icon name="people-outline" aria-hidden="true"></ion-icon>
+      <ion-label>{{ offersLabel() }}</ion-label>
+    </ion-chip>
+  </li>
+</ul>
+
+<section class="ion-padding-horizontal">
+  <h2>Opis</h2>
+  <p class="description">{{ item.description }}</p>
+</section>
+
+<section class="ion-padding-horizontal">
+  <h2>Miejsce</h2>
+  <app-map class="detail-map" [markers]="marker()" [center]="item.location" [zoom]="15" [interactive]="false"></app-map>
+  <ion-button fill="clear" size="small" [href]="mapLink()" target="_blank" rel="noopener">
+    <ion-icon name="location-outline" slot="start" aria-hidden="true"></ion-icon>
+    Otwórz w mapach
+  </ion-button>
+</section>

@@ -40,7 +40,7 @@ describe('AddAnnouncementPage', () => {
   }
 
   function fill(page: AddAnnouncementPage): void {
-    page.form.setValue({
+    page.draft.form.setValue({
       categoryId: 'cat-home',
       subcategoryId: 'sub-plumbing',
       difficulty: 'Medium',
@@ -48,7 +48,7 @@ describe('AddAnnouncementPage', () => {
       description: 'Kran w kuchni cieknie od tygodnia.',
       budget: 120,
     });
-    page.location.set({ latitude: 53.844, longitude: 22.979 });
+    page.draft.location.set({ latitude: 53.844, longitude: 22.979 });
   }
 
   beforeEach(() => {
@@ -58,19 +58,19 @@ describe('AddAnnouncementPage', () => {
 
   it('does not send an incomplete announcement', () => {
     const page = create();
-    page.form.patchValue({ title: 'Kran' });
+    page.draft.form.patchValue({ title: 'Kran' });
 
     page.submit();
 
     expect(client.create).not.toHaveBeenCalled();
     expect(toast.error).toHaveBeenCalledWith('Uzupełnij zaznaczone pola.');
-    expect(page.form.controls.description.touched).toBe(true);
+    expect(page.draft.form.controls.description.touched).toBe(true);
   });
 
   it('requires a place on the map', () => {
     const page = create();
     fill(page);
-    page.location.set(null);
+    page.draft.location.set(null);
 
     page.submit();
 
@@ -84,7 +84,7 @@ describe('AddAnnouncementPage', () => {
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     fill(page);
     const blob = new Blob(['jpeg'], { type: 'image/jpeg' });
-    page.photos.set([{ kind: 'new', id: 'p1', url: 'blob:p1', blob, fileName: 'kran.jpg' }]);
+    page.draft.photos.set([{ kind: 'new', id: 'p1', url: 'blob:p1', blob, fileName: 'kran.jpg' }]);
 
     page.submit();
 
@@ -102,8 +102,8 @@ describe('AddAnnouncementPage', () => {
     expect(navigate).toHaveBeenCalledWith(['/announcements', 'new-1']);
     expect(push.suggest).toHaveBeenCalledTimes(1);
     // Zakładka zostaje w pamięci – formularz jest gotowy na kolejne ogłoszenie.
-    expect(page.form.controls.title.value).toBe('');
-    expect(page.photos()).toEqual([]);
-    expect(page.location()).toBeNull();
+    expect(page.draft.form.controls.title.value).toBe('');
+    expect(page.draft.photos()).toEqual([]);
+    expect(page.draft.location()).toBeNull();
   });
 });

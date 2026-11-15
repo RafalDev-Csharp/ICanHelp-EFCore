@@ -2,7 +2,7 @@ using ICanHelp.Core.Exceptions;
 
 namespace ICanHelp.Application.Exceptions;
 
-public class AnnouncementNotFoundException : CustomExceptions
+public class AnnouncementNotFoundException : NotFoundException
 {
     public Guid AnnouncementId { get; }
 

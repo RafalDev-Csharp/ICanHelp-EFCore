@@ -36,10 +36,7 @@ internal static class AnnouncementTestData
         => announcement.AddOffer(
             Id.New(),
             helperId,
-            Price.Pln(price),
-            Now.AddDays(1),
-            Now.AddDays(1).AddHours(2),
-            "Mogę wpaść po pracy.",
+            new OfferTerms(Price.Pln(price), Now.AddDays(1), Now.AddDays(1).AddHours(2), "Mogę wpaść po pracy."),
             Now);
 
     /// <summary>Kontroferta złożona przez <paramref name="actorId"/> godzinę później (pojutrze, 2 godziny).</summary>
@@ -48,10 +45,7 @@ internal static class AnnouncementTestData
             offer.Id,
             Id.New(),
             actorId,
-            Price.Pln(price),
-            Now.AddDays(2),
-            Now.AddDays(2).AddHours(2),
-            null,
+            new OfferTerms(Price.Pln(price), Now.AddDays(2), Now.AddDays(2).AddHours(2)),
             Now.AddHours(1));
 
     /// <summary>Buduje ogłoszenie w podanym statusie, przechodząc przez prawdziwe metody domenowe.</summary>

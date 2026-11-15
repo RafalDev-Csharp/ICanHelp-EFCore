@@ -56,15 +56,27 @@ internal static class Extensions
                     RoleClaimType = AuthClaims.Role
                 };
 
-                // WebSockets (SignalR, /hubs/...) cannot send the Authorization header – the token comes in the query.
                 jwt.Events = new JwtBearerEvents
                 {
+                    // WebSockets (SignalR, /hubs/...) cannot send the Authorization header – the token comes in the query.
                     OnMessageReceived = context =>
                     {
                         var accessToken = context.Request.Query["access_token"];
                         if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
                         {
                             context.Token = accessToken;
+                        }
+
+                        return Task.CompletedTask;
+                    },
+
+                    // A token that does not say who the user is (claim "sub" with a Guid) is not a token of this API.
+                    // Rejected here, once (→ 401), so every [Authorize] action can simply read the id.
+                    OnTokenValidated = context =>
+                    {
+                        if (context.Principal is null || !context.Principal.TryGetUserId(out _))
+                        {
+                            context.Fail("The token does not identify a user.");
                         }
 
                         return Task.CompletedTask;

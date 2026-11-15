@@ -1,6 +1,6 @@
 namespace ICanHelp.Core.Exceptions;
 
-public class ImageNotFoundException : CustomExceptions
+public class ImageNotFoundException : NotFoundException
 {
     public Guid ImageId { get; }
 

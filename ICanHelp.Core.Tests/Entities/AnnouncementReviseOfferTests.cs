@@ -19,8 +19,9 @@ public class AnnouncementReviseOfferTests
             announcement.Title, description, announcement.Budget, announcement.Location, Now.AddHours(1));
 
     private static Offer Revise(Announcement announcement, Offer offer, UserId actorId, decimal price = 180m)
-        => announcement.ReviseOffer(offer.Id, Id.New(), actorId, Price.Pln(price), Now.AddDays(3),
-            Now.AddDays(3).AddHours(2), "Z syfonem drożej.", Now.AddHours(2));
+        => announcement.ReviseOffer(offer.Id, Id.New(), actorId,
+            new OfferTerms(Price.Pln(price), Now.AddDays(3), Now.AddDays(3).AddHours(2), "Z syfonem drożej."),
+            Now.AddHours(2));
 
     [Fact]
     public void ReviseOffer_OutdatedHelperOffer_ReplacesItWithPendingOfferOnCurrentRevision()
@@ -175,7 +176,7 @@ public class AnnouncementReviseOfferTests
         var announcement = CreateAnnouncement();
 
         Should.Throw<OfferNotFoundException>(() => announcement.ReviseOffer(Id.New(), Id.New(), Helper,
-            Price.Pln(100m), Now.AddDays(1), Now.AddDays(1).AddHours(1), null, Now));
+            new OfferTerms(Price.Pln(100m), Now.AddDays(1), Now.AddDays(1).AddHours(1)), Now));
     }
 
     [Fact]

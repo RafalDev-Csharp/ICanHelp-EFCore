@@ -3,7 +3,7 @@ using ICanHelp.Core.Exceptions;
 namespace ICanHelp.Application.Exceptions;
 
 /// <summary>Konto z tokenu nie istnieje (np. token wystawiony przed usunięciem konta).</summary>
-public class UserNotFoundException : CustomExceptions
+public class UserNotFoundException : NotFoundException
 {
     public Guid UserId { get; }
 

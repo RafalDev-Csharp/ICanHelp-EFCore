@@ -1,4 +1,4 @@
-using ICanHelp.Api.Security;
+using ICanHelp.Infrastructure.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 

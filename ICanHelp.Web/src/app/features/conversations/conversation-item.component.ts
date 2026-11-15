@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { IonBadge, IonIcon, IonItem, IonLabel, IonNote, IonThumbnail } from '@ionic/angular';
 import { addIcons } from 'ionicons';
@@ -9,7 +9,7 @@ import { apiResourceUrl } from '../../core/api/api.providers';
 import { PricePipe } from '../../shared/pipes/price.pipe';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
 import { statusColor, statusLabel } from '../announcements/announcement-labels';
-import { offerStateLabel } from '../offers/offer-labels';
+import { offerStateLabel, oppositeParty, partyLabel } from '../offers/offer-labels';
 
 /**
  * Wątek na liście (`ion-list`): miniatura, tytuł ogłoszenia, druga strona, status, ostatnia oferta, podgląd wiadomości
@@ -30,7 +30,7 @@ import { offerStateLabel } from '../offers/offer-labels';
       <ion-label>
         <h2 [class.unread]="item.unreadCount > 0">{{ item.title }}</h2>
         <p>
-          {{ item.myRole === 'Client' ? 'Pomocnik' : 'Zleceniodawca' }}: {{ item.otherParty.userName }}
+          {{ otherPartyLabel() }}: {{ item.otherParty.userName }}
           <ion-badge [color]="statusColor(item.announcementStatus)">{{
             statusLabel(item.announcementStatus)
           }}</ion-badge>
@@ -67,6 +67,8 @@ import { offerStateLabel } from '../offers/offer-labels';
 export class ConversationItemComponent {
   readonly conversation = input.required<MyConversationDto>();
 
+  /** „Pomocnik” / „Zleceniodawca” – kim jest druga strona wątku. */
+  protected readonly otherPartyLabel = computed(() => partyLabel(oppositeParty(this.conversation().myRole)));
   protected readonly statusLabel = statusLabel;
   protected readonly statusColor = statusColor;
   protected readonly offerStateLabel = offerStateLabel;

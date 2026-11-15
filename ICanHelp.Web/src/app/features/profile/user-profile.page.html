@@ -10,9 +10,7 @@
 
 <ion-content class="page-column">
   @switch (state()) { @case ('loading') {
-  <div class="ion-text-center ion-padding" aria-busy="true">
-    <ion-spinner name="crescent"></ion-spinner>
-  </div>
+  <app-loading></app-loading>
   } @case ('not-found') {
   <app-empty-state
     icon="alert-circle-outline"
@@ -20,15 +18,9 @@
     message="Konto mogło zostać usunięte albo link jest niepoprawny."
   ></app-empty-state>
   } @case ('failed') {
-  <app-empty-state
-    icon="cloud-offline-outline"
-    heading="Nie udało się wczytać profilu"
-    message="Sprawdź połączenie z internetem i spróbuj ponownie."
-  >
-    <ion-button (click)="load()">Spróbuj ponownie</ion-button>
-  </app-empty-state>
+  <app-load-failed heading="Nie udało się wczytać profilu" (retry)="resource.load()"></app-load-failed>
   } @case ('ready') { @if (profile(); as item) {
-  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+  <ion-refresher slot="fixed" (ionRefresh)="resource.refresh($event)">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
@@ -93,10 +85,10 @@
         @if (entry.exit.response) {
         <p class="response">
           <ion-icon name="chatbubble-ellipses-outline" aria-hidden="true"></ion-icon>
-          {{ responseAuthor(entry) }}: {{ entry.exit.response }}
+          {{ responseAuthor(entry.exit) }}: {{ entry.exit.response }}
         </p>
         } @else {
-        <p class="response none">{{ responseAuthor(entry) }}: jeszcze brak.</p>
+        <p class="response none">{{ responseAuthor(entry.exit) }}: jeszcze brak.</p>
         }
       </ion-label>
     </ion-item>

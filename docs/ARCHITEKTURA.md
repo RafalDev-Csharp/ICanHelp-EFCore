@@ -1,7 +1,7 @@
 # ICanHelpApp – szczegóły techniczne
 
 > Szczegóły przeniesione z `CLAUDE.md`, żeby tamten został krótki. Czytaj sekcję, której dotyczy bieżący krok.
-> Sekcje: Model domeny, Infrastructure, Api, Uwierzytelnianie (z prywatnością), Zdjęcia, Rozmowa, Powiadomienia,
+> Sekcje: Model domeny, Application, Infrastructure, Api, Uwierzytelnianie (z prywatnością), Zdjęcia, Rozmowa, Powiadomienia,
 > Push i urządzenia, Alerty.
 
 ## Model domeny (Core)
@@ -25,6 +25,12 @@
     (tylko przyjęty pomocnik → `JobStarted`), `ReportDone(actor, at)` (przyjęty pomocnik, InProgress, raz → `JobDoneReported`),
     `Complete(actor, at)` (właściciel, z Accepted lub InProgress → `JobCompleted`), `Cancel(actor)`, `GetAcceptedHelperId()`,
     `IsParticipant(user)`, `CreateRating(...)`, `GetOffersVisibleTo(viewer?)`, `StartConversation(...)`, `AllowsConversationWith(helper)`.
+  - Jedna klasa w czterech plikach (`partial`, wg obszaru): `Announcement.cs` – stan, treść i rewizje, wspólne reguły
+    (`EnsureOwner`, `EnsureStatus`…); `Announcement.Images.cs` – zdjęcia (`GetImagesInOrder()`, miniatura);
+    `Announcement.Negotiation.cs` – oferty i wątek; `Announcement.Job.cs` – realizacja, wyjścia ze zlecenia, ocena.
+    Warunki oferty (cena, terminy, wiadomość) to jeden obiekt `OfferTerms` (`Core/ValueObjects`) – ten sam w `AddOffer`,
+    `CounterOffer` i `ReviseOffer`; reguły (cena > 0, koniec po początku, nie w przeszłości) sprawdza konstruktor `Offer`.
+    Kto co widzi – w agregacie: `GetOffersVisibleTo(viewer?)`, `GetJobExitsVisibleTo(viewer?)`.
   - `Offer` (część agregatu): HelperId, ProposedBy (Client/Helper), Price, ProposedStart/End, Message?, Status, ParentOfferId?,
     AnnouncementRevision (kontroferta = nowy `Offer` wskazujący poprzedni; poprzedni dostaje status `Countered`;
     F11 C/D: autor oczekującej oferty (aktualnej albo nieaktualnej) może ją zmienić, zanim druga strona odpowie –
@@ -41,6 +47,10 @@
   zlecenie potwierdzone < 30 min po przyjęciu (`MinJobDuration`) albo kolejne z tym samym partnerem w ciągu 7 dni
   (`RepeatWindow`, obie role) – ocena zostaje, ale nie wchodzi do średniej. Używa jej `GetUserProfileHandler`
   (`RoleStatsDto`: `ratingCount` wszystkie, `raterCount` osoby w średniej, `partnerCount`, `mostJobsWithOnePartner`).
+- `Services/TextPreview` – skrót dłuższego tekstu (≤ 100 znaków, cięcie między słowami, „…”): podgląd ostatniej wiadomości
+  i teksty powiadomień (jedna reguła zamiast dwóch).
+- Wyjątki (`Core/Exceptions`): wszystkie dziedziczą po `CustomExceptions`; rodzaj błędu = klasa bazowa: `NotFoundException`
+  (404), `DomainRuleException` (409), `AlreadyExistsException` (409), pozostałe `Invalid*Exception` (400).
 - `LikedAnnouncement` (UserId, AnnouncementId) i `LikedUser` (LikerId, LikedId) – klucze złożone, istnienie wiersza = polubione.
 - `Conversation` (agregat, `Entities/Negotiations`): AnnouncementId, ClientId (= właściciel), HelperId, CreatedAt,
   `Client/HelperLastReadAt`, **Messages** (`ConversationMessage`: SenderId, Text (Description ≤ 500), SentAt, AnnouncementRevision).
@@ -57,12 +67,29 @@
 - `AnnouncementAlert` (agregat, `Entities/Alerts`): Area (1 punkt) | Route (2–1000), kategoria + podkategorie, RadiusKm 0,5–50,
   dni/godziny, IsEnabled, max 10/użytkownik. Geometria tylko w bazie (`Shape` z EF, `Zone` z triggera SQL) – sekcja „Alerty”.
 
+## Application (handlery komend)
+- Handler = klasa `internal sealed` z konstruktorem głównym; ciało: `unitOfWork.ExecuteAsync(...)` – wczytaj agregat, wywołaj
+  metodę domeny, zapisz. Obiekty domeny z danych wejściowych budujemy przed transakcją – błędne dane nie dotykają bazy.
+- Wspólne kroki (`Commands/Handlers`): `RepositoryExtensions` – `GetOrThrowAsync` (brak → 404), `GetActiveOrThrowAsync`
+  (użytkownik istnieje i nie jest zablokowany), `GetOwnedOrThrowAsync` (alert / urządzenie / powiadomienie – cudze = 404),
+  `GetOrStartAsync` (wątek pomocnika), `EnsureCategoryAsync` (kategoria + podkategorie – ogłoszenie i alert);
+  `CommandMapping` – DTO i tekst z komendy → obiekty domeny (`ToPrice`, `ToLocation`, `ToOptionalDescription`, `ToTerms`).
+- Komendy o tych samych polach mają rekord bazowy: `OfferTermsCommand` (`MakeOffer`, `CounterOffer`, `ReviseOffer`),
+  `JobExitCommand` (`AbandonJob`, `InterruptJob`) – w JSON-ie i Swaggerze bez różnicy (pola dziedziczone są spłaszczane).
+
 ## Infrastructure (jak jest zbudowane)
 - `ICanHelpDbContext.ConfigureConventions` – globalne konwertery VO (`DAL/Converters`) i enumy jako string.
 - `Price`, `Location` → `ComplexProperty`; `ContactData` → `OwnsOne` (indeks na Email).
 - Relacje między agregatami tylko przez FK (`HasOne<User>().WithMany()`), bez nawigacji. Cascade tylko wewnątrz agregatu.
 - Repozytoria per agregat (`DAL/Repositories`) – ładują cały agregat (`Include` Offers/Images).
-- Strona odczytu: handlery zapytań w `DAL/Handlers` czytają z DbContext (`AsNoTracking`) i mapują do DTO (`Handlers/Extensions.cs`).
+- Strona odczytu: handlery zapytań w `DAL/Handlers` czytają z DbContext (`AsNoTracking`) i mapują do DTO: `AnnouncementMapping`
+  (ogłoszenie i części agregatu; wspólne pola listy i szczegółów – `AsSummary<TDto>`), `ConversationMapping` (wątek + oś czasu),
+  `DtoMapping` (kategorie, użytkownicy, oceny, polubienia, `Price`, `Location`), `AlertDtoMapping`, `DeviceMapping`.
+  Lista ogłoszeń (szukanie, podgląd alertu): `AnnouncementListRow` + `ToListRows([distanceFrom])` – encja + miniatura i liczba
+  pomocników z podzapytań (+ odległość), na końcu zapytania – po filtrach, sortowaniu i stronie. Stronicowanie:
+  `Paging.TakePage(page, pageSize)` (strona od 1, rozmiar 1–100, wartości spoza zakresu przycinane).
+- Klasy z zależnościami z DI (handlery, repozytoria, serwisy) mają konstruktory główne (`class X(IDep dep) : IFoo`) – bez pól
+  i przypisań; zwykły konstruktor zostaje tam, gdzie coś liczy (`Authenticator`, `FcmPushSender`, `LocalFileStorage`).
 - `DbInitializer` (IHostedService) – przy starcie: migracje + seed kategorii (nic nie robi, dopóki nie ma żadnej migracji).
 - Connection string: `ConnectionStrings:DefaultConnection` (w appsettings projektu Api).
 - Migracje w `ICanHelp.Infrastructure/DAL/Migrations`. `dotnet-ef` jako lokalne narzędzie (`.config/dotnet-tools.json`, 9.0.11).
@@ -77,15 +104,18 @@
   kolacja bez rozróżniania wielkości liter). Bez indeksu pełnotekstowego.
 
 ## Api (jak jest zbudowane)
-- Kontrolery `[ApiController]`, trasy `api/<zasób>`. Handler wstrzykiwany do akcji przez `[FromServices] IQueryHandler<TQuery, TResult>`
-  (bez mediatora). Zapytanie z filtrami bindowane `[FromQuery]` prosto do klasy z Application (`GetAnnouncements`, `GetUsers`).
-  `null` z handlera → `NotFound()`. Komendy: `[FromBody]` + `[FromServices] ICommandHandler<T>`. Dostęp do GET-ów – sekcja „Uwierzytelnianie”.
+- Kontrolery dziedziczą po `Controllers/ApiController` (`[ApiController]`), trasy `api/<zasób>`. Handler wstrzykiwany do akcji przez
+  `[FromServices] IQueryHandler<TQuery, TResult>` (bez mediatora). Zapytanie z filtrami bindowane `[FromQuery]` prosto do klasy
+  z Application (`GetAnnouncements`, `GetUsers`). Komendy: `[FromBody]` + `[FromServices] ICommandHandler<T>`. Dostęp do GET-ów –
+  sekcja „Uwierzytelnianie”. Z bazy: `CurrentUserId` (id z tokenu; tylko w akcjach z `[Authorize]`), `CurrentUserIdOrNull`
+  (token opcjonalny), `Send(komenda, handler, ct)` → 204, `OkOrNotFound(wynik)` → 200 albo 404, gdy handler zwrócił `null`.
 - Komendy ogłoszeń (wszystkie `[Authorize]`, `api/announcements`): `POST` (201 + `CreatedDto`), `POST {id}/offers` (201),
   `POST {id}/offers/{offerId}/counter|accept|reject|withdraw`, `POST {id}/start|complete|cancel` (204), `POST {id}/ratings` (201).
-  Akcje bez body idą przez prywatne `Execute(userId => komenda, ...)` w kontrolerze. Przykłady całego przepływu w `ICanHelp.Api.http`.
+  Akcje bez odpowiedzi to jedna linia: `=> Send(new Komenda(id, CurrentUserId), handler, ct)`. Przykłady całego przepływu w `ICanHelp.Api.http`.
 - Błędy zawsze jako ProblemDetails: `AddProblemDetails` + `UseExceptionHandler` + `UseStatusCodePages`.
-  `DomainExceptionHandler`: `OfferNotFound`/`AnnouncementNotFound`/`UserNotFound`/`ImageNotFound`/`ConversationNotFound` → 404, `DomainRuleException`, `AlreadyRated` → 409,
-  wyjątki auth (wyżej), inne `CustomExceptions` (np. `InvalidCategory`) → 400
+  `DomainExceptionHandler` patrzy na klasę bazową wyjątku: `NotFoundException` → 404, `DomainRuleException`,
+  `AlreadyExistsException` (`AlreadyRated`, `*AlreadyInUse`), `ConcurrencyConflict` → 409, wyjątki auth (niżej) → 401 / 403,
+  inne `CustomExceptions` (np. `InvalidCategory`) → 400 – nowy wyjątek tylko dziedziczy po właściwej klasie, handlera nie ruszamy
   (pole `errorCode` = nazwa wyjątku bez „Exception”), reszta → 500 bez szczegółów. Każda odpowiedź ma `traceId`.
 - Enumy w JSON jako string (`JsonStringEnumConverter`). Swagger (Swashbuckle) tylko w Development, z komentarzy `///`.
 - `GET /health` – health check (bez sprawdzania bazy). Porty: http 5080, https 7080. W Development `/` → `/swagger`
@@ -119,12 +149,15 @@
   współbieżności (dwa równoczesne użycia → 409). Ponowne użycie zrotowanego tokenu: do 1 min (`ReuseGracePeriod`, wyścig kart) – tylko 401,
   później = wyciek → unieważnienie wszystkich aktywnych sesji użytkownika (zapis przed rzuceniem wyjątku). Nieznany/wygasły/unieważniony
   → 401 `InvalidRefreshToken`; zablokowany użytkownik → 403. `POST api/users/sign-out` (`EndSession`, anonimowo, zawsze 204) unieważnia
-  podany token. Wspólne wystawianie: `Application/Security/TokenIssuer.IssueAsync`.
+  podany token. Wspólne wystawianie: `Application/Security/SessionTokenIssuer.IssueAsync` (klasa z DI – handlery logowania
+  i odświeżania nie przekazują już same generatora tokenów i wystawcy JWT).
 - Prywatność: `GET api/users/{id}` zwraca `UserPublicDto` (bez kontaktu, roli, blokady; query `GetUserPublicById`).
   Pełny `UserDto` tylko w `/me` i w `GET api/users` (`[Authorize(Roles = "Admin")]`). `liked-*` – tylko właściciel lub admin
   (`IsSelfOrAdmin` w kontrolerze, inaczej 403). Oceny, ogłoszenia, kategorie – publiczne.
   Kontakt drugiej strony: `GET api/announcements/{id}/contact` (query `GetAnnouncementContact`) – tylko uczestnik, status
-  Accepted/InProgress/Completed, inaczej 404. Id aktora w komendach zawsze z tokenu (`User.TryGetUserId`, `Api/Security`), pola `[JsonIgnore]`.
+  Accepted/InProgress/Completed, inaczej 404. Id aktora w komendach zawsze z tokenu (`ApiController.CurrentUserId`), pola `[JsonIgnore]`.
+  Token bez poprawnego `sub` (Guid) odrzuca uwierzytelnianie (`JwtBearerEvents.OnTokenValidated` w `Infrastructure/Security`,
+  `ClaimsPrincipalExtensions.TryGetUserId`) → 401 w akcjach z `[Authorize]`, anonim w publicznych; kontrolery nie sprawdzają tego same.
   Oferty w `GET api/announcements/{id}` (token opcjonalny → `GetAnnouncementById.ViewerId`): właściciel – wszystkie, pomocnik – swoje,
   reszta (też anonim) – pusta lista + `HelperCount` (ilu pomocników złożyło ofertę). Reguła w `Announcement.GetOffersVisibleTo`.
 
@@ -206,7 +239,8 @@
   psuje tylko kanał push (ostrzeżenie w logu), powiadomienia i SignalR działają dalej. Klucz VAPID (Cloud Messaging) to coś innego –
   potrzebuje go tylko frontend (F7). Wiadomość: `notification` (title/body)
   + `data` (notificationId, type, announcementId?, conversationId?, url).
-- Teksty: `Application/Notifications/NotificationTextFormatter` – `Title`/`Body`/`Url` w `NotificationDto` (lista, SignalR, push).
+- Teksty: `Application/Notifications/NotificationTextFormatter` – `Title`/`Body`/`Url` w `NotificationDto` (lista, SignalR, push);
+  liczby po polsku (cena „120 zł”, odległość „2,5 km”) – `PolishFormat`.
 - Api: `DevicesController` – `GET/POST api/me/devices`, `DELETE api/me/devices/{id}` (cudze → 404 `DeviceNotFound`).
 
 ## Alerty (Krok 14)

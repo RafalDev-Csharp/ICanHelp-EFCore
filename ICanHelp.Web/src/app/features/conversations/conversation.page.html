@@ -8,56 +8,18 @@
   </ion-toolbar>
   @if (conversation(); as thread) {
   <ion-toolbar>
-    <div class="subject page-column">
-      <a
-        class="subject-thumb"
-        [routerLink]="['/announcements', thread.announcementId]"
-        tabindex="-1"
-        aria-hidden="true"
-      >
-        @if (thumbnailUrl(); as url) {
-        <img [src]="url" alt="" />
-        } @else {
-        <ion-icon name="image-outline"></ion-icon>
-        }
-      </a>
-      <div class="subject-text">
-        <h2>{{ thread.announcementTitle }}</h2>
-        <p>
-          <ion-badge [color]="statusColor(thread.announcementStatus)"
-            >{{ statusLabel(thread.announcementStatus) }}</ion-badge
-          >
-          · jesteś: {{ partyLabel(thread.myRole).toLowerCase() }}
-        </p>
-        @if (otherReliability(); as reliability) {
-        <p class="reliability">
-          <ion-icon name="warning-outline" color="warning" aria-hidden="true"></ion-icon>
-          {{ partyLabel(thread.myRole === 'Client' ? 'Helper' : 'Client') }}: {{ reliability }}
-        </p>
-        }
-        <a
-          class="profile-link"
-          [routerLink]="['/users', thread.myRole === 'Client' ? thread.helperId : thread.clientId]"
-          >Profil: {{ partyLabel(thread.myRole === 'Client' ? 'Helper' : 'Client').toLowerCase() }}</a
-        >
-      </div>
-      <ion-button
-        class="subject-link"
-        size="small"
-        fill="outline"
-        [routerLink]="['/announcements', thread.announcementId]"
-        >Zobacz ogłoszenie</ion-button
-      >
-    </div>
+    <app-conversation-subject
+      [thread]="thread"
+      [thumbnailUrl]="thumbnailUrl()"
+      [otherReliability]="otherReliability()"
+    ></app-conversation-subject>
   </ion-toolbar>
   }
 </ion-header>
 
 <ion-content class="page-column">
   @switch (state()) { @case ('loading') {
-  <div class="ion-text-center ion-padding" aria-busy="true">
-    <ion-spinner name="crescent"></ion-spinner>
-  </div>
+  <app-loading></app-loading>
   } @case ('not-found') {
   <app-empty-state
     icon="alert-circle-outline"
@@ -65,13 +27,7 @@
     message="Rozmowę widzą tylko jej dwaj uczestnicy."
   ></app-empty-state>
   } @case ('failed') {
-  <app-empty-state
-    icon="cloud-offline-outline"
-    heading="Nie udało się wczytać rozmowy"
-    message="Sprawdź połączenie z internetem i spróbuj ponownie."
-  >
-    <ion-button (click)="load()">Spróbuj ponownie</ion-button>
-  </app-empty-state>
+  <app-load-failed heading="Nie udało się wczytać rozmowy" (retry)="load()"></app-load-failed>
   } @case ('ready') {
   <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
     <ion-refresher-content></ion-refresher-content>
@@ -88,88 +44,15 @@
       <p class="bubble">{{ item.message.text }}</p>
       <span class="when">{{ item.at | timeAgo }}</span>
     </div>
-    } @else if (item.kind === 'offer') { @if (item.previous) {
-    <details class="offer previous" [id]="'offer-' + item.offer.id">
-      <summary>
-        Poprzednia wersja · {{ item.mine ? 'Ty' : partyLabel(item.offer.proposedBy) }} · {{ item.offer.price.amount |
-        price }}
-      </summary>
-      <p class="offer-term">{{ formatOfferTerm(item.offer.proposedStart, item.offer.proposedEnd) }}</p>
-      @if (item.offer.message) {
-      <p class="offer-message">{{ item.offer.message }}</p>
-      }
-      <span class="when">{{ item.at | timeAgo }}</span>
-    </details>
-    } @else {
-    <article
-      class="offer"
-      [id]="'offer-' + item.offer.id"
-      [class.mine]="item.mine"
-      [class.awaiting]="!!item.changes"
-      [class.highlight]="highlightedOfferId() === item.offer.id"
-    >
-      <header>
-        <ion-icon name="pricetag-outline" aria-hidden="true"></ion-icon>
-        <span class="offer-title"
-          >{{ item.kindLabel }} · {{ item.mine ? 'Ty' : partyLabel(item.offer.proposedBy) }}</span
-        >
-        <ion-badge [color]="item.stateColor">{{ item.stateLabel }}</ion-badge>
-      </header>
-      <p class="offer-price">{{ item.offer.price.amount | price }}</p>
-      <p class="offer-term">{{ formatOfferTerm(item.offer.proposedStart, item.offer.proposedEnd) }}</p>
-      @if (item.offer.message) {
-      <p class="offer-message">{{ item.offer.message }}</p>
-      } @if (item.changes === 'respond') {
-      <p class="offer-changes">
-        <ion-icon name="create-outline" aria-hidden="true"></ion-icon>
-        {{ conversation()?.myRole === 'Helper' ? 'Zleceniodawca zmienił ogłoszenie' : 'Zmieniłeś ogłoszenie' }} po tej
-        ofercie{{ item.changedSince ? ' (' + item.changedSince + ')' : '' }}. Zobacz zmiany i podtrzymaj ofertę, zmień
-        ją albo wycofaj.
-      </p>
-      } @else if (item.changes === 'wait') {
-      <p class="offer-changes">
-        <ion-icon name="hourglass-outline" aria-hidden="true"></ion-icon>
-        Czeka na odpowiedź {{ partyGenitive(item.offer.proposedBy) }} na zmiany w ogłoszeniu{{ item.changedSince ? ' ('
-        + item.changedSince + ')' : '' }}.
-      </p>
-      } @if (item.changes === 'respond') {
-      <div class="offer-actions">
-        <ion-button size="small" (click)="reviewChanges(item.offer)" [disabled]="busy()">
-          <ion-icon name="eye-outline" slot="start" aria-hidden="true"></ion-icon>
-          Zobacz zmiany
-        </ion-button>
-      </div>
-      } @else if (item.actions.accept || item.actions.reject || item.actions.counter || item.actions.withdraw ||
-      item.actions.revise) {
-      <div class="offer-actions">
-        @if (item.actions.withdraw) {
-        <ion-button size="small" fill="outline" color="medium" (click)="withdraw(item.offer)" [disabled]="busy()"
-          >Wycofaj</ion-button
-        >
-        } @if (item.actions.revise) {
-        <ion-button size="small" fill="outline" (click)="revise(item.offer)" [disabled]="busy()"
-          >Zmień ofertę</ion-button
-        >
-        } @if (item.actions.reject) {
-        <ion-button size="small" fill="outline" color="danger" (click)="reject(item.offer)" [disabled]="busy()"
-          >Odrzuć</ion-button
-        >
-        } @if (item.actions.counter) {
-        <ion-button
-          size="small"
-          [fill]="item.actions.accept ? 'outline' : 'solid'"
-          (click)="counter(item.offer)"
-          [disabled]="busy()"
-          >{{ item.actions.accept ? 'Kontroferta' : 'Zaproponuj kontrofertę' }}</ion-button
-        >
-        } @if (item.actions.accept) {
-        <ion-button size="small" color="success" (click)="accept(item.offer)" [disabled]="busy()">Przyjmij</ion-button>
-        }
-      </div>
-      }
-      <span class="when">{{ item.at | timeAgo }}</span>
-    </article>
-    } } @else if (item.kind === 'exit') {
+    } @else if (item.kind === 'offer') {
+    <app-offer-card
+      [view]="item"
+      [at]="item.at"
+      [busy]="busy()"
+      [highlighted]="highlightedOfferId() === item.offer.id"
+      (action)="offerAction($event, item.offer)"
+    ></app-offer-card>
+    } @else if (item.kind === 'exit') {
     <p class="change exit" [class.mine]="item.mine">
       <ion-icon
         [name]="item.exit.kind === 'Abandoned' ? 'exit-outline' : 'stop-circle-outline'"
@@ -212,25 +95,25 @@
 
 @if (conversation(); as thread) {
 <ion-footer>
-  @if (job(); as step) {
+  @if (jobView(); as step) {
   <ion-toolbar>
     <div class="job page-column">
-      @if (step.note) {
-      <p class="job-note" [class.highlight]="step.highlight">
-        <ion-icon [name]="step.highlight ? 'flag-outline' : 'hourglass-outline'" aria-hidden="true"></ion-icon>
-        {{ step.note }}
+      @if (step.note; as note) {
+      <p class="job-note" [class.highlight]="note.highlight">
+        <ion-icon [name]="note.icon" aria-hidden="true"></ion-icon>
+        {{ note.text }}
       </p>
       } @if (step.action; as action) {
       <ion-button
         expand="block"
         class="ion-padding-horizontal job-action"
-        [color]="action === 'complete' ? 'success' : 'primary'"
-        [fill]="step.primary ? 'solid' : 'outline'"
+        [color]="action.color"
+        [fill]="action.fill"
         (click)="runJobAction()"
         [disabled]="busy()"
       >
-        <ion-icon [name]="jobIcons[action]" slot="start" aria-hidden="true"></ion-icon>
-        {{ jobLabels[action] }}
+        <ion-icon [name]="action.icon" slot="start" aria-hidden="true"></ion-icon>
+        {{ action.label }}
       </ion-button>
       } @if (step.exit; as exit) {
       <ion-button
@@ -242,12 +125,8 @@
         (click)="exitJob()"
         [disabled]="busy()"
       >
-        <ion-icon
-          [name]="exit === 'abandon' ? 'exit-outline' : 'stop-circle-outline'"
-          slot="start"
-          aria-hidden="true"
-        ></ion-icon>
-        {{ exitLabels[exit] }}
+        <ion-icon [name]="exit.icon" slot="start" aria-hidden="true"></ion-icon>
+        {{ exit.label }}
       </ion-button>
       }
     </div>
@@ -297,7 +176,7 @@
       <ion-textarea
         [(ngModel)]="draft"
         aria-label="Wiadomość"
-        [placeholder]="questionsOnly() ? (thread.myRole === 'Helper' ? 'Zadaj pytanie…' : 'Odpowiedz…') : 'Napisz wiadomość…'"
+        [placeholder]="placeholder()"
         [autoGrow]="true"
         [rows]="1"
         [maxlength]="maxMessage"

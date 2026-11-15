@@ -10,9 +10,7 @@
 
 <ion-content class="ion-padding page-column">
   @switch (state()) { @case ('loading') {
-  <div class="ion-text-center ion-padding" aria-busy="true">
-    <ion-spinner name="crescent"></ion-spinner>
-  </div>
+  <app-loading></app-loading>
   } @case ('ready') { @if (original(); as item) { @if (item.helperCount > 0) {
   <p class="edit-warning">
     Masz już oferty od pomocników. Po zmianie treści oczekujące oferty staną się nieaktualne – pomocnicy zobaczą, co się
@@ -20,10 +18,10 @@
   </p>
   } }
   <app-announcement-form
-    [form]="form"
-    [(location)]="location"
-    [(photos)]="photos"
-    [submitted]="submitted()"
+    [form]="draft.form"
+    [(location)]="draft.location"
+    [(photos)]="draft.photos"
+    [submitted]="draft.submitted()"
   ></app-announcement-form>
   } @case ('locked') {
   <app-empty-state
@@ -50,21 +48,15 @@
     <ion-button routerLink="/announcements" fill="outline">Wróć do ogłoszeń</ion-button>
   </app-empty-state>
   } @case ('failed') {
-  <app-empty-state
-    icon="cloud-offline-outline"
-    heading="Nie udało się wczytać ogłoszenia"
-    message="Sprawdź połączenie z internetem i spróbuj ponownie."
-  >
-    <ion-button (click)="load()">Spróbuj ponownie</ion-button>
-  </app-empty-state>
+  <app-load-failed heading="Nie udało się wczytać ogłoszenia" (retry)="load()"></app-load-failed>
   } }
 </ion-content>
 
 @if (state() === 'ready') {
 <ion-footer>
   <ion-toolbar>
-    <ion-button class="page-column" expand="block" (click)="save()" [disabled]="saving()">
-      @if (saving()) {
+    <ion-button class="page-column" expand="block" (click)="save()" [disabled]="draft.saving()">
+      @if (draft.saving()) {
       <ion-spinner name="crescent" slot="start"></ion-spinner> Zapisuję… } @else { Zapisz zmiany }
     </ion-button>
   </ion-toolbar>

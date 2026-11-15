@@ -7,21 +7,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ICanHelp.Infrastructure.DAL.Handlers;
 
-internal sealed class GetMyDevicesHandler : IQueryHandler<GetMyDevices, IReadOnlyList<DeviceDto>>
+internal sealed class GetMyDevicesHandler(ICanHelpDbContext db) : IQueryHandler<GetMyDevices, IReadOnlyList<DeviceDto>>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetMyDevicesHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<IReadOnlyList<DeviceDto>> HandleAsync(GetMyDevices query,
         CancellationToken cancellationToken = default)
     {
         var userId = new UserId(query.UserId);
 
-        var devices = await _db.UserDevices
+        var devices = await db.UserDevices
             .AsNoTracking()
             .Where(d => d.UserId == userId)
             .OrderByDescending(d => d.LastSeenAt)
@@ -31,20 +24,13 @@ internal sealed class GetMyDevicesHandler : IQueryHandler<GetMyDevices, IReadOnl
     }
 }
 
-internal sealed class GetMyDeviceByTokenHandler : IQueryHandler<GetMyDeviceByToken, DeviceDto?>
+internal sealed class GetMyDeviceByTokenHandler(ICanHelpDbContext db) : IQueryHandler<GetMyDeviceByToken, DeviceDto?>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetMyDeviceByTokenHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<DeviceDto?> HandleAsync(GetMyDeviceByToken query, CancellationToken cancellationToken = default)
     {
         var userId = new UserId(query.UserId);
 
-        var device = await _db.UserDevices
+        var device = await db.UserDevices
             .AsNoTracking()
             .SingleOrDefaultAsync(d => d.Token == query.Token && d.UserId == userId, cancellationToken);
 

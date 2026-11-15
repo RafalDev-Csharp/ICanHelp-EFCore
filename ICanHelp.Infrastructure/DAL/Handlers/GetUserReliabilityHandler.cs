@@ -8,26 +8,20 @@ using Microsoft.EntityFrameworkCore;
 namespace ICanHelp.Infrastructure.DAL.Handlers;
 
 /// <summary>F11 E: wyjścia ze zleceń, które użytkownik zrobił sam (indeks JobExits.ActorId).</summary>
-internal sealed class GetUserReliabilityHandler : IQueryHandler<GetUserReliability, UserReliabilityDto?>
+internal sealed class GetUserReliabilityHandler(ICanHelpDbContext db)
+    : IQueryHandler<GetUserReliability, UserReliabilityDto?>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetUserReliabilityHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<UserReliabilityDto?> HandleAsync(GetUserReliability query,
         CancellationToken cancellationToken = default)
     {
         var userId = new UserId(query.UserId);
 
-        if (!await _db.Users.AnyAsync(u => u.Id == userId, cancellationToken))
+        if (!await db.Users.AnyAsync(u => u.Id == userId, cancellationToken))
         {
             return null;
         }
 
-        var counts = await _db.JobExits
+        var counts = await db.JobExits
             .AsNoTracking()
             .Where(e => e.ActorId == userId)
             .GroupBy(e => e.Kind)

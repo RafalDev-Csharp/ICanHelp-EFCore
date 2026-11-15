@@ -1,6 +1,7 @@
 using ICanHelp.Application.Commands;
 using ICanHelp.Application.Commands.Handlers;
 using ICanHelp.Application.Exceptions;
+using ICanHelp.Application.Security;
 using ICanHelp.Application.Tests.Fakes;
 using ICanHelp.Core.Enums;
 
@@ -19,8 +20,8 @@ public class SignInHandlerTests
     public SignInHandlerTests()
     {
         var passwordManager = new FakePasswordManager();
-        _handler = new SignInHandler(_users, passwordManager, _authenticator, _tokenStorage, _refreshTokens,
-            new FakeRefreshTokenService(), new FakeUnitOfWork(), _clock);
+        var tokenIssuer = new SessionTokenIssuer(_refreshTokens, new FakeRefreshTokenService(), _authenticator);
+        _handler = new SignInHandler(_users, passwordManager, tokenIssuer, _tokenStorage, new FakeUnitOfWork(), _clock);
 
         // Rejestrujemy użytkownika prawdziwym handlerem, żeby nie budować encji ręcznie.
         new SignUpHandler(_users, new FakeUnitOfWork(), passwordManager, new FixedClock())

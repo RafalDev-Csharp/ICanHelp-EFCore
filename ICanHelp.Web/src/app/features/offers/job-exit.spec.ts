@@ -1,9 +1,13 @@
+import type { JobExitDto } from '../../core/api/api-client';
+
 import {
   canRespondToExit,
   jobExitReasonLabel,
   jobExitReasonText,
   jobExitReasons,
+  jobExitResponseAuthor,
   jobExitTitle,
+  jobExitView,
   reliabilityLabel,
 } from './job-exit';
 
@@ -43,6 +47,39 @@ describe('job-exit', () => {
     const byOwner = { actorRole: 'Client', helperId: 'h1', response: undefined };
     expect(canRespondToExit(byOwner, 'h1', 'o1')).toBe(true);
     expect(canRespondToExit(byOwner, 'x', 'o1')).toBe(false);
+  });
+
+  it('builds the whole entry for the reader – the same in the thread and in the announcement', () => {
+    const exit: JobExitDto = {
+      number: 1,
+      kind: 'Interrupted',
+      offerId: 'o1',
+      helperId: 'h1',
+      actorId: 'h1',
+      actorRole: 'Helper',
+      reason: 'NoContact',
+      note: 'Nie odbiera.',
+      occurredAt: '2026-11-13T10:00:00Z',
+      response: undefined,
+      respondedAt: undefined,
+    };
+
+    expect(jobExitView(exit, 'o1', 'o1')).toEqual({
+      exit,
+      title: 'Pomocnik przerwał zlecenie',
+      reason: 'Brak kontaktu – Nie odbiera.',
+      mine: false,
+      canRespond: true,
+      responseAuthor: 'Stanowisko zleceniodawcy',
+    });
+    expect(jobExitView(exit, 'h1', 'o1')).toMatchObject({
+      title: 'Przerwałeś zlecenie',
+      mine: true,
+      canRespond: false,
+    });
+    // Widz bez roli (niezalogowany) niczego nie dopisze.
+    expect(jobExitView(exit, undefined, 'o1')).toMatchObject({ mine: false, canRespond: false });
+    expect(jobExitResponseAuthor({ actorRole: 'Client' })).toBe('Stanowisko pomocnika');
   });
 
   it('counts abandonments and interruptions with Polish plurals', () => {

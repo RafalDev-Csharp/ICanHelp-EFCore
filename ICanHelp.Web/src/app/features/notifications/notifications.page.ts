@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   IonBackButton,
@@ -15,7 +15,6 @@ import {
   IonNote,
   IonRefresher,
   IonRefresherContent,
-  IonSpinner,
   IonTitle,
   IonToolbar,
 } from '@ionic/angular';
@@ -29,7 +28,6 @@ import {
   checkmarkCircleOutline,
   checkmarkDoneOutline,
   closeCircleOutline,
-  cloudOfflineOutline,
   createOutline,
   exitOutline,
   flagOutline,
@@ -45,18 +43,18 @@ import {
 
 import type { NotificationDto } from '../../core/api/api-client';
 import { NotificationsClient } from '../../core/api/api-client';
+import { asRead, isRead } from '../../core/notifications/notification-model';
 import { describeNotification } from '../../core/notifications/notification-texts';
-import { NotificationsService, asRead, isRead } from '../../core/notifications/notifications.service';
+import { NotificationsService } from '../../core/notifications/notifications.service';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { LoadFailedComponent } from '../../shared/components/load-state/load-failed.component';
+import { LoadingComponent } from '../../shared/components/load-state/loading.component';
+import { PagedList } from '../../shared/data/remote-list';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
 
 /** Powiadomień na stronę (`GET api/me/notifications`). */
 export const NOTIFICATIONS_PAGE_SIZE = 20;
-
-interface CompletableTarget {
-  complete(): Promise<void>;
-}
 
 /**
  * „Powiadomienia” (tylko zalogowani; z dzwonka w nagłówku albo z „Konta” – bez własnej zakładki): od najnowszych, nieprzeczytane wyróżnione, kliknięcie → właściwy
@@ -82,10 +80,11 @@ interface CompletableTarget {
     IonIcon,
     IonLabel,
     IonNote,
-    IonSpinner,
     IonInfiniteScroll,
     IonInfiniteScrollContent,
     EmptyStateComponent,
+    LoadingComponent,
+    LoadFailedComponent,
     TimeAgoPipe,
   ],
 })
@@ -93,11 +92,13 @@ export class NotificationsPage implements ViewWillEnter {
   private readonly client = inject(NotificationsClient);
   protected readonly notifications = inject(NotificationsService);
 
-  readonly items = signal<NotificationDto[]>([]);
-  readonly state = signal<'loading' | 'ready' | 'failed'>('loading');
-  readonly complete = signal(false);
+  protected readonly list = new PagedList<NotificationDto>(
+    (page) => this.client.getMine(undefined, page, NOTIFICATIONS_PAGE_SIZE),
+    (item) => item.id,
+    NOTIFICATIONS_PAGE_SIZE,
+  );
+  readonly items = this.list.items;
   readonly hasUnread = computed(() => this.notifications.unreadCount() > 0 || this.items().some((n) => !isRead(n)));
-  private page = 1;
 
   protected readonly describe = describeNotification;
   protected readonly isRead = isRead;
@@ -111,7 +112,6 @@ export class NotificationsPage implements ViewWillEnter {
       checkmarkCircleOutline,
       checkmarkDoneOutline,
       closeCircleOutline,
-      cloudOfflineOutline,
       createOutline,
       exitOutline,
       flagOutline,
@@ -134,47 +134,13 @@ export class NotificationsPage implements ViewWillEnter {
   }
 
   ionViewWillEnter(): void {
-    this.reload();
+    this.list.reload();
     this.notifications.refreshCount();
-  }
-
-  reload(done?: () => void): void {
-    if (this.items().length === 0) {
-      this.state.set('loading');
-    }
-    this.client.getMine(undefined, 1, NOTIFICATIONS_PAGE_SIZE).subscribe({
-      next: (items) => {
-        this.page = 1;
-        this.items.set(items);
-        this.complete.set(items.length < NOTIFICATIONS_PAGE_SIZE);
-        this.state.set('ready');
-        done?.();
-      },
-      error: () => {
-        if (this.items().length === 0) {
-          this.state.set('failed');
-        }
-        done?.();
-      },
-    });
   }
 
   refresh(event: Event): void {
-    this.reload(() => void (event.target as unknown as CompletableTarget).complete());
+    this.list.refresh(event);
     this.notifications.refreshCount();
-  }
-
-  loadMore(event: Event): void {
-    const target = event.target as unknown as CompletableTarget;
-    this.client.getMine(undefined, this.page + 1, NOTIFICATIONS_PAGE_SIZE).subscribe({
-      next: (items) => {
-        this.page += 1;
-        this.items.update((current) => [...current, ...items.filter((item) => !current.some((c) => c.id === item.id))]);
-        this.complete.set(items.length < NOTIFICATIONS_PAGE_SIZE);
-        void target.complete();
-      },
-      error: () => void target.complete(),
-    });
   }
 
   async open(notification: NotificationDto): Promise<void> {

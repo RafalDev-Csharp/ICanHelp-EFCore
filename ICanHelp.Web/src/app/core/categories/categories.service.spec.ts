@@ -64,6 +64,8 @@ describe('CategoriesService', () => {
     expect(service.name('home')).toBe('Dom');
     expect(service.name('painting')).toBe('Malowanie');
     expect(service.name(undefined)).toBe('');
+    expect(service.path('home', 'painting')).toBe('Dom · Malowanie');
+    expect(service.path('home', 'unknown')).toBe('Dom');
     expect(service.subcategoriesOf('home').map((subcategory) => subcategory.name)).toEqual(['Hydraulika', 'Malowanie']);
     expect(service.subcategoriesOf(undefined)).toEqual([]);
   });

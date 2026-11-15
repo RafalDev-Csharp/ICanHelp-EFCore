@@ -2,6 +2,7 @@ using System.Globalization;
 using ICanHelp.Application.Alerts;
 using ICanHelp.Application.Events;
 using ICanHelp.Application.Time;
+using ICanHelp.Core.Entities;
 using ICanHelp.Core.Entities.Notifications;
 using ICanHelp.Core.Enums;
 using ICanHelp.Core.Events;
@@ -22,67 +23,33 @@ namespace ICanHelp.Application.Notifications;
 /// </list>
 /// Ogłoszenie usunięte albo już nie Open (np. anulowane, zanim outbox doszedł) → nic.
 /// </summary>
-internal sealed class NewAnnouncementAlertHandler : IDomainEventHandler<AnnouncementPublished>
+internal sealed class NewAnnouncementAlertHandler(IAnnouncementRepository announcements, ICategoryRepository categories,
+    IAnnouncementAlertRepository alerts, INotificationRepository notifications, IUnitOfWork unitOfWork,
+    INotificationSender sender, IClock clock, AlertOptions options) : IDomainEventHandler<AnnouncementPublished>
 {
-    private readonly IAnnouncementRepository _announcements;
-    private readonly ICategoryRepository _categories;
-    private readonly IAnnouncementAlertRepository _alerts;
-    private readonly INotificationRepository _notifications;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly INotificationSender _sender;
-    private readonly IClock _clock;
-    private readonly AlertOptions _options;
-
-    public NewAnnouncementAlertHandler(IAnnouncementRepository announcements, ICategoryRepository categories,
-        IAnnouncementAlertRepository alerts, INotificationRepository notifications, IUnitOfWork unitOfWork,
-        INotificationSender sender, IClock clock, AlertOptions options)
-    {
-        _announcements = announcements;
-        _categories = categories;
-        _alerts = alerts;
-        _notifications = notifications;
-        _unitOfWork = unitOfWork;
-        _sender = sender;
-        _clock = clock;
-        _options = options;
-    }
-
     public async Task HandleAsync(Guid eventId, AnnouncementPublished e, CancellationToken cancellationToken = default)
     {
-        var announcement = await _announcements.GetByIdAsync(new Id(e.AnnouncementId), cancellationToken);
+        var announcement = await announcements.GetByIdAsync(new Id(e.AnnouncementId), cancellationToken);
         if (announcement is null || announcement.Status != AnnouncementStatus.Open)
         {
             return;
         }
 
-        var ownerId = new UserId(e.OwnerId);
-        var categoryId = new Id(e.CategoryId);
-        var subcategoryId = new Id(e.SubcategoryId);
-        var timeZone = _options.GetTimeZone();
+        var timeZone = options.GetTimeZone();
         var publishedLocal = TimeZoneInfo.ConvertTimeFromUtc(e.OccurredAt.AsUtc(), timeZone);
 
-        var candidates = await _alerts.FindCandidatesAsync(categoryId, ownerId,
-            new Location(e.Latitude, e.Longitude), cancellationToken);
-
-        var matches = candidates
-            .Where(c => !c.Alert.IsOwnedBy(ownerId)
-                        && c.Alert.Matches(categoryId, subcategoryId)
-                        && c.Alert.IsActiveAt(publishedLocal))
-            .GroupBy(c => c.Alert.UserId)
-            .Select(g => g.OrderBy(c => c.DistanceMeters).First())
-            .ToList();
-
+        var matches = await FindMatchesAsync(e, publishedLocal, cancellationToken);
         if (matches.Count == 0)
         {
             return;
         }
 
-        var categoryName = (await _categories.GetByIdAsync(categoryId, cancellationToken))?.CategoryName.Value
+        var categoryName = (await categories.GetByIdAsync(new Id(e.CategoryId), cancellationToken))?.CategoryName.Value
                            ?? string.Empty;
         var dayStartUtc = StartOfLocalDayUtc(publishedLocal, timeZone);
         var toDeliver = new List<Notification>();
 
-        await _unitOfWork.ExecuteAsync(async () =>
+        await unitOfWork.ExecuteAsync(async () =>
         {
             toDeliver.Clear();
 
@@ -91,62 +58,94 @@ internal sealed class NewAnnouncementAlertHandler : IDomainEventHandler<Announce
                 var userId = match.Alert.UserId;
 
                 // Idempotencja: to samo zdarzenie drugi raz (ponowienie z outboksa) nic nie dodaje.
-                if (await _notifications.ExistsAsync(userId, eventId, cancellationToken))
+                if (await notifications.ExistsAsync(userId, eventId, cancellationToken))
                 {
                     continue;
                 }
 
-                var sentToday = await _notifications.CountSinceAsync(userId, NotificationType.NewAnnouncementNearby,
+                var sentToday = await notifications.CountSinceAsync(userId, NotificationType.NewAnnouncementNearby,
                     dayStartUtc, cancellationToken);
 
-                if (sentToday < _options.DailyLimit)
-                {
-                    var notification = new Notification(Id.New(), userId, NotificationType.NewAnnouncementNearby,
-                        NotificationPayload.Serialize(new Dictionary<string, string>
-                        {
-                            [NotificationPayload.AnnouncementTitle] = announcement.Title.Value,
-                            [NotificationPayload.CategoryName] = categoryName,
-                            [NotificationPayload.AlertName] = match.Alert.Name.Value,
-                            [NotificationPayload.AlertKind] = match.Alert.Kind.ToString(),
-                            [NotificationPayload.DistanceKm] = FormatKm(match.DistanceMeters)
-                        }),
-                        announcement.Id, conversationId: null, eventId, e.OccurredAt);
-
-                    await _notifications.AddAsync(notification, cancellationToken);
-                    toDeliver.Add(notification);
-                    continue;
-                }
-
-                var digest = await _notifications.GetLatestSinceAsync(userId, NotificationType.NewAnnouncementsDigest,
-                    dayStartUtc, cancellationToken);
-
-                if (digest is null)
-                {
-                    digest = new Notification(Id.New(), userId, NotificationType.NewAnnouncementsDigest,
-                        DigestPayload(1), announcementId: null, conversationId: null, eventId, e.OccurredAt);
-                    await _notifications.AddAsync(digest, cancellationToken);
-                }
-                else
-                {
-                    // Ponowienie tego samego zdarzenia mogłoby tu podbić licznik drugi raz (źródłem skrótu jest
-                    // pierwsze zdarzenie) – rzadkie i niegroźne, to tylko „i jeszcze N”.
-                    digest.Renew(DigestPayload(DigestCount(digest) + 1), e.OccurredAt);
-                }
-
-                toDeliver.Add(digest);
+                toDeliver.Add(sentToday < options.DailyLimit
+                    ? await AddNearbyAsync(match, announcement, categoryName, eventId, e.OccurredAt, cancellationToken)
+                    : await AddToDigestAsync(userId, dayStartUtc, eventId, e.OccurredAt, cancellationToken));
             }
         }, cancellationToken);
 
         // Cisza nocna: zostaje wpis na liście, bez dostarczenia na żywo.
-        if (_options.IsQuietAt(TimeZoneInfo.ConvertTimeFromUtc(_clock.UtcNow.AsUtc(), timeZone)))
+        if (options.IsQuietAt(TimeZoneInfo.ConvertTimeFromUtc(clock.UtcNow.AsUtc(), timeZone)))
         {
             return;
         }
 
         foreach (var notification in toDeliver)
         {
-            await _sender.SendAsync(notification.UserId, notification.ToDto(), cancellationToken);
+            await sender.SendAsync(notification.UserId, notification.ToDto(), cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Alerty, do których ogłoszenie pasuje (strefa – baza; kategoria, podkategorie i harmonogram – domena),
+    /// po jednym na użytkownika: ten, od którego kształtu jest najbliżej.
+    /// </summary>
+    private async Task<List<AlertCandidate>> FindMatchesAsync(AnnouncementPublished e, DateTime publishedLocal,
+        CancellationToken cancellationToken)
+    {
+        var ownerId = new UserId(e.OwnerId);
+        var categoryId = new Id(e.CategoryId);
+        var subcategoryId = new Id(e.SubcategoryId);
+
+        var candidates = await alerts.FindCandidatesAsync(categoryId, ownerId, new Location(e.Latitude, e.Longitude),
+            cancellationToken);
+
+        return candidates
+            .Where(c => !c.Alert.IsOwnedBy(ownerId)
+                        && c.Alert.Matches(categoryId, subcategoryId)
+                        && c.Alert.IsActiveAt(publishedLocal))
+            .GroupBy(c => c.Alert.UserId)
+            .Select(g => g.OrderBy(c => c.DistanceMeters).First())
+            .ToList();
+    }
+
+    private async Task<Notification> AddNearbyAsync(AlertCandidate match, Announcement announcement,
+        string categoryName, Guid eventId, DateTime occurredAtUtc, CancellationToken cancellationToken)
+    {
+        var notification = new Notification(Id.New(), match.Alert.UserId, NotificationType.NewAnnouncementNearby,
+            NotificationPayload.Serialize(new Dictionary<string, string>
+            {
+                [NotificationPayload.AnnouncementTitle] = announcement.Title.Value,
+                [NotificationPayload.CategoryName] = categoryName,
+                [NotificationPayload.AlertName] = match.Alert.Name.Value,
+                [NotificationPayload.AlertKind] = match.Alert.Kind.ToString(),
+                [NotificationPayload.DistanceKm] = FormatKm(match.DistanceMeters)
+            }),
+            announcement.Id, conversationId: null, eventId, occurredAtUtc);
+
+        await notifications.AddAsync(notification, cancellationToken);
+        return notification;
+    }
+
+    /// <summary>Ponad limit: jeden skrót dnia na użytkownika – nowy albo dzisiejszy z licznikiem o 1 większym.</summary>
+    private async Task<Notification> AddToDigestAsync(UserId userId, DateTime dayStartUtc, Guid eventId,
+        DateTime occurredAtUtc, CancellationToken cancellationToken)
+    {
+        var digest = await notifications.GetLatestSinceAsync(userId, NotificationType.NewAnnouncementsDigest,
+            dayStartUtc, cancellationToken);
+
+        if (digest is null)
+        {
+            digest = new Notification(Id.New(), userId, NotificationType.NewAnnouncementsDigest, DigestPayload(1),
+                announcementId: null, conversationId: null, eventId, occurredAtUtc);
+            await notifications.AddAsync(digest, cancellationToken);
+        }
+        else
+        {
+            // Ponowienie tego samego zdarzenia mogłoby tu podbić licznik drugi raz (źródłem skrótu jest
+            // pierwsze zdarzenie) – rzadkie i niegroźne, to tylko „i jeszcze N”.
+            digest.Renew(DigestPayload(DigestCount(digest) + 1), occurredAtUtc);
+        }
+
+        return digest;
     }
 
     private static string FormatKm(double meters)

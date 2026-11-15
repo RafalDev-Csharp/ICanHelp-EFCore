@@ -13,20 +13,13 @@ namespace ICanHelp.Infrastructure.DAL.Handlers;
 /// Kilka małych zapytań (oceny, zakończone, wyjścia) – przy tej skali prościej niż jedno złożone.
 /// F11 H: średnia i liczniki z <see cref="ReputationPolicy"/> (jeden głos na osobę = średnia jej ocen, bez podejrzanych zleceń).
 /// </summary>
-internal sealed class GetUserProfileHandler : IQueryHandler<GetUserProfile, UserProfileDto?>
+internal sealed class GetUserProfileHandler(ICanHelpDbContext db) : IQueryHandler<GetUserProfile, UserProfileDto?>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetUserProfileHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<UserProfileDto?> HandleAsync(GetUserProfile query, CancellationToken cancellationToken = default)
     {
         var userId = new UserId(query.UserId);
 
-        var user = await _db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId, cancellationToken);
+        var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId, cancellationToken);
         if (user is null)
         {
             return null;
@@ -34,18 +27,18 @@ internal sealed class GetUserProfileHandler : IQueryHandler<GetUserProfile, User
 
         // Oceny otrzymane (ratee = user) z właścicielem ogłoszenia – rola.
         var ratings = await (
-                from r in _db.Ratings.AsNoTracking()
+                from r in db.Ratings.AsNoTracking()
                 where r.RateeId == userId
-                join a in _db.Announcements.AsNoTracking() on r.AnnouncementId equals a.Id
+                join a in db.Announcements.AsNoTracking() on r.AnnouncementId equals a.Id
                 select new { r.AnnouncementId, r.RaterId, r.Rate, a.OwnerId })
             .ToListAsync(cancellationToken);
 
         // Zakończone zlecenia w obu rolach: jako zleceniodawca – moje ogłoszenia; jako pomocnik – przyjęta oferta moja.
         var completed = await (
-                from a in _db.Announcements.AsNoTracking()
+                from a in db.Announcements.AsNoTracking()
                 where a.Status == AnnouncementStatus.Completed
                 // Przyjęta oferta jest najwyżej jedna (jak w GetMyPendingRatingsHandler).
-                join o in _db.Offers.AsNoTracking().Where(o => o.Status == OfferStatus.Accepted)
+                join o in db.Offers.AsNoTracking().Where(o => o.Status == OfferStatus.Accepted)
                     on a.Id equals o.AnnouncementId
                 where a.OwnerId == userId || o.HelperId == userId
                 select new { a.Id, a.OwnerId, o.HelperId, a.AcceptedAt, a.CompletedAt })
@@ -63,8 +56,8 @@ internal sealed class GetUserProfileHandler : IQueryHandler<GetUserProfile, User
 
         // Wyjścia ze zleceń, w których użytkownik był stroną (pomocnik z wpisu albo właściciel ogłoszenia).
         var exits = await (
-                from e in _db.JobExits.AsNoTracking()
-                join a in _db.Announcements.AsNoTracking() on e.AnnouncementId equals a.Id
+                from e in db.JobExits.AsNoTracking()
+                join a in db.Announcements.AsNoTracking() on e.AnnouncementId equals a.Id
                 where e.HelperId == userId || a.OwnerId == userId
                 select new { Exit = e, a.OwnerId, a.Title })
             .ToListAsync(cancellationToken);

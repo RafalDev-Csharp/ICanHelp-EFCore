@@ -1,4 +1,3 @@
-using ICanHelp.Api.Security;
 using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.Commands;
 using ICanHelp.Application.DTO;
@@ -13,9 +12,8 @@ namespace ICanHelp.Api.Controllers;
 /// Ogłoszenia: odczyt (publiczny) oraz cały przepływ – dodanie, negocjacja ofert, realizacja, oceny (wymaga tokenu).
 /// Kto wykonuje akcję, zawsze wynika z tokenu (claim <c>sub</c>), nie z body.
 /// </summary>
-[ApiController]
 [Route("api/announcements")]
-public sealed class AnnouncementsController : ControllerBase
+public sealed class AnnouncementsController : ApiController
 {
     // Zapas na nagłówki multipart ponad sam plik (limit pliku sprawdza handler: ImageFiles.MaxBytes).
     private const int MaxImageRequestBytes = ImageFiles.MaxBytes + 1024 * 1024;
@@ -48,14 +46,10 @@ public sealed class AnnouncementsController : ControllerBase
         Guid announcementId,
         [FromServices] IQueryHandler<GetAnnouncementById, AnnouncementDetailsDto?> handler,
         CancellationToken cancellationToken)
-    {
         // Token jest opcjonalny: zalogowany właściciel/pomocnik widzi oferty, reszta – tylko ich liczbę.
-        Guid? viewerId = User.TryGetUserId(out var userId) ? userId : null;
-        var announcement = await handler.HandleAsync(
-            new GetAnnouncementById { AnnouncementId = announcementId, ViewerId = viewerId }, cancellationToken);
-
-        return announcement is null ? NotFound() : Ok(announcement);
-    }
+        => OkOrNotFound(await handler.HandleAsync(
+            new GetAnnouncementById { AnnouncementId = announcementId, ViewerId = CurrentUserIdOrNull },
+            cancellationToken));
 
     /// <summary>Oceny wystawione po zakończeniu ogłoszenia (najwyżej po jednej od każdej strony).</summary>
     [HttpGet("{announcementId:guid}/ratings")]
@@ -80,17 +74,8 @@ public sealed class AnnouncementsController : ControllerBase
         Guid announcementId,
         [FromServices] IQueryHandler<GetAnnouncementContact, AnnouncementContactDto?> handler,
         CancellationToken cancellationToken)
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        var contact = await handler.HandleAsync(
-            new GetAnnouncementContact { AnnouncementId = announcementId, UserId = userId }, cancellationToken);
-
-        return contact is null ? NotFound() : Ok(contact);
-    }
+        => OkOrNotFound(await handler.HandleAsync(
+            new GetAnnouncementContact { AnnouncementId = announcementId, UserId = CurrentUserId }, cancellationToken));
 
     /// <summary>
     /// Plik zdjęcia (publiczny, jak ogłoszenie). Adres jest w <c>images[].url</c> i <c>thumbnailUrl</c>.
@@ -132,13 +117,9 @@ public sealed class AnnouncementsController : ControllerBase
         [FromServices] ICommandHandler<CreateAnnouncement> handler,
         CancellationToken cancellationToken)
     {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
         var announcementId = Guid.NewGuid();
-        await handler.HandleAsync(command with { AnnouncementId = announcementId, OwnerId = userId }, cancellationToken);
+        await handler.HandleAsync(command with { AnnouncementId = announcementId, OwnerId = CurrentUserId },
+            cancellationToken);
 
         return CreatedAtAction(nameof(GetById), new { announcementId }, new CreatedDto(announcementId));
     }
@@ -156,20 +137,12 @@ public sealed class AnnouncementsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Update(
+    public Task<IActionResult> Update(
         Guid announcementId,
         [FromBody] UpdateAnnouncement command,
         [FromServices] ICommandHandler<UpdateAnnouncement> handler,
         CancellationToken cancellationToken)
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        await handler.HandleAsync(command with { AnnouncementId = announcementId, ActorId = userId }, cancellationToken);
-        return NoContent();
-    }
+        => Send(command with { AnnouncementId = announcementId, ActorId = CurrentUserId }, handler, cancellationToken);
 
     /// <summary>
     /// Dodaje zdjęcie (multipart/form-data, pole <c>file</c>): JPEG, PNG albo WebP, max 5 MB, max 5 zdjęć.
@@ -192,18 +165,13 @@ public sealed class AnnouncementsController : ControllerBase
         [FromServices] ICommandHandler<AddAnnouncementImage> handler,
         CancellationToken cancellationToken)
     {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
         var imageId = Guid.NewGuid();
         await using var content = file.OpenReadStream();
         await handler.HandleAsync(new AddAnnouncementImage
         {
             AnnouncementId = announcementId,
             ImageId = imageId,
-            ActorId = userId,
+            ActorId = CurrentUserId,
             FileName = file.FileName,
             Content = content
         }, cancellationToken);
@@ -219,7 +187,7 @@ public sealed class AnnouncementsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<IActionResult> DeleteImage(Guid announcementId, Guid imageId,
         [FromServices] ICommandHandler<RemoveAnnouncementImage> handler, CancellationToken cancellationToken)
-        => Execute(userId => new RemoveAnnouncementImage(announcementId, imageId, userId), handler, cancellationToken);
+        => Send(new RemoveAnnouncementImage(announcementId, imageId, CurrentUserId), handler, cancellationToken);
 
     /// <summary>Anuluje ogłoszenie (tylko właściciel, w statusie Open albo Accepted).</summary>
     [HttpPost("{announcementId:guid}/cancel")]
@@ -229,7 +197,7 @@ public sealed class AnnouncementsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<IActionResult> Cancel(Guid announcementId,
         [FromServices] ICommandHandler<CancelAnnouncement> handler, CancellationToken cancellationToken)
-        => Execute(userId => new CancelAnnouncement(announcementId, userId), handler, cancellationToken);
+        => Send(new CancelAnnouncement(announcementId, CurrentUserId), handler, cancellationToken);
 
     /// <summary>Rozpoczęcie pracy (tylko pomocnik z zaakceptowanej oferty). Zleceniodawca dostaje powiadomienie JobStarted.</summary>
     [HttpPost("{announcementId:guid}/start")]
@@ -239,7 +207,7 @@ public sealed class AnnouncementsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<IActionResult> Start(Guid announcementId,
         [FromServices] ICommandHandler<StartAnnouncement> handler, CancellationToken cancellationToken)
-        => Execute(userId => new StartAnnouncement(announcementId, userId), handler, cancellationToken);
+        => Send(new StartAnnouncement(announcementId, CurrentUserId), handler, cancellationToken);
 
     /// <summary>
     /// Pomocnik zgłasza wykonanie (status InProgress, raz – drugi raz 409). Status się nie zmienia, ustawia się
@@ -252,7 +220,7 @@ public sealed class AnnouncementsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<IActionResult> ReportDone(Guid announcementId,
         [FromServices] ICommandHandler<ReportAnnouncementDone> handler, CancellationToken cancellationToken)
-        => Execute(userId => new ReportAnnouncementDone(announcementId, userId), handler, cancellationToken);
+        => Send(new ReportAnnouncementDone(announcementId, CurrentUserId), handler, cancellationToken);
 
     /// <summary>
     /// Potwierdzenie wykonania (tylko właściciel, z InProgress albo Accepted – gdy pomocnik nie kliknął „Rozpocznij”).
@@ -265,7 +233,7 @@ public sealed class AnnouncementsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<IActionResult> Complete(Guid announcementId,
         [FromServices] ICommandHandler<CompleteAnnouncement> handler, CancellationToken cancellationToken)
-        => Execute(userId => new CompleteAnnouncement(announcementId, userId), handler, cancellationToken);
+        => Send(new CompleteAnnouncement(announcementId, CurrentUserId), handler, cancellationToken);
 
     /// <summary>
     /// F11 E: „Zrezygnuj” przed rozpoczęciem (status Accepted, właściciel albo przyjęty pomocnik). Powód obowiązkowy
@@ -281,8 +249,7 @@ public sealed class AnnouncementsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<IActionResult> Abandon(Guid announcementId, [FromBody] AbandonJob command,
         [FromServices] ICommandHandler<AbandonJob> handler, CancellationToken cancellationToken)
-        => Execute(userId => command with { AnnouncementId = announcementId, ActorId = userId }, handler,
-            cancellationToken);
+        => Send(command with { AnnouncementId = announcementId, ActorId = CurrentUserId }, handler, cancellationToken);
 
     /// <summary>
     /// F11 E: „Przerwij zlecenie” w trakcie (status InProgress, każda strona). Powód obowiązkowy. Status końcowy
@@ -296,8 +263,7 @@ public sealed class AnnouncementsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<IActionResult> Interrupt(Guid announcementId, [FromBody] InterruptJob command,
         [FromServices] ICommandHandler<InterruptJob> handler, CancellationToken cancellationToken)
-        => Execute(userId => command with { AnnouncementId = announcementId, ActorId = userId }, handler,
-            cancellationToken);
+        => Send(command with { AnnouncementId = announcementId, ActorId = CurrentUserId }, handler, cancellationToken);
 
     /// <summary>
     /// F11 G: stanowisko drugiej strony do rezygnacji / przerwania numer <paramref name="number"/> (<c>jobExits[].number</c>)
@@ -312,7 +278,7 @@ public sealed class AnnouncementsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<IActionResult> RespondToJobExit(Guid announcementId, int number, [FromBody] RespondToJobExit command,
         [FromServices] ICommandHandler<RespondToJobExit> handler, CancellationToken cancellationToken)
-        => Execute(userId => command with { AnnouncementId = announcementId, Number = number, ActorId = userId },
+        => Send(command with { AnnouncementId = announcementId, Number = number, ActorId = CurrentUserId },
             handler, cancellationToken);
 
     /// <summary>Ocena drugiej strony po zakończeniu (raz na ogłoszenie; ocenianego wybiera domena; nie po przerwaniu).</summary>
@@ -327,14 +293,10 @@ public sealed class AnnouncementsController : ControllerBase
         [FromServices] ICommandHandler<RateAnnouncement> handler,
         CancellationToken cancellationToken)
     {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
         var ratingId = Guid.NewGuid();
         await handler.HandleAsync(
-            command with { AnnouncementId = announcementId, RatingId = ratingId, RaterId = userId }, cancellationToken);
+            command with { AnnouncementId = announcementId, RatingId = ratingId, RaterId = CurrentUserId },
+            cancellationToken);
 
         return CreatedAtAction(nameof(GetRatings), new { announcementId }, new CreatedDto(ratingId));
     }
@@ -352,7 +314,7 @@ public sealed class AnnouncementsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public Task<IActionResult> Like(Guid announcementId,
         [FromServices] ICommandHandler<LikeAnnouncement> handler, CancellationToken cancellationToken)
-        => Execute(userId => new LikeAnnouncement(announcementId, userId), handler, cancellationToken);
+        => Send(new LikeAnnouncement(announcementId, CurrentUserId), handler, cancellationToken);
 
     /// <summary>Cofnięcie polubienia. Idempotentne – gdy polubienia nie było, też 204.</summary>
     [HttpDelete("{announcementId:guid}/like")]
@@ -361,7 +323,7 @@ public sealed class AnnouncementsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public Task<IActionResult> Unlike(Guid announcementId,
         [FromServices] ICommandHandler<UnlikeAnnouncement> handler, CancellationToken cancellationToken)
-        => Execute(userId => new UnlikeAnnouncement(announcementId, userId), handler, cancellationToken);
+        => Send(new UnlikeAnnouncement(announcementId, CurrentUserId), handler, cancellationToken);
 
     // ---------- rozmowa ----------
 
@@ -382,17 +344,13 @@ public sealed class AnnouncementsController : ControllerBase
         [FromServices] IQueryHandler<GetConversationId, Guid?> conversationIdHandler,
         CancellationToken cancellationToken)
     {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
         // Komenda nic nie zwraca: jeśli wątek już był, nie tworzy nowego – jego id czytamy po niej.
         var newConversationId = Guid.NewGuid();
-        await handler.HandleAsync(new StartConversation(announcementId, newConversationId, userId), cancellationToken);
+        await handler.HandleAsync(new StartConversation(announcementId, newConversationId, CurrentUserId),
+            cancellationToken);
 
         var conversationId = await conversationIdHandler.HandleAsync(
-            new GetConversationId { AnnouncementId = announcementId, HelperId = userId }, cancellationToken)
+            new GetConversationId { AnnouncementId = announcementId, HelperId = CurrentUserId }, cancellationToken)
             ?? newConversationId;
 
         var body = new CreatedDto(conversationId);
@@ -418,14 +376,10 @@ public sealed class AnnouncementsController : ControllerBase
         [FromServices] ICommandHandler<MakeOffer> handler,
         CancellationToken cancellationToken)
     {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
         var offerId = Guid.NewGuid();
         await handler.HandleAsync(
-            command with { AnnouncementId = announcementId, OfferId = offerId, HelperId = userId }, cancellationToken);
+            command with { AnnouncementId = announcementId, OfferId = offerId, HelperId = CurrentUserId },
+            cancellationToken);
 
         return CreatedAtAction(nameof(GetById), new { announcementId }, new CreatedDto(offerId));
     }
@@ -443,18 +397,13 @@ public sealed class AnnouncementsController : ControllerBase
         [FromServices] ICommandHandler<CounterOffer> handler,
         CancellationToken cancellationToken)
     {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
         var newOfferId = Guid.NewGuid();
         await handler.HandleAsync(command with
         {
             AnnouncementId = announcementId,
             OfferId = offerId,
             NewOfferId = newOfferId,
-            ActorId = userId
+            ActorId = CurrentUserId
         }, cancellationToken);
 
         return CreatedAtAction(nameof(GetById), new { announcementId }, new CreatedDto(newOfferId));
@@ -476,18 +425,13 @@ public sealed class AnnouncementsController : ControllerBase
         [FromServices] ICommandHandler<ReviseOffer> handler,
         CancellationToken cancellationToken)
     {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
         var newOfferId = Guid.NewGuid();
         await handler.HandleAsync(command with
         {
             AnnouncementId = announcementId,
             OfferId = offerId,
             NewOfferId = newOfferId,
-            ActorId = userId
+            ActorId = CurrentUserId
         }, cancellationToken);
 
         return CreatedAtAction(nameof(GetById), new { announcementId }, new CreatedDto(newOfferId));
@@ -501,7 +445,7 @@ public sealed class AnnouncementsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<IActionResult> Accept(Guid announcementId, Guid offerId,
         [FromServices] ICommandHandler<AcceptOffer> handler, CancellationToken cancellationToken)
-        => Execute(userId => new AcceptOffer(announcementId, offerId, userId), handler, cancellationToken);
+        => Send(new AcceptOffer(announcementId, offerId, CurrentUserId), handler, cancellationToken);
 
     /// <summary>Odrzucenie oferty (druga strona niż autor).</summary>
     [HttpPost("{announcementId:guid}/offers/{offerId:guid}/reject")]
@@ -511,7 +455,7 @@ public sealed class AnnouncementsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<IActionResult> Reject(Guid announcementId, Guid offerId,
         [FromServices] ICommandHandler<RejectOffer> handler, CancellationToken cancellationToken)
-        => Execute(userId => new RejectOffer(announcementId, offerId, userId), handler, cancellationToken);
+        => Send(new RejectOffer(announcementId, offerId, CurrentUserId), handler, cancellationToken);
 
     /// <summary>Wycofanie własnej oferty.</summary>
     [HttpPost("{announcementId:guid}/offers/{offerId:guid}/withdraw")]
@@ -521,19 +465,5 @@ public sealed class AnnouncementsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public Task<IActionResult> Withdraw(Guid announcementId, Guid offerId,
         [FromServices] ICommandHandler<WithdrawOffer> handler, CancellationToken cancellationToken)
-        => Execute(userId => new WithdrawOffer(announcementId, offerId, userId), handler, cancellationToken);
-
-    /// <summary>Akcje bez body (POST/DELETE): komenda z id z trasy + id z tokenu, odpowiedź 204.</summary>
-    private async Task<IActionResult> Execute<TCommand>(Func<Guid, TCommand> createCommand,
-        ICommandHandler<TCommand> handler, CancellationToken cancellationToken)
-        where TCommand : class, ICommand
-    {
-        if (!User.TryGetUserId(out var userId))
-        {
-            return Unauthorized();
-        }
-
-        await handler.HandleAsync(createCommand(userId), cancellationToken);
-        return NoContent();
-    }
+        => Send(new WithdrawOffer(announcementId, offerId, CurrentUserId), handler, cancellationToken);
 }

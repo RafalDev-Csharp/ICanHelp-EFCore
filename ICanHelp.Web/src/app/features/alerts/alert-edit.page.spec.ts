@@ -100,9 +100,9 @@ describe('AlertEditPage', () => {
     page.setName('Dom');
     page.setCategory('cat-home');
     page.setSubcategories(['sub-plumbing']);
-    page.setCenter({ latitude: 53.844, longitude: 22.979 });
+    page.patch({ center: { latitude: 53.844, longitude: 22.979 } });
     page.setRadius(7.5);
-    page.setDays(31);
+    page.patch({ days: 31 });
     page.setLimitHours(true);
     page.setFrom('15:00');
     page.setTo('18:00');
@@ -134,7 +134,7 @@ describe('AlertEditPage', () => {
 
   it('toggles single days', () => {
     const { page } = create({ kind: 'Area' });
-    page.setDays(0);
+    page.patch({ days: 0 });
 
     page.toggleDay(1);
     page.toggleDay(16);

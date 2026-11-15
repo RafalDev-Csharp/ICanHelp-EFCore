@@ -20,23 +20,43 @@
 </ion-header>
 
 <ion-content class="page-column">
-  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+  @let list = current();
+  <ion-refresher slot="fixed" (ionRefresh)="list.refresh($event)">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  @let list = current(); @switch (list.state()) { @case ('loading') {
-  <div class="ion-text-center ion-padding" aria-busy="true">
-    <ion-spinner name="crescent"></ion-spinner>
-  </div>
+  @switch (list.state()) { @case ('loading') {
+  <app-loading></app-loading>
   } @case ('failed') {
-  <app-empty-state
-    icon="cloud-offline-outline"
-    heading="Nie udało się wczytać zleceń"
-    message="Sprawdź połączenie z internetem i spróbuj ponownie."
-  >
-    <ion-button (click)="list.reload()">Spróbuj ponownie</ion-button>
-  </app-empty-state>
-  } @case ('ready') { @if (role() === 'Client') { @if (clientGroups().length === 0) {
+  <app-load-failed heading="Nie udało się wczytać zleceń" (retry)="list.reload()"></app-load-failed>
+  } @case ('ready') { @if (groups().length > 0) {
+  <ion-list>
+    @for (group of groups(); track group.key) {
+    <ion-item-group [attr.data-group]="group.key" [class.finished]="group.key === 'finished'">
+      @if (group.key === 'finished') {
+      <ion-item-divider
+        class="finished-toggle"
+        sticky="true"
+        button
+        (click)="toggleFinished()"
+        [attr.aria-expanded]="finishedOpen()"
+      >
+        <ion-label>{{ group.label }} ({{ group.count }})</ion-label>
+        <ion-icon slot="end" [name]="finishedOpen() ? 'chevron-up' : 'chevron-down'" aria-hidden="true"></ion-icon>
+      </ion-item-divider>
+      } @else {
+      <ion-item-divider sticky="true">
+        <ion-label>{{ group.label }} ({{ group.count }})</ion-label>
+      </ion-item-divider>
+      } @if (group.key !== 'finished' || finishedOpen()) { @for (item of group.announcements; track item.id) {
+      <app-announcement-card [announcement]="item" [showStatus]="true"></app-announcement-card>
+      } @for (item of group.conversations; track item.conversationId) {
+      <app-conversation-item [conversation]="item"></app-conversation-item>
+      } }
+    </ion-item-group>
+    }
+  </ion-list>
+  } @else if (role() === 'Client') {
   <app-empty-state
     icon="briefcase-outline"
     heading="Nie masz jeszcze zleceń"
@@ -45,31 +65,6 @@
     <ion-button routerLink="/add">Dodaj ogłoszenie</ion-button>
   </app-empty-state>
   } @else {
-  <ion-list>
-    @for (group of clientGroups(); track group.key) {
-    <ion-item-group [attr.data-group]="group.key" [class.finished]="group.key === 'finished'">
-      @if (group.key === 'finished') {
-      <ion-item-divider
-        class="finished-toggle"
-        sticky="true"
-        button
-        (click)="toggleFinished()"
-        [attr.aria-expanded]="finishedOpen()"
-      >
-        <ion-label>{{ group.label }} ({{ group.items.length }})</ion-label>
-        <ion-icon slot="end" [name]="finishedOpen() ? 'chevron-up' : 'chevron-down'" aria-hidden="true"></ion-icon>
-      </ion-item-divider>
-      } @else {
-      <ion-item-divider sticky="true">
-        <ion-label>{{ group.label }} ({{ group.items.length }})</ion-label>
-      </ion-item-divider>
-      } @if (group.key !== 'finished' || finishedOpen()) { @for (item of group.items; track item.id) {
-      <app-announcement-card [announcement]="item" [showStatus]="true"></app-announcement-card>
-      } }
-    </ion-item-group>
-    }
-  </ion-list>
-  } } @else { @if (helperGroups().length === 0) {
   <app-empty-state
     icon="hand-left-outline"
     heading="Jeszcze nikomu nie pomagasz"
@@ -77,33 +72,8 @@
   >
     <ion-button routerLink="/announcements" fill="outline">Szukaj ogłoszeń</ion-button>
   </app-empty-state>
-  } @else {
-  <ion-list>
-    @for (group of helperGroups(); track group.key) {
-    <ion-item-group [attr.data-group]="group.key" [class.finished]="group.key === 'finished'">
-      @if (group.key === 'finished') {
-      <ion-item-divider
-        class="finished-toggle"
-        sticky="true"
-        button
-        (click)="toggleFinished()"
-        [attr.aria-expanded]="finishedOpen()"
-      >
-        <ion-label>{{ group.label }} ({{ group.items.length }})</ion-label>
-        <ion-icon slot="end" [name]="finishedOpen() ? 'chevron-up' : 'chevron-down'" aria-hidden="true"></ion-icon>
-      </ion-item-divider>
-      } @else {
-      <ion-item-divider sticky="true">
-        <ion-label>{{ group.label }} ({{ group.items.length }})</ion-label>
-      </ion-item-divider>
-      } @if (group.key !== 'finished' || finishedOpen()) { @for (item of group.items; track item.conversationId) {
-      <app-conversation-item [conversation]="item"></app-conversation-item>
-      } }
-    </ion-item-group>
-    }
-  </ion-list>
-  } }
-  <ion-infinite-scroll [disabled]="list.complete()" (ionInfinite)="loadMore($event)">
+  }
+  <ion-infinite-scroll [disabled]="list.complete()" (ionInfinite)="list.loadMore($event)">
     <ion-infinite-scroll-content></ion-infinite-scroll-content>
   </ion-infinite-scroll>
   } }
