@@ -56,11 +56,13 @@
         (ionChange)="setView($event.detail.value)"
         aria-label="Widok ogłoszeń"
       >
-        <ion-segment-button value="list" aria-label="Lista" title="Lista">
+        <ion-segment-button value="list" layout="icon-start">
           <ion-icon name="list-outline" aria-hidden="true"></ion-icon>
+          <ion-label>Lista</ion-label>
         </ion-segment-button>
-        <ion-segment-button value="map" aria-label="Mapa" title="Mapa">
+        <ion-segment-button value="map" layout="icon-start">
           <ion-icon name="map-outline" aria-hidden="true"></ion-icon>
+          <ion-label>Mapa</ion-label>
         </ion-segment-button>
       </ion-segment>
 

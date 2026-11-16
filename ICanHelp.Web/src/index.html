@@ -2,7 +2,7 @@
 <html lang="pl">
   <head>
     <meta charset="utf-8" />
-    <title>ICanHelp – pomoc sąsiedzka</title>
+    <title>I can help U – pomoc sąsiedzka</title>
 
     <base href="/" />
     <meta name="description" content="Drobna pomoc sąsiedzka: opisz problem, a ktoś z okolicy zaproponuje pomoc." />
@@ -19,12 +19,25 @@
 
     <!-- PWA: manifest (Android/Chrome), ekran początkowy na iPhonie (ikona, nazwa, pasek stanu) -->
     <link rel="manifest" href="manifest.webmanifest" />
-    <meta name="theme-color" content="#0054e9" />
+    <meta name="theme-color" content="#FF7A1A" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="ICanHelp" />
+    <meta name="apple-mobile-web-app-title" content="I can help U" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+
+    <!-- Motyw przed startem aplikacji (bez mignięcia jasnego ekranu) – ta sama reguła co ThemeService. -->
+    <script>
+      (function () {
+        var mode = null;
+        try {
+          mode = localStorage.getItem('icanhelp.theme');
+        } catch (e) {}
+        var dark = mode === 'dark' || (mode !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('ion-palette-dark', dark);
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      })();
+    </script>
   </head>
 
   <body>

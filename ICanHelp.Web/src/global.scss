@@ -32,12 +32,35 @@
  * https://ionicframework.com/docs/theming/dark-mode
  */
 
-/* @import "@ionic/angular/css/palettes/dark.always.css"; */
-/* @import "@ionic/angular/css/palettes/dark.class.css"; */
-@import '@ionic/angular/css/palettes/dark.system.css';
+/* Ciemny motyw przez klasę `ion-palette-dark` na <html> – ustawia ją `ThemeService` (Konto → Aplikacja → Motyw:
+   systemowy / jasny / ciemny) i skrypt w `index.html` przed startem aplikacji. */
+@import '@ionic/angular/css/palettes/dark.class.css';
 
 /* Style Leaflet (mapy, F3) – razem z pozostałymi importami, przed regułami. */
 @import 'leaflet/dist/leaflet.css';
+
+/*
+ * Kolor główny = pomarańcz z logo (uścisk dłoni). Jasny motyw: ciemniejszy odcień (#C9500B, kontrast z białym 4,5:1),
+ * ciemny motyw: jasny pomarańcz logo (#FF7A1A) z ciemnym tekstem na przyciskach. Po imporcie palety dark.class –
+ * nadpisuje jej primary.
+ */
+:root {
+  --ion-color-primary: #c9500b;
+  --ion-color-primary-rgb: 201, 80, 11;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #b1460a;
+  --ion-color-primary-tint: #ce6123;
+}
+
+:root.ion-palette-dark {
+  --ion-color-primary: #ff7a1a;
+  --ion-color-primary-rgb: 255, 122, 26;
+  --ion-color-primary-contrast: #000000;
+  --ion-color-primary-contrast-rgb: 0, 0, 0;
+  --ion-color-primary-shade: #e06b17;
+  --ion-color-primary-tint: #ff8731;
+}
 
 /*
  * Szeroki ekran (F11): treść stron w wyśrodkowanej kolumnie – na komputerze zdjęcia, mapy i listy nie rozciągają się

@@ -38,6 +38,7 @@ public static class Extensions
             .WithScopedLifetime());
 
         services.AddHostedService<DbInitializer>();
+        services.AddHostedService<DemoDataSeeder>(); // after DbInitializer (categories); only with "Seed:DemoData"
 
         // Krok 13: outbox (events saved with the change → handled in the background → notifications).
         // Registered after DbInitializer: hosted services start in order, so migrations run first.

@@ -138,6 +138,8 @@ cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /ap
 - [x] Refaktoryzacja (bez zmian zachowania i kontraktu API). **R1 backend 14.11.2026**: wspólne kroki handlerów i kontrolerów,
   `OfferTerms`, `Announcement` w 4 plikach, wyjątki wg klasy bazowej (−900 linii; dotnet 610/610). **R2 frontend 15.11.2026**:
   szczegóły i wątek = store + sekcje + czyste funkcje, wspólne listy / okna / komendy API (`verify.cmd -SkipBackend`: Vitest 425/425).
+- [x] Przed testem z ludźmi 16.11.2026: kategorie po polsku, dane testowe `DemoDataSeeder` (Development, pusta baza), nowe logo
+  (uścisk dłoni) i pomarańczowy kolor główny, motyw jasny / ciemny / systemowy w Konto → Aplikacja, większe Lista / Mapa (dotnet 610/610, Vitest 425/425).
 - [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)

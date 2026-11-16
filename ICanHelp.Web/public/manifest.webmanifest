@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "ICanHelp – pomoc sąsiedzka",
-  "short_name": "ICanHelp",
+  "name": "I can help U – pomoc sąsiedzka",
+  "short_name": "I can help U",
   "description": "Drobna pomoc sąsiedzka: opisz problem, a ktoś z okolicy zaproponuje pomoc.",
   "lang": "pl",
   "dir": "ltr",
@@ -9,7 +9,7 @@
   "orientation": "portrait",
   "scope": "./",
   "start_url": "./announcements",
-  "theme_color": "#0054e9",
+  "theme_color": "#FF7A1A",
   "background_color": "#ffffff",
   "categories": ["lifestyle", "social"],
   "icons": [

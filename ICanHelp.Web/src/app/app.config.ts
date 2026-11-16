@@ -17,6 +17,7 @@ import { provideAppLocale } from './core/config/locale';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { InstallPromptService } from './core/pwa/install-prompt.service';
+import { ThemeService } from './core/theme/theme.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -34,5 +35,7 @@ export const appConfig: ApplicationConfig = {
     }),
     // `beforeinstallprompt` przychodzi zaraz po wczytaniu – słuchamy od startu.
     provideAppInitializer(() => void inject(InstallPromptService)),
+    // Motyw (Konto → Aplikacja): śledzi zmianę motywu systemu od startu, nie dopiero po wejściu w ustawienia.
+    provideAppInitializer(() => void inject(ThemeService)),
   ],
 };

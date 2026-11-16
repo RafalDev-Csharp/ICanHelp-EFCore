@@ -21,20 +21,26 @@
   }
 }
 
+/* Duże, podpisane przyciski Lista / Mapa – czytelne i łatwe do trafienia palcem (min. 44 px wysokości). */
 .view-switch {
   flex: 0 0 auto;
-  width: 96px;
-  min-height: 32px;
+  width: 200px;
+  min-height: 44px;
 
   ion-segment-button {
     min-width: 0;
-    min-height: 32px;
-    --padding-start: 8px;
-    --padding-end: 8px;
+    min-height: 44px;
+    --padding-start: 10px;
+    --padding-end: 10px;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
   }
 
   ion-icon {
-    font-size: 1.125rem;
+    font-size: 1.5rem;
+    margin-inline-end: 6px;
   }
 }
 

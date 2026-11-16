@@ -31,6 +31,8 @@ core/             jedno miejsce na całą aplikację: config/locale.ts (pl-PL, P
                   `reloadOnActivity` (otwarty ekran przeładowuje dane po `activity$`), `notification-model` (`PushNotice`,
                   `NotificationActivity`, `isRead`, `asRead`), `notification-texts` (tekst i link z `type` + `parameters`),
                   `NOTIFICATION_HUB_FACTORY` (w specs – fałszywe połączenie);
+                  theme/ – `ThemeService` (Systemowy / Jasny / Ciemny → klasa `ion-palette-dark`, `localStorage`
+                  `icanhelp.theme`; ten sam odczyt w skrypcie `index.html`); kolor główny (pomarańcz) w `global.scss`;
                   pwa/ – `PushService` (FCM: zgoda po akcji – `suggest()` / `enable()`, `api/me/devices`, `unregister()` przed
                   wylogowaniem, push z workera → `NotificationsService.showPush`), `push-platform` (`PUSH_PLATFORM` – dostęp do
                   przeglądarki), `push-storage` (pamięć urządzenia), `push-messages` (`parseWorkerMessage`), `PUSH_MESSAGING`

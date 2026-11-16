@@ -13,6 +13,8 @@ describe('BrandComponent', () => {
     const button = (fixture.nativeElement as HTMLElement).querySelector('ion-button');
 
     expect(button?.getAttribute('aria-label')).toContain('I can help U');
+    const lines = Array.from(button?.querySelectorAll('.brand-name > span') ?? []).map((line) => line.textContent);
+    expect(lines).toEqual(['I', 'can help', 'U']);
     button?.dispatchEvent(new Event('click'));
 
     expect(navigateRoot).toHaveBeenCalledWith(HOME_URL, { animated: true, animationDirection: 'back' });

@@ -471,5 +471,20 @@
   są dane (`jobStepView`). Jedyna zmiana widoczna dla użytkownika (na prośbę autora, po R2): ikona megafonu na pustej
   liście „Szukaj” zaczęła się rysować – `megaphone-outline` nie była nigdzie rejestrowana (`addIcons`).
   Przeklikanie w przeglądarce z prawdziwym API – ręcznie.
+- [x] Przed testem z ludźmi (16.11.2026): 12 kategorii po polsku (`DbInitializer`, w każdej podkategoria „Inne”; ikony
+  kafelków po nazwie w `category-icons.ts`), dane testowe `DemoDataSeeder` (tylko `Seed:DemoData = true` –
+  appsettings.Development.json – i pusta tabela Users; przez prawdziwe handlery komend: 6 kont `<imię>@test.pl` z hasłem
+  `DemoDataSeeder.Password`, 16 ogłoszeń w Augustowie / Suwałkach, oczekujące oferty, przyjęte zlecenie, pytanie bez oferty,
+  zakończone zlecenie z ocenami obu stron), większe podpisane przyciski Lista / Mapa, nowe logo (biały uścisk dłoni na
+  pomarańczowym kafelku `#FF7A1A` – wybrany z 4 wariantów: uścisk, uścisk + iskry, pomocna dłoń, przybij piątkę;
+  `public/icons/logo.svg` + ikony PWA i favicon wygenerowane z SVG), nazwa w nagłówku w trzech liniach „I / can help / U”,
+  „I can help U” w manifeście i tytule. Kolor główny (Ionic primary) pomarańczowy w `global.scss`: jasny motyw `#C9500B`
+  (kontrast 4,5:1 z białym), ciemny `#FF7A1A` z ciemnym tekstem na przyciskach.
+  Motyw do wyboru (Konto → Aplikacja → Motyw: Systemowy / Jasny / Ciemny): `core/theme/ThemeService` – klasa
+  `ion-palette-dark` na `<html>` (paleta `dark.class.css` zamiast `dark.system.css`), wybór w `localStorage`
+  `icanhelp.theme` (na urządzeniu, nie na koncie), „Systemowy” śledzi zmianę motywu systemu; skrypt w `index.html` ustawia
+  motyw przed startem Angulara (bez mignięcia). Sekcja „Aplikacja” widoczna zawsze (też bez logowania). Vitest 430/430.
+  Nowe kategorie i dane testowe wymagają czystej bazy (`dotnet ef database drop -f -p ICanHelp.Infrastructure -s ICanHelp.Api`).
+  `verify.cmd`: dotnet 610/610 (Core 267, Application 225, integracyjne 118), Vitest 425/425, lint + build zielone.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

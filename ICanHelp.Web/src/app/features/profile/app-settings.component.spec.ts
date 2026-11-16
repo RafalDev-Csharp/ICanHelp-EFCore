@@ -5,6 +5,8 @@ import { AuthService } from '../../core/auth/auth.service';
 import { InstallPromptService } from '../../core/pwa/install-prompt.service';
 import type { PushState } from '../../core/pwa/push.service';
 import { PushService } from '../../core/pwa/push.service';
+import type { ThemeMode } from '../../core/theme/theme.service';
+import { ThemeService } from '../../core/theme/theme.service';
 
 import { AppSettingsComponent } from './app-settings.component';
 
@@ -16,6 +18,7 @@ describe('AppSettingsComponent', () => {
     install: vi.fn(() => Promise.resolve(true)),
   };
   const push = { state: signal<PushState>('default'), busy: signal(false), enable: vi.fn(() => Promise.resolve(true)) };
+  const theme = { mode: signal<ThemeMode>('system'), setMode: vi.fn() };
 
   function render(): HTMLElement {
     TestBed.configureTestingModule({
@@ -24,6 +27,7 @@ describe('AppSettingsComponent', () => {
         { provide: AuthService, useValue: { isAuthenticated: () => authenticated() } },
         { provide: InstallPromptService, useValue: install },
         { provide: PushService, useValue: push },
+        { provide: ThemeService, useValue: theme },
       ],
     });
     const fixture = TestBed.createComponent(AppSettingsComponent);
@@ -71,9 +75,26 @@ describe('AppSettingsComponent', () => {
     expect(iphone.querySelector('[data-testid="push-note"]')?.textContent).toContain('ekranu początkowego');
   });
 
-  it('renders nothing when push is unavailable and there is nothing to install', () => {
+  it('always offers the theme choice, even without push and installation', () => {
     push.state.set('unavailable');
-    expect(render().querySelector('ion-list')).toBeNull();
+    authenticated.set(false);
+    const element = render();
+
+    expect(element.querySelector('[data-testid="push-note"]')).toBeNull();
+    expect(element.querySelector('[data-testid="install"]')).toBeNull();
+    const labels = Array.from(element.querySelectorAll('[data-testid="theme"] ion-segment-button')).map((b) =>
+      b.textContent?.trim(),
+    );
+    expect(labels).toEqual(['Systemowy', 'Jasny', 'Ciemny']);
+  });
+
+  it('switches the theme', () => {
+    const element = render();
+    const segment = element.querySelector('[data-testid="theme"]') as HTMLElement;
+
+    segment.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'dark' } }));
+
+    expect(theme.setMode).toHaveBeenCalledWith('dark');
   });
 
   it('hides push for a signed-out user', () => {
