@@ -56,7 +56,7 @@ public class GetAnnouncementsDistanceFilterTests
     [InlineData(52.23, -181.0, null)]
     [InlineData(52.23, 21.01, 0.0)]
     [InlineData(52.23, 21.01, -1.0)]
-    [InlineData(52.23, 21.01, 100.1)]
+    [InlineData(52.23, 21.01, 200.1)]
     [InlineData(double.NaN, 21.01, null)]
     public void Invalid_parameters_throw(double? latitude, double? longitude, double? radiusKm)
     {

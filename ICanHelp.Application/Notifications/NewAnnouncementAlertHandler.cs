@@ -110,16 +110,22 @@ internal sealed class NewAnnouncementAlertHandler(IAnnouncementRepository announ
     private async Task<Notification> AddNearbyAsync(AlertCandidate match, Announcement announcement,
         string categoryName, Guid eventId, DateTime occurredAtUtc, CancellationToken cancellationToken)
     {
+        var payload = new Dictionary<string, string>
+        {
+            [NotificationPayload.AnnouncementTitle] = announcement.Title.Value,
+            [NotificationPayload.CategoryName] = categoryName,
+            [NotificationPayload.AlertName] = match.Alert.Name.Value,
+            [NotificationPayload.AlertKind] = match.Alert.Kind.ToString()
+        };
+
+        // Cała Polska nie ma środka ani trasy – odległość nic by nie mówiła.
+        if (match.Alert.Kind != AlertKind.Country)
+        {
+            payload[NotificationPayload.DistanceKm] = FormatKm(match.DistanceMeters);
+        }
+
         var notification = new Notification(Id.New(), match.Alert.UserId, NotificationType.NewAnnouncementNearby,
-            NotificationPayload.Serialize(new Dictionary<string, string>
-            {
-                [NotificationPayload.AnnouncementTitle] = announcement.Title.Value,
-                [NotificationPayload.CategoryName] = categoryName,
-                [NotificationPayload.AlertName] = match.Alert.Name.Value,
-                [NotificationPayload.AlertKind] = match.Alert.Kind.ToString(),
-                [NotificationPayload.DistanceKm] = FormatKm(match.DistanceMeters)
-            }),
-            announcement.Id, conversationId: null, eventId, occurredAtUtc);
+            NotificationPayload.Serialize(payload), announcement.Id, conversationId: null, eventId, occurredAtUtc);
 
         await notifications.AddAsync(notification, cancellationToken);
         return notification;

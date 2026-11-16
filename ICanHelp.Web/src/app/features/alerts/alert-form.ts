@@ -8,6 +8,7 @@ import type {
   WeekDays,
 } from '../../core/api/api-client';
 import type { GeoPoint } from '../../core/geo/geo-point';
+import { pluralPl } from '../../shared/text/plural';
 
 /** Reguły jak w backendzie (`AnnouncementAlert`, `StringObject`). */
 export const ALERT_RULES = {
@@ -40,10 +41,13 @@ const NAMED_DAYS: Readonly<Record<string, number>> = {
   All: DAYS_ALL,
 };
 
-/** Stan formularza alertu (ekran „Nowy alert” / edycja). Godziny jako „HH:mm” (pole `type="time"`). */
+/**
+ * Stan formularza alertu (ekran „Nowy alert” / edycja). Godziny jako „HH:mm” (pole `type="time"`). Nazwy alertu
+ * użytkownik nie wpisuje – powstaje z kategorii i miejsca (`alertName`), bo sam alert mówi, czego dotyczy.
+ */
 export interface AlertFormValue {
-  name: string;
   kind: AlertKind;
+  /** Pusty = wszystkie kategorie. */
   categoryId: string;
   /** Puste = cała kategoria. */
   subcategoryIds: string[];
@@ -62,12 +66,22 @@ export interface AlertFormValue {
   to: string;
 }
 
-export type AlertFormField = 'name' | 'categoryId' | 'subcategoryIds' | 'place' | 'radiusKm' | 'days' | 'hours';
+export type AlertFormField = 'subcategoryIds' | 'place' | 'radiusKm' | 'days' | 'hours';
 export type AlertFormErrors = Partial<Record<AlertFormField, string>>;
+
+/** Rodzaj z adresu (`?kind=`); nieznany → obszar. */
+export function parseAlertKind(value: string | null): AlertKind {
+  return value === 'Route' || value === 'Country' ? value : 'Area';
+}
+
+const DEFAULT_RADIUS: Record<AlertKind, number> = {
+  Area: ALERT_RULES.radiusKm.defaultArea,
+  Route: ALERT_RULES.radiusKm.defaultRoute,
+  Country: 0,
+};
 
 export function emptyAlertForm(kind: AlertKind): AlertFormValue {
   return {
-    name: '',
     kind,
     categoryId: '',
     subcategoryIds: [],
@@ -75,7 +89,7 @@ export function emptyAlertForm(kind: AlertKind): AlertFormValue {
     routeStart: null,
     routeEnd: null,
     routePoints: [],
-    radiusKm: kind === 'Area' ? ALERT_RULES.radiusKm.defaultArea : ALERT_RULES.radiusKm.defaultRoute,
+    radiusKm: DEFAULT_RADIUS[kind],
     days: DAYS_ALL,
     limitHours: false,
     from: '15:00',
@@ -88,9 +102,8 @@ export function alertFormFrom(alert: AlertDto): AlertFormValue {
   const from = fromApiTime(alert.schedule?.from);
   const to = fromApiTime(alert.schedule?.to);
   return {
-    name: alert.name,
     kind: alert.kind,
-    categoryId: alert.categoryId,
+    categoryId: alert.categoryId ?? '',
     subcategoryIds: [...(alert.subcategoryIds ?? [])],
     center: alert.kind === 'Area' && alert.center ? toPoint(alert.center) : null,
     routeStart: route.length > 1 ? toPoint(route[0]) : null,
@@ -107,13 +120,6 @@ export function alertFormFrom(alert: AlertDto): AlertFormValue {
 /** Błędy pól (puste = można zapisać). */
 export function validateAlertForm(value: AlertFormValue): AlertFormErrors {
   const errors: AlertFormErrors = {};
-  const name = value.name.trim();
-  if (name.length === 0 || name.length > ALERT_RULES.name.max) {
-    errors.name = `Podaj nazwę (do ${ALERT_RULES.name.max} znaków), np. „Dom” albo „Droga z pracy”.`;
-  }
-  if (!value.categoryId) {
-    errors.categoryId = 'Wybierz kategorię.';
-  }
   if (value.subcategoryIds.length > ALERT_RULES.maxSubcategories) {
     errors.subcategoryIds = `Najwyżej ${ALERT_RULES.maxSubcategories} podkategorii.`;
   }
@@ -124,7 +130,7 @@ export function validateAlertForm(value: AlertFormValue): AlertFormErrors {
     errors.place = 'Wybierz start i cel, a potem wyznacz trasę.';
   }
   const { min, max } = ALERT_RULES.radiusKm;
-  if (!Number.isFinite(value.radiusKm) || value.radiusKm < min || value.radiusKm > max) {
+  if (value.kind !== 'Country' && (!Number.isFinite(value.radiusKm) || value.radiusKm < min || value.radiusKm > max)) {
     errors.radiusKm = `Promień od ${min} do ${max} km.`;
   }
   if ((value.days & DAYS_ALL) === 0) {
@@ -140,32 +146,72 @@ export function validateAlertForm(value: AlertFormValue): AlertFormErrors {
   return errors;
 }
 
-export function toCreateAlert(value: AlertFormValue): CreateAlert {
+/** `categoryName` – nazwa wybranej kategorii (do nazwy alertu); bez kategorii nie jest potrzebna. */
+export function toCreateAlert(value: AlertFormValue, categoryName = ''): CreateAlert {
   return {
-    name: value.name.trim(),
+    name: alertName(value, categoryName),
     kind: value.kind,
-    categoryId: value.categoryId,
-    subcategoryIds: value.subcategoryIds,
+    categoryId: value.categoryId || undefined,
+    subcategoryIds: value.categoryId ? value.subcategoryIds : [],
     ...placeOf(value),
     radiusKm: value.radiusKm,
     schedule: scheduleOf(value),
   } as CreateAlert;
 }
 
-/** PATCH ze wszystkimi polami (formularz pokazuje całość); rodzaju się nie zmienia – backend go nie przyjmuje. */
-export function toUpdateAlert(value: AlertFormValue): UpdateAlert {
+/**
+ * PATCH ze wszystkimi polami (formularz pokazuje całość); rodzaju się nie zmienia – backend go nie przyjmuje.
+ * Pusta kategoria = `allCategories` (samo `categoryId: undefined` w PATCH znaczy „bez zmian”).
+ */
+export function toUpdateAlert(value: AlertFormValue, categoryName = ''): UpdateAlert {
   return {
-    name: value.name.trim(),
-    categoryId: value.categoryId,
-    subcategoryIds: value.subcategoryIds,
+    name: alertName(value, categoryName),
+    ...(value.categoryId
+      ? { categoryId: value.categoryId, subcategoryIds: value.subcategoryIds }
+      : { allCategories: true }),
     ...placeOf(value),
     radiusKm: value.radiusKm,
     schedule: scheduleOf(value),
   } as UpdateAlert;
 }
 
-/** Obszar → `center`, trasa → `routePoints` (drugie pole nie idzie – klient NSwag ma je jako wymagane, API jako opcjonalne). */
+/** Co obserwuje alert: „Hydraulika”, „Hydraulika (2 podkategorie)”, „Wszystkie kategorie”. */
+export function alertWhat(categoryId: string | undefined, subcategoryCount: number, categoryName: string): string {
+  if (!categoryId) {
+    return 'Wszystkie kategorie';
+  }
+  const name = categoryName || 'Kategoria';
+  return subcategoryCount > 0
+    ? `${name} (${subcategoryCount} ${pluralPl(subcategoryCount, 'podkategoria', 'podkategorie', 'podkategorii')})`
+    : name;
+}
+
+/** Gdzie: „do 5 km”, „2 km od trasy”, „cała Polska”. */
+export function alertWhere(kind: AlertKind, radiusKm: number): string {
+  switch (kind) {
+    case 'Country':
+      return 'cała Polska';
+    case 'Route':
+      return `${formatRadius(radiusKm)} od trasy`;
+    default:
+      return `do ${formatRadius(radiusKm)}`;
+  }
+}
+
+/** Nazwa alertu (w powiadomieniu „alert „…”” i przy usuwaniu): „Hydraulika · do 5 km”. */
+export function alertName(value: AlertFormValue, categoryName: string): string {
+  const what = alertWhat(value.categoryId, value.subcategoryIds.length, categoryName);
+  return `${what} · ${alertWhere(value.kind, value.radiusKm)}`.slice(0, ALERT_RULES.name.max);
+}
+
+/**
+ * Obszar → `center`, trasa → `routePoints`, cała Polska – nic (drugie pole nie idzie – klient NSwag ma je jako
+ * wymagane, API jako opcjonalne).
+ */
 function placeOf(value: AlertFormValue): { center?: LocationDto; routePoints?: LocationDto[] } {
+  if (value.kind === 'Country') {
+    return {};
+  }
   return value.kind === 'Area' && value.center
     ? { center: toPoint(value.center) }
     : { routePoints: value.routePoints.map(toPoint) };

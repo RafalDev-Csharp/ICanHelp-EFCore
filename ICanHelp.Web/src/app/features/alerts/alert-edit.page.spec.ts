@@ -97,7 +97,6 @@ describe('AlertEditPage', () => {
     client.create.mockReturnValue(of({ id: 'al-9' }));
     const { page } = create({ kind: 'Area' });
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
-    page.setName('Dom');
     page.setCategory('cat-home');
     page.setSubcategories(['sub-plumbing']);
     page.patch({ center: { latitude: 53.844, longitude: 22.979 } });
@@ -110,7 +109,8 @@ describe('AlertEditPage', () => {
     page.save();
 
     expect(client.create).toHaveBeenCalledWith({
-      name: 'Dom',
+      // Nazwy nikt nie wpisuje – powstaje z kategorii i promienia.
+      name: expect.stringMatching(/\(1 podkategoria\) · do 7,5 km$/),
       kind: 'Area',
       categoryId: 'cat-home',
       subcategoryIds: ['sub-plumbing'],
@@ -152,6 +152,22 @@ describe('AlertEditPage', () => {
     expect(element.querySelector('app-location-picker')).toBeNull();
   });
 
+  it('starts a whole-of-Poland alert without a place or a radius and saves it at once', () => {
+    client.create.mockReturnValue(of({ id: 'al-9' }));
+    const { page, element } = create({ kind: 'Country' });
+    vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    expect(element.querySelector('ion-title')?.textContent).toContain('Alert – cała Polska');
+    expect(element.querySelector('app-location-picker')).toBeNull();
+    expect(element.querySelector('[data-testid="alert-radius"]')).toBeNull();
+
+    page.save();
+
+    expect(client.create).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'Country', categoryId: undefined, name: 'Wszystkie kategorie · cała Polska' }),
+    );
+  });
+
   it('loads a saved alert with its preview and saves changes without the kind', () => {
     const preview: AnnouncementDto[] = [announcement('a1', { title: 'Cieknący kran', distanceKm: 1.2 })];
     client.getById.mockReturnValue(of(alertFixture()));
@@ -163,7 +179,7 @@ describe('AlertEditPage', () => {
     expect(client.preview).toHaveBeenCalledWith('al-1', PREVIEW_LIMIT);
     expect(page.preview()).toEqual(preview);
     expect(element.querySelector('[data-testid="alert-preview"]')?.textContent).toContain('Cieknący kran');
-    expect(page.form().name).toBe('Dom');
+    expect(page.form().categoryId).toBe(alertFixture().categoryId);
 
     page.setRadius(10);
     page.save();

@@ -112,6 +112,23 @@ ion-content.page-column::part(scroll) {
   font: inherit;
 }
 
+/* Podpis kafelków (licencja OSM) – jak najmniejszy i półprzezroczysty, ale czytelny po najechaniu. */
+.leaflet-container .leaflet-control-attribution {
+  padding: 0 4px;
+  font-size: 9px;
+  line-height: 14px;
+  background: rgb(255 255 255 / 45%);
+  opacity: 0.7;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  a {
+    color: #555;
+  }
+}
+
 .leaflet-container path.map-pin {
   fill: var(--ion-color-primary);
   stroke: #fff;
@@ -125,7 +142,7 @@ ion-content.page-column::part(scroll) {
 /* Alert trasy (F8): pas wokół drogi (grubość = 2 × promień, liczy `app-map`) i sama droga. */
 .leaflet-container path.map-corridor {
   stroke: var(--ion-color-primary);
-  stroke-opacity: 0.12;
+  stroke-opacity: 0.3;
   fill: none;
 }
 
@@ -137,7 +154,8 @@ ion-content.page-column::part(scroll) {
 
 .leaflet-container path.map-radius {
   fill: var(--ion-color-primary);
-  fill-opacity: 0.08;
+  fill-opacity: 0.22;
   stroke: var(--ion-color-primary);
-  stroke-width: 1;
+  stroke-width: 2;
+  stroke-opacity: 0.9;
 }

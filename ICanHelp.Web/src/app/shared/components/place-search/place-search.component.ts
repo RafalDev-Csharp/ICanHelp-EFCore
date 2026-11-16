@@ -1,8 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { IonButton, IonIcon, IonInput, IonItem, IonLabel, IonList, IonSpinner } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { locateOutline, locationOutline, searchOutline } from 'ionicons/icons';
+import { Subject, catchError, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
 
+import { SUGGESTIONS } from '../../../core/config/map';
 import type { GeoPoint } from '../../../core/geo/geo-point';
 import type { GeocodingResult } from '../../../core/geo/geocoding.service';
 import { GeocodingService } from '../../../core/geo/geocoding.service';
@@ -10,7 +13,8 @@ import { GeolocationError, GeolocationService } from '../../../core/geo/geolocat
 import { ToastService } from '../../../core/ui/toast.service';
 
 /**
- * Wybór punktu bez mapy: „Moja pozycja” (GPS, tylko po kliknięciu) albo wyszukanie adresu (Nominatim, po zatwierdzeniu).
+ * Wybór punktu bez mapy: „Moja pozycja” (GPS, tylko po kliknięciu) albo adres – podpowiedzi w trakcie pisania (Photon,
+ * od 3 znaków, po przerwie) i pełne wyszukanie po zatwierdzeniu (Nominatim, Enter / lupa).
  * Wybrany punkt → `picked`. Mapę (dotknięcie) dokłada rodzic – miejsce ogłoszenia, środek alertu, start i cel trasy.
  */
 @Component({
@@ -33,9 +37,29 @@ export class PlaceSearchComponent {
   protected readonly results = signal<GeocodingResult[] | null>(null);
   protected readonly searching = signal(false);
   protected readonly locating = signal(false);
+  private readonly typed = new Subject<string>();
 
   constructor() {
     addIcons({ locateOutline, locationOutline, searchOutline });
+    this.typed
+      .pipe(
+        debounceTime(SUGGESTIONS.debounceMs),
+        distinctUntilChanged(),
+        // Nowy tekst anuluje poprzednie zapytanie; błąd podpowiedzi = po prostu brak podpowiedzi (zostaje lupa).
+        switchMap((query) =>
+          query.length < SUGGESTIONS.minLength
+            ? of(null)
+            : this.geocoding.suggest(query).pipe(catchError(() => of(null))),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((suggestions) => {
+        // Pełne wyszukiwanie w toku ma pierwszeństwo. Brak podpowiedzi = lista schowana („Nic nie znaleziono” mówi
+        // dopiero pełne wyszukiwanie).
+        if (!this.searching()) {
+          this.results.set(suggestions && suggestions.length > 0 ? suggestions : null);
+        }
+      });
   }
 
   async useMyPosition(): Promise<void> {
@@ -54,6 +78,7 @@ export class PlaceSearchComponent {
 
   setQuery(value: unknown): void {
     this.query.set(typeof value === 'string' ? value : '');
+    this.typed.next(this.query().trim());
   }
 
   search(): void {
@@ -74,7 +99,9 @@ export class PlaceSearchComponent {
     });
   }
 
+  /** Wybór z listy: punkt idzie do rodzica, a w polu zostaje nazwa miejsca (bez nowych podpowiedzi dla niej). */
   pick(result: GeocodingResult): void {
+    this.query.set(result.label);
     this.results.set(null);
     this.picked.emit(result.point);
   }

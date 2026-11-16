@@ -120,6 +120,53 @@ public sealed class AlertTests
     }
 
     [Fact]
+    public async Task Country_EveryCategory_NotifiesFarAway_WithoutDistance_AndPatchToOneCategory()
+    {
+        var plumber = await _factory.CreateUserAsync();
+        var owner = await _factory.CreateUserAsync();
+        var (category, other) = await CategoriesAsync(owner.Client);
+
+        var alertId = await CreateAlertAsync(plumber, new { name = "Cała Polska", kind = "Country" });
+
+        var alert = await plumber.Client.GetFromJsonAsync<AlertDto>($"/api/me/alerts/{alertId}", Json);
+        alert.ShouldNotBeNull();
+        alert.CategoryId.ShouldBeNull();
+        alert.Center.ShouldBeNull();
+        alert.RadiusKm.ShouldBe(0);
+
+        // Kraków – daleko od wszystkiego, inna kategoria niż zwykle.
+        var krakow = await CreateAnnouncementAsync(owner, other, 50.06, 19.94, "Kraków – cała Polska");
+        await _factory.ProcessOutboxAsync();
+
+        var notification = (await AlertNotificationsAsync(plumber, krakow)).ShouldHaveSingleItem();
+        notification.Parameters[NotificationPayload.AlertKind].ShouldBe("Country");
+        notification.Parameters.ContainsKey(NotificationPayload.DistanceKm).ShouldBeFalse();
+        notification.Title.ShouldBe("Nowe ogłoszenie");
+
+        var preview = await plumber.Client.GetFromJsonAsync<List<AnnouncementDto>>($"/api/me/alerts/{alertId}/preview");
+        preview.ShouldNotBeNull().ShouldContain(a => a.Id == krakow);
+
+        // Tylko jedna kategoria – ogłoszenie z innej już nie pasuje; miejsca alert „cała Polska” nie ma.
+        (await plumber.Client.PatchAsJsonAsync($"/api/me/alerts/{alertId}", new { categoryId = category.Id }))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        await (await plumber.Client.PatchAsJsonAsync($"/api/me/alerts/{alertId}",
+                new { center = new { latitude = AugustowLat, longitude = AugustowLon } }))
+            .ShouldBeProblemAsync(HttpStatusCode.BadRequest, "InvalidAlert");
+
+        var otherCategory = await CreateAnnouncementAsync(owner, other, 50.06, 19.94, "Inna kategoria – cała Polska");
+        await _factory.ProcessOutboxAsync();
+        (await AlertNotificationsAsync(plumber, otherCategory)).ShouldBeEmpty();
+
+        // Z powrotem wszystkie kategorie.
+        (await plumber.Client.PatchAsJsonAsync($"/api/me/alerts/{alertId}", new { allCategories = true }))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await plumber.Client.GetFromJsonAsync<AlertDto>($"/api/me/alerts/{alertId}", Json))!.CategoryId.ShouldBeNull();
+
+        // Baza jest wspólna – alert na cały kraj nie może zbierać ogłoszeń innych testów.
+        (await plumber.Client.DeleteAsync($"/api/me/alerts/{alertId}")).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
     public async Task Crud_Patch_RecomputesZone_Disable_Preview_AndPrivacy()
     {
         var plumber = await _factory.CreateUserAsync();

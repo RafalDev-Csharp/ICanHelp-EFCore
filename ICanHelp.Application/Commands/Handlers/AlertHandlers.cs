@@ -19,8 +19,14 @@ internal sealed class CreateAlertHandler(IAnnouncementAlertRepository alerts, IC
             var now = clock.UtcNow;
             var subcategoryIds = AlertMapping.ToIds(command.SubcategoryIds);
 
+            var categoryId = command.CategoryId is { } category ? new Id(category) : null;
+
             await users.GetActiveOrThrowAsync(command.UserId, cancellationToken);
-            await categories.EnsureCategoryAsync(new Id(command.CategoryId), subcategoryIds, cancellationToken);
+            if (categoryId is not null)
+            {
+                await categories.EnsureCategoryAsync(categoryId, subcategoryIds, cancellationToken);
+            }
+
             AnnouncementAlert.EnsureCanCreate(await alerts.CountByUserAsync(userId, cancellationToken));
 
             var alert = new AnnouncementAlert(
@@ -28,7 +34,7 @@ internal sealed class CreateAlertHandler(IAnnouncementAlertRepository alerts, IC
                 userId,
                 new StringObject(command.Name),
                 command.Kind,
-                new Id(command.CategoryId),
+                categoryId,
                 subcategoryIds,
                 AlertMapping.ToPoints(command.Kind, command.Center, command.RoutePoints),
                 command.RadiusKm,
@@ -53,15 +59,23 @@ internal sealed class UpdateAlertHandler(IAnnouncementAlertRepository alerts, IC
             var now = clock.UtcNow;
             var alert = await alerts.GetOwnedOrThrowAsync(command.AlertId, userId, cancellationToken);
 
-            var categoryChanged = command.CategoryId is { } newCategory && newCategory != alert.CategoryId.Value;
-            var categoryId = new Id(command.CategoryId ?? alert.CategoryId.Value);
+            if (command.AllCategories == true && command.CategoryId is not null)
+            {
+                throw new InvalidAlertException("Give a category or all categories, not both.");
+            }
+
+            // Wszystkie kategorie / nowa kategoria / bez zmian.
+            var categoryId = command.AllCategories == true
+                ? null
+                : command.CategoryId is { } newCategory ? new Id(newCategory) : alert.CategoryId;
+            var categoryChanged = categoryId != alert.CategoryId;
 
             // Nowa kategoria bez podanych podkategorii → cała kategoria (stare podkategorie do niej nie należą).
             var subcategoryIds = command.SubcategoryIds is not null
                 ? AlertMapping.ToIds(command.SubcategoryIds)
                 : categoryChanged ? Array.Empty<Id>() : alert.SubcategoryIds;
 
-            if (categoryChanged || command.SubcategoryIds is not null)
+            if (categoryId is not null && (categoryChanged || command.SubcategoryIds is not null))
             {
                 await categories.EnsureCategoryAsync(categoryId, subcategoryIds, cancellationToken);
             }
@@ -130,6 +144,9 @@ internal static class AlertMapping
             AlertKind.Route => routePoints is null
                 ? throw new InvalidAlertException("A route alert needs the points of the route (routePoints).")
                 : routePoints.Select(point => point.ToLocation()).ToList(),
+            AlertKind.Country => center is not null || routePoints is { Count: > 0 }
+                ? throw new InvalidAlertException("A country alert has no centre and no route.")
+                : [],
             _ => throw new InvalidAlertException($"Alert kind: {kind} is invalid.")
         };
 
@@ -145,6 +162,11 @@ internal static class AlertMapping
         if (alert.Kind == AlertKind.Route && center is not null)
         {
             throw new InvalidAlertException("A route alert has no centre – the kind of an alert cannot change.");
+        }
+
+        if (alert.Kind == AlertKind.Country && (center is not null || routePoints is not null))
+        {
+            throw new InvalidAlertException("A country alert has no place – the kind of an alert cannot change.");
         }
 
         return center is null && routePoints is null

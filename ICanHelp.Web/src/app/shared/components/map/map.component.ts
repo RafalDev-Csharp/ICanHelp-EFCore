@@ -2,7 +2,7 @@ import type { ElementRef, OnDestroy } from '@angular/core';
 import { ChangeDetectionStrategy, Component, afterNextRender, effect, input, output, viewChild } from '@angular/core';
 import * as L from 'leaflet';
 
-import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM, MAP_TILES } from '../../../core/config/map';
+import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM, MAP_TILES, POINT_MAP_ZOOM } from '../../../core/config/map';
 import type { GeoPoint } from '../../../core/geo/geo-point';
 
 /** Pinezka na mapie (np. ogłoszenie). Kliknięcie → zdarzenie `markerClick` z `id`. */
@@ -42,7 +42,7 @@ export function metersPerPixel(latitude: number, zoom: number): number {
 export class MapComponent implements OnDestroy {
   readonly markers = input<MapMarker[]>([]);
   readonly center = input<GeoPoint>();
-  readonly zoom = input(DEFAULT_MAP_ZOOM);
+  readonly zoom = input(POINT_MAP_ZOOM);
   readonly circle = input<MapCircle>();
   readonly route = input<MapRoute>();
   /** Pozycja użytkownika – tylko dla niego samego (nigdy nie pokazujemy jej innym). */
@@ -86,7 +86,10 @@ export class MapComponent implements OnDestroy {
       // Kółko myszy przybliża / oddala tylko mapę interaktywną; poglądowa nie przechwytuje przewijania strony.
       scrollWheelZoom: interactive,
       wheelPxPerZoomLevel: 90,
+      attributionControl: false,
     });
+    // Bez flagi i napisu „Leaflet” (prefiks); licencja OSM (ODbL) wymaga jednak podpisu – zostaje mały „© OSM” (`global.scss`).
+    L.control.attribution({ prefix: false }).addTo(this.map);
     L.tileLayer(MAP_TILES.url, { attribution: MAP_TILES.attribution, maxZoom: MAP_TILES.maxZoom }).addTo(this.map);
     this.layers = L.layerGroup().addTo(this.map);
     if (interactive) {

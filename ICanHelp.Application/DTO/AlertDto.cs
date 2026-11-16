@@ -8,7 +8,8 @@ public sealed record AlertDto
     public Guid Id { get; init; }
     public string Name { get; init; } = string.Empty;
     public AlertKind Kind { get; init; }
-    public Guid CategoryId { get; init; }
+    /// <summary><c>null</c> = wszystkie kategorie.</summary>
+    public Guid? CategoryId { get; init; }
 
     /// <summary>Empty = the whole category.</summary>
     public IReadOnlyList<Guid> SubcategoryIds { get; init; } = [];

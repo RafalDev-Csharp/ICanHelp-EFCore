@@ -7,5 +7,8 @@ public enum AlertKind
     Area,
 
     /// <summary>A corridor along a route (e.g. work → home): <c>RadiusKm</c> on both sides of the line.</summary>
-    Route
+    Route,
+
+    /// <summary>The whole country (the app works only in Poland): no points, no radius – every new announcement.</summary>
+    Country
 }

@@ -55,9 +55,10 @@ internal sealed class AnnouncementAlertConfiguration : IEntityTypeConfiguration<
         builder.Ignore(x => x.Center);
         builder.Ignore(x => x.RoutePoints);
 
-        builder.Property<Geometry>(Spatial.AlertShape)
+        // Country (cała Polska) has no shape and no zone.
+        builder.Property<Geometry?>(Spatial.AlertShape)
             .HasColumnType("geography")
-            .IsRequired();
+            .IsRequired(false);
 
         var zone = builder.Property<Geometry>(Spatial.AlertZone)
             .HasColumnType("geography")
@@ -73,6 +74,7 @@ internal sealed class AnnouncementAlertConfiguration : IEntityTypeConfiguration<
         builder.HasOne<Category>()
             .WithMany()
             .HasForeignKey(x => x.CategoryId)
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(x => x.UserId);

@@ -74,9 +74,12 @@ public static class NotificationTextFormatter
             }
             case NotificationType.NewAnnouncementNearby:
             {
-                var where = Get(parameters, NotificationPayload.AlertKind) == nameof(AlertKind.Route)
-                    ? "po drodze"
-                    : "w okolicy";
+                var where = Get(parameters, NotificationPayload.AlertKind) switch
+                {
+                    nameof(AlertKind.Route) => " po drodze",
+                    nameof(AlertKind.Country) => string.Empty,
+                    _ => " w okolicy"
+                };
                 var alertName = Get(parameters, NotificationPayload.AlertName);
                 var details = string.Join(" · ", new[]
                 {
@@ -85,7 +88,7 @@ public static class NotificationTextFormatter
                     alertName.Length > 0 ? $"alert „{alertName}”" : string.Empty
                 }.Where(part => part.Length > 0));
 
-                return new($"Nowe ogłoszenie {where}", details.Length > 0 ? $"{title} – {details}" : title);
+                return new($"Nowe ogłoszenie{where}", details.Length > 0 ? $"{title} – {details}" : title);
             }
             case NotificationType.NewAnnouncementsDigest:
             {

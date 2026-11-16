@@ -35,9 +35,15 @@ internal static class Spatial
     public static Point CreatePoint(double latitude, double longitude)
         => Factory.CreatePoint(new Coordinate(longitude, latitude));
 
-    /// <summary>One point → Point (area alert), more → LineString (route). The route is simplified by SQL (Reduce).</summary>
-    public static Geometry CreateShape(IReadOnlyList<Location> points)
-        => points.Count == 1
-            ? CreatePoint(points[0].Latitude, points[0].Longitude)
-            : Factory.CreateLineString(points.Select(p => new Coordinate(p.Longitude, p.Latitude)).ToArray());
+    /// <summary>
+    /// One point → Point (area alert), more → LineString (route; simplified by SQL – Reduce), none → null (country –
+    /// the trigger then leaves the zone null too).
+    /// </summary>
+    public static Geometry? CreateShape(IReadOnlyList<Location> points)
+        => points.Count switch
+        {
+            0 => null,
+            1 => CreatePoint(points[0].Latitude, points[0].Longitude),
+            _ => Factory.CreateLineString(points.Select(p => new Coordinate(p.Longitude, p.Latitude)).ToArray())
+        };
 }

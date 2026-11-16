@@ -4264,7 +4264,7 @@ export interface AlertDto {
     id: string;
     name: string;
     kind: AlertKind;
-    categoryId: string;
+    categoryId: string | undefined;
     subcategoryIds: string[];
     center: LocationDto;
     routePoints: LocationDto[];
@@ -4275,7 +4275,7 @@ export interface AlertDto {
     updatedAt: string | undefined;
 }
 
-export type AlertKind = "Area" | "Route";
+export type AlertKind = "Area" | "Route" | "Country";
 
 export interface AlertScheduleDto {
     days: WeekDays;
@@ -4407,7 +4407,7 @@ export interface CounterOffer {
 export interface CreateAlert {
     name: string;
     kind: AlertKind;
-    categoryId: string;
+    categoryId: string | undefined;
     subcategoryIds: string[] | undefined;
     center: LocationDto;
     routePoints: LocationDto[] | undefined;
@@ -4697,6 +4697,7 @@ export interface UnreadCountDto {
 export interface UpdateAlert {
     name: string | undefined;
     categoryId: string | undefined;
+    allCategories: boolean | undefined;
     subcategoryIds: string[] | undefined;
     center: LocationDto;
     routePoints: LocationDto[] | undefined;

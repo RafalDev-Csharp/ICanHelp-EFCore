@@ -495,5 +495,16 @@
   i tylko po stronie z ukrytą treścią, kółko myszy przewija w poziomie; `scrollEdges` + spec). `app-map`: zoom kółkiem
   myszy na mapie interaktywnej (poglądowa bez zmian). Baza deweloperska wyczyszczona i zasiana od nowa.
   `verify.cmd`: dotnet 610/610 (Core 267, Application 225, integracyjne 118), Vitest 434/434, lint + build zielone.
+- [x] Poprawki po teście (16.11.2026): Konto – większa czcionka danych; mapa bez pinezek = cała Polska (środek 52,07 /
+  19,48, zoom 6, `POINT_MAP_ZOOM` 15 dla `center`), podpis tylko „© OSM” bez flagi Leaflet (licencja ODbL wymaga podpisu);
+  serduszko-przycisk na kartach „Szukaj” / mapy / „Ulubionych” (`likeable` + `likeToggle`, `LikeToggleService`); odstęp nad
+  kategoriami. „Blisko mnie”: 75 / 100 / 150 / 200 km (`GetAnnouncements.MaxRadiusKm` 100 → 200). Alerty: rodzaj `Country`
+  („cała Polska” – bez punktów, `RadiusKm` 0, `Shape`/`Zone` NULL, dopasowanie bez strefy), `CategoryId` opcjonalne
+  (brak = wszystkie kategorie, podkategorie tylko z kategorią; PATCH `allCategories: true`), migracja
+  `AlertCountryAndAnyCategory`; front bez pola nazwy (nazwa z kategorii i miejsca – `alertName`), „Wszystkie kategorie”,
+  „Nowy alert – cała Polska”; powiadomienie „Nowe ogłoszenie” bez odległości. Podpowiedzi adresu w trakcie pisania
+  (`GeocodingService.suggest` – Photon, od 3 znaków, 400 ms, ramka Polski, `lang=default`; Enter / lupa – dalej Nominatim).
+  Ciemniejszy okrąg promienia i pas trasy. `verify.cmd`: dotnet 615/615 (Core 271, Application 225, integracyjne 119),
+  Vitest 442/442, lint + build zielone; ręcznie w przeglądarce: alert „cała Polska” + podgląd, podpowiedzi adresu, okrąg.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

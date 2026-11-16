@@ -1,4 +1,5 @@
 using ICanHelp.Core.Entities.Alerts;
+using ICanHelp.Core.Enums;
 using ICanHelp.Core.Repositories;
 using ICanHelp.Core.ValueObjects;
 using Microsoft.EntityFrameworkCore;
@@ -23,15 +24,19 @@ internal sealed class AnnouncementAlertRepository(ICanHelpDbContext db) : IAnnou
 
         // Zone.STIntersects(@point) = 1 – can use the spatial index IX_AnnouncementAlerts_Zone (the radius is already
         // in the zone, so it does not differ per row in the condition). Distance from the shape: centre or route line.
+        // Country (no zone) – every point; no category – every category.
         var rows = await db.AnnouncementAlerts
             .Where(a => a.IsEnabled
-                        && a.CategoryId == categoryId
+                        && (a.CategoryId == null || a.CategoryId == categoryId)
                         && a.UserId != excludedUserId
-                        && EF.Property<Geometry>(a, Spatial.AlertZone).Intersects(origin))
+                        && (a.Kind == AlertKind.Country
+                            || EF.Property<Geometry>(a, Spatial.AlertZone).Intersects(origin)))
             .Select(a => new
             {
                 Alert = a,
-                Distance = EF.Property<Geometry>(a, Spatial.AlertShape).Distance(origin)
+                Distance = a.Kind == AlertKind.Country
+                    ? 0
+                    : EF.Property<Geometry>(a, Spatial.AlertShape).Distance(origin)
             })
             .ToListAsync(cancellationToken);
 

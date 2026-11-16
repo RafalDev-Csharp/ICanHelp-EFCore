@@ -21,7 +21,6 @@ import {
 function areaForm(changes: Partial<AlertFormValue> = {}): AlertFormValue {
   return {
     ...emptyAlertForm('Area'),
-    name: 'Dom',
     categoryId: 'cat-home',
     center: { latitude: 53.844, longitude: 22.979 },
     ...changes,
@@ -91,14 +90,18 @@ describe('alert form', () => {
       expect(validateAlertForm(areaForm())).toEqual({});
     });
 
-    it('requires a name, a category and a place', () => {
-      const errors = validateAlertForm({ ...emptyAlertForm('Area'), name: '   ' });
+    it('requires only a place – no name, and no category means every category', () => {
+      const errors = validateAlertForm(emptyAlertForm('Area'));
 
-      expect(Object.keys(errors).sort()).toEqual(['categoryId', 'name', 'place']);
+      expect(Object.keys(errors)).toEqual(['place']);
+    });
+
+    it('needs neither a place nor a radius for the whole of Poland', () => {
+      expect(validateAlertForm(emptyAlertForm('Country'))).toEqual({});
     });
 
     it('requires a planned route for a route alert', () => {
-      const route = { ...emptyAlertForm('Route'), name: 'Praca', categoryId: 'cat-home' };
+      const route = { ...emptyAlertForm('Route'), categoryId: 'cat-home' };
 
       expect(validateAlertForm(route).place).toContain('wyznacz trasę');
       expect(
@@ -124,11 +127,9 @@ describe('alert form', () => {
   });
 
   describe('requests', () => {
-    it('sends an area alert with the centre and without hours', () => {
-      expect(
-        toCreateAlert(areaForm({ name: '  Dom ', subcategoryIds: ['sub-plumbing'], days: DAYS_WORKDAYS })),
-      ).toEqual({
-        name: 'Dom',
+    it('sends an area alert with the centre, a generated name and without hours', () => {
+      expect(toCreateAlert(areaForm({ subcategoryIds: ['sub-plumbing'], days: DAYS_WORKDAYS }), 'Dom')).toEqual({
+        name: 'Dom (1 podkategoria) · do 5 km',
         kind: 'Area',
         categoryId: 'cat-home',
         subcategoryIds: ['sub-plumbing'],
@@ -156,6 +157,21 @@ describe('alert form', () => {
       expect(body.radiusKm).toBe(10);
       expect(body.center).toEqual({ latitude: 53.844, longitude: 22.979 });
       expect('routePoints' in body).toBe(false);
+    });
+
+    it('sends the whole of Poland for every category without a place', () => {
+      const body = toCreateAlert(emptyAlertForm('Country'));
+
+      expect(body).toMatchObject({ name: 'Wszystkie kategorie · cała Polska', kind: 'Country', subcategoryIds: [] });
+      expect(body.categoryId).toBeUndefined();
+      expect('center' in body || 'routePoints' in body).toBe(false);
+    });
+
+    it('switches a saved alert to every category with allCategories', () => {
+      const body = toUpdateAlert(areaForm({ categoryId: '' }));
+
+      expect(body.allCategories).toBe(true);
+      expect('categoryId' in body || 'subcategoryIds' in body).toBe(false);
     });
   });
 

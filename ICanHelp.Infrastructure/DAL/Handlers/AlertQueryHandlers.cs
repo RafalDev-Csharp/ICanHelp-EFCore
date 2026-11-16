@@ -59,10 +59,11 @@ internal sealed class GetAlertPreviewHandler(ICanHelpDbContext db)
             .Where(a => a.Id == alertId && a.UserId == userId)
             .Select(a => new
             {
+                a.Kind,
                 a.CategoryId,
                 a.SubcategoryIds,
-                Shape = EF.Property<Geometry>(a, Spatial.AlertShape),
-                Zone = EF.Property<Geometry>(a, Spatial.AlertZone)
+                Shape = EF.Property<Geometry?>(a, Spatial.AlertShape),
+                Zone = EF.Property<Geometry?>(a, Spatial.AlertZone)
             })
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -71,7 +72,8 @@ internal sealed class GetAlertPreviewHandler(ICanHelpDbContext db)
             return null;
         }
 
-        if (alert.Zone is null)
+        var everywhere = alert.Kind == AlertKind.Country;
+        if (alert.Zone is null && !everywhere)
         {
             return [];
         }
@@ -81,16 +83,27 @@ internal sealed class GetAlertPreviewHandler(ICanHelpDbContext db)
         var categoryId = alert.CategoryId;
         var limit = Math.Clamp(query.Limit, 1, Paging.MaxPageSize);
 
-        // GeoPoint.STIntersects(@zone) – indeks IX_Announcements_GeoPoint.
-        var candidates = await db.Announcements
+        var open = db.Announcements
             .AsNoTracking()
-            .Where(a => a.Status == AnnouncementStatus.Open
-                        && a.CategoryId == categoryId
-                        && a.OwnerId != userId
-                        && EF.Property<Point>(a, Spatial.GeoPoint).Intersects(zone))
+            .Where(a => a.Status == AnnouncementStatus.Open && a.OwnerId != userId);
+
+        if (categoryId is not null)
+        {
+            open = open.Where(a => a.CategoryId == categoryId);
+        }
+
+        // GeoPoint.STIntersects(@zone) – indeks IX_Announcements_GeoPoint. Cała Polska – bez strefy.
+        if (!everywhere)
+        {
+            open = open.Where(a => EF.Property<Point>(a, Spatial.GeoPoint).Intersects(zone));
+        }
+
+        var newest = open
             .OrderByDescending(a => a.CreatedAt)
-            .Take(MaxCandidates)
-            .ToListRows(distanceFrom: shape)
+            .Take(MaxCandidates);
+
+        // Odległość – od środka albo linii trasy; cała Polska nie ma kształtu, więc bez odległości.
+        var candidates = await (shape is null ? newest.ToListRows() : newest.ToListRows(distanceFrom: shape))
             .ToListAsync(cancellationToken);
 
         return candidates
@@ -109,7 +122,7 @@ internal static class AlertDtoMapping
             Id = entity.Id,
             Name = entity.Name,
             Kind = entity.Kind,
-            CategoryId = entity.CategoryId,
+            CategoryId = entity.CategoryId?.Value,
             SubcategoryIds = entity.SubcategoryIds.Select(s => s.Value).ToList(),
             Center = entity.Center?.AsDto(),
             RoutePoints = entity.RoutePoints.Select(p => p.AsDto()).ToList(),

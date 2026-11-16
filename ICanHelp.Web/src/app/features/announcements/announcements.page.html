@@ -133,6 +133,9 @@
     <app-announcement-card
       [announcement]="announcement"
       [liked]="likes.isLiked(announcement.id)"
+      [likeable]="likeToggle.canLike(announcement.ownerId)"
+      [likePending]="likeToggle.isPending(announcement.id)"
+      (likeToggle)="likeToggle.toggle($event)"
     ></app-announcement-card>
     }
   </ion-list>
@@ -206,6 +209,9 @@
         <app-announcement-card
           [announcement]="announcement"
           [liked]="likes.isLiked(announcement.id)"
+          [likeable]="likeToggle.canLike(announcement.ownerId)"
+          [likePending]="likeToggle.isPending(announcement.id)"
+          (likeToggle)="likeToggle.toggle($event)"
           lines="none"
         ></app-announcement-card>
       </div>

@@ -51,6 +51,7 @@ import { completeIonEvent } from '../../shared/data/ion-events';
 import { formatPrice } from '../../shared/pipes/price.pipe';
 import { pluralPl } from '../../shared/text/plural';
 
+import { LikeToggleService } from './likes/like-toggle.service';
 import { LikesService } from './likes/likes.service';
 import { AnnouncementCardComponent } from './list/announcement-card.component';
 import { NO_RADIUS_LIMIT, RADIUS_OPTIONS_KM, activeFilterCount, normalizePhrase } from './list/announcement-filters';
@@ -109,6 +110,7 @@ export class AnnouncementsPage implements OnInit, ViewWillEnter {
   protected readonly store = inject(AnnouncementListStore);
   protected readonly categories = inject(CategoriesService);
   protected readonly likes = inject(LikesService);
+  protected readonly likeToggle = inject(LikeToggleService);
 
   protected readonly radiusOptions = RADIUS_OPTIONS_KM;
   /** Opcja promienia „Bez limitu” – wyłącza „Blisko mnie”. */

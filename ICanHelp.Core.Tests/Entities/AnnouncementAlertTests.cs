@@ -45,6 +45,42 @@ public class AnnouncementAlertTests
         alert.RoutePoints.ShouldBe(new[] { Suwalki, Augustow });
     }
 
+    [Fact]
+    public void Country_HasNoPlace_NoRadius_AndMatchesEveryCategory()
+    {
+        var alert = new AnnouncementAlert(Id.New(), Owner, "Cała Polska", AlertKind.Country, categoryId: null, [], [],
+            radiusKm: 999, Now);
+
+        alert.Center.ShouldBeNull();
+        alert.RoutePoints.ShouldBeEmpty();
+        alert.RadiusKm.ShouldBe(0);
+        alert.CategoryId.ShouldBeNull();
+        alert.Matches(Plumbing, LeakingTap).ShouldBeTrue();
+        alert.Matches(Id.New(), Id.New()).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Country_WithAPoint_Throws()
+        => Should.Throw<InvalidAlertException>(() =>
+            new AnnouncementAlert(Id.New(), Owner, "Cała Polska", AlertKind.Country, Plumbing, [], [Augustow], 0, Now));
+
+    [Fact]
+    public void Subcategories_WithoutACategory_Throw()
+        => Should.Throw<InvalidAlertException>(() =>
+            new AnnouncementAlert(Id.New(), Owner, "Dom", AlertKind.Area, categoryId: null, [LeakingTap], [Augustow], 5,
+                Now));
+
+    [Fact]
+    public void Update_ToEveryCategory_MatchesOtherCategories()
+    {
+        var alert = Area();
+
+        alert.Update(Owner, "Dom", categoryId: null, [], [Augustow], 5, Now.AddHours(1));
+
+        alert.CategoryId.ShouldBeNull();
+        alert.Matches(Id.New(), Id.New()).ShouldBeTrue();
+    }
+
     [Theory]
     [InlineData(0.4)]
     [InlineData(50.1)]

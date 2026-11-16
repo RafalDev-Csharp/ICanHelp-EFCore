@@ -22,9 +22,9 @@ import {
 } from '@ionic/angular';
 import type { ViewWillEnter } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { locationOutline, navigateOutline, notificationsOutline } from 'ionicons/icons';
+import { earthOutline, locationOutline, navigateOutline, notificationsOutline } from 'ionicons/icons';
 
-import type { AlertDto } from '../../core/api/api-client';
+import type { AlertDto, AlertKind } from '../../core/api/api-client';
 import { AlertsClient } from '../../core/api/api-client';
 import { CategoriesService } from '../../core/categories/categories.service';
 import { BrandComponent } from '../../shared/components/brand/brand.component';
@@ -33,7 +33,7 @@ import { LoadFailedComponent } from '../../shared/components/load-state/load-fai
 import { LoadingComponent } from '../../shared/components/load-state/loading.component';
 import { RemoteList } from '../../shared/data/remote-list';
 
-import { ALERT_RULES, describeSchedule, formatRadius } from './alert-form';
+import { ALERT_RULES, alertWhat, alertWhere, describeSchedule } from './alert-form';
 import { AlertRemovalService } from './alert-removal.service';
 
 /**
@@ -83,9 +83,14 @@ export class AlertsPage implements ViewWillEnter {
   readonly limitReached = computed(() => this.items().length >= ALERT_RULES.maxPerUser);
 
   protected readonly maxPerUser = ALERT_RULES.maxPerUser;
+  protected readonly kindIcon: Record<AlertKind, string> = {
+    Area: 'location-outline',
+    Route: 'navigate-outline',
+    Country: 'earth-outline',
+  };
 
   constructor() {
-    addIcons({ locationOutline, navigateOutline, notificationsOutline });
+    addIcons({ earthOutline, locationOutline, navigateOutline, notificationsOutline });
   }
 
   /** Przy każdym wejściu – po zapisie albo usunięciu w edycji lista ma być aktualna. */
@@ -94,13 +99,14 @@ export class AlertsPage implements ViewWillEnter {
     this.list.reload();
   }
 
-  /** Podpis: „Hydraulika · 5 km · Dni robocze, 15:00–18:00”. */
+  /** Nagłówek: „Hydraulika”, „Hydraulika (2 podkategorie)”, „Wszystkie kategorie”. */
+  what(alert: AlertDto): string {
+    return alertWhat(alert.categoryId, alert.subcategoryIds?.length ?? 0, this.categories.name(alert.categoryId));
+  }
+
+  /** Podpis: „do 5 km · Dni robocze, 15:00–18:00”, „cała Polska · Codziennie, całą dobę”. */
   summary(alert: AlertDto): string {
-    const category = this.categories.name(alert.categoryId);
-    const subcategories = alert.subcategoryIds?.length ?? 0;
-    const what = subcategories > 0 ? `${category} (${subcategories})` : category;
-    const distance = alert.kind === 'Area' ? formatRadius(alert.radiusKm) : `${formatRadius(alert.radiusKm)} od trasy`;
-    return [what, distance, describeSchedule(alert.schedule)].filter((part) => part).join(' · ');
+    return [alertWhere(alert.kind, alert.radiusKm), describeSchedule(alert.schedule)].join(' · ');
   }
 
   setEnabled(alert: AlertDto, enabled: boolean): void {

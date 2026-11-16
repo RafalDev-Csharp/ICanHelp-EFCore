@@ -1,8 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { IonBadge, IonIcon, IonItem, IonLabel, IonNote, IonThumbnail } from '@ionic/angular';
+import { IonBadge, IonButton, IonIcon, IonItem, IonLabel, IonNote, IonThumbnail } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { heart, imageOutline } from 'ionicons/icons';
+import { heart, heartOutline, imageOutline } from 'ionicons/icons';
 
 import type { AnnouncementDto } from '../../../core/api/api-client';
 import { apiResourceUrl } from '../../../core/api/api.providers';
@@ -15,6 +15,7 @@ import { offersCountLabel, statusColor, statusLabel } from '../announcement-labe
 /**
  * Ogłoszenie na liście (i w podglądzie na mapie): miniatura, tytuł, budżet, kategoria, odległość, wiek,
  * liczba ofert i serduszko (polubione). `showStatus` – status ogłoszenia (np. „Moje ogłoszenia”).
+ * `likeable` – serduszko jako przycisk (dodaj / usuń z ulubionych → `likeToggle`; obsługę daje strona, np. `LikeToggleService`).
  */
 @Component({
   selector: 'app-announcement-card',
@@ -29,6 +30,7 @@ import { offersCountLabel, statusColor, statusLabel } from '../announcement-labe
     IonLabel,
     IonNote,
     IonBadge,
+    IonButton,
     PricePipe,
     DistancePipe,
     TimeAgoPipe,
@@ -41,6 +43,10 @@ export class AnnouncementCardComponent {
   readonly lines = input<'full' | 'inset' | 'none'>('full');
   readonly liked = input(false);
   readonly showStatus = input(false);
+  readonly likeable = input(false);
+  /** Przełączenie w toku – przycisk serduszka nieaktywny. */
+  readonly likePending = input(false);
+  readonly likeToggle = output<string>();
 
   protected readonly statusLabel = statusLabel;
   protected readonly statusColor = statusColor;
@@ -57,6 +63,13 @@ export class AnnouncementCardComponent {
   });
 
   constructor() {
-    addIcons({ heart, imageOutline });
+    addIcons({ heart, heartOutline, imageOutline });
+  }
+
+  /** Serduszko leży w wierszu z linkiem – kliknięcie nie może otworzyć szczegółów. */
+  protected toggleLike(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.likeToggle.emit(this.announcement().id);
   }
 }

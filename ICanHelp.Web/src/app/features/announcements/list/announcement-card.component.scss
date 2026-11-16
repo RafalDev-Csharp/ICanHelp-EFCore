@@ -24,12 +24,31 @@ h2 {
   font-weight: 600;
 }
 
+/* Cena u góry, pod nią serduszko (gdy karta je ma). */
+.end {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  align-self: stretch;
+  justify-content: space-between;
+  margin-inline-start: 8px;
+}
+
 .price {
-  align-self: flex-start;
   margin-top: 12px;
   color: var(--ion-text-color);
   font-weight: 600;
   font-size: 1rem;
+}
+
+.like {
+  margin: 0 -8px 4px 0;
+  --padding-start: 8px;
+  --padding-end: 8px;
+
+  ion-icon {
+    font-size: 1.5rem;
+  }
 }
 
 .liked {

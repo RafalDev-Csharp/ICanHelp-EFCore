@@ -25,7 +25,7 @@ import { addIcons } from 'ionicons';
 import { notificationsOffOutline } from 'ionicons/icons';
 import type { Observable } from 'rxjs';
 
-import type { AlertKind, AnnouncementDto } from '../../core/api/api-client';
+import type { AnnouncementDto } from '../../core/api/api-client';
 import { AlertsClient } from '../../core/api/api-client';
 import { errorStatus } from '../../core/api/api-errors';
 import { CategoriesService } from '../../core/categories/categories.service';
@@ -45,8 +45,10 @@ import {
   DAYS_WORKDAYS,
   WEEK_DAYS,
   alertFormFrom,
+  alertName,
   emptyAlertForm,
   formatRadius,
+  parseAlertKind,
   toCreateAlert,
   toUpdateAlert,
   validateAlertForm,
@@ -133,8 +135,9 @@ export class AlertEditPage implements OnInit {
     if (this.alertId()) {
       return 'Alert';
     }
-    return this.form().kind === 'Area' ? 'Alert w okolicy' : 'Alert po drodze';
+    return { Area: 'Alert w okolicy', Route: 'Alert po drodze', Country: 'Alert – cała Polska' }[this.form().kind];
   });
+  private readonly categoryName = computed(() => this.categories.name(this.form().categoryId));
 
   constructor() {
     addIcons({ notificationsOffOutline });
@@ -144,8 +147,7 @@ export class AlertEditPage implements OnInit {
     this.categories.load().subscribe({ error: () => undefined });
     const alertId = this.route.snapshot.paramMap.get('alertId');
     if (!alertId) {
-      const kind: AlertKind = this.route.snapshot.queryParamMap.get('kind') === 'Route' ? 'Route' : 'Area';
-      this.form.set(emptyAlertForm(kind));
+      this.form.set(emptyAlertForm(parseAlertKind(this.route.snapshot.queryParamMap.get('kind'))));
       this.state.set('ready');
       return;
     }
@@ -175,10 +177,6 @@ export class AlertEditPage implements OnInit {
   /** Zmiana pól formularza (miejsce, trasa, dni – wartości już sprawdzone przez komponent pola). */
   patch(changes: Partial<AlertFormValue>): void {
     this.form.update((value) => ({ ...value, ...changes }));
-  }
-
-  setName(value: unknown): void {
-    this.patch({ name: asText(value) });
   }
 
   /** Inna kategoria = podkategorie od nowa (należały do poprzedniej). */
@@ -234,8 +232,8 @@ export class AlertEditPage implements OnInit {
     this.saving.set(true);
     const alertId = this.alertId();
     const request: Observable<unknown> = alertId
-      ? this.client.update(alertId, toUpdateAlert(this.form()))
-      : this.client.create(toCreateAlert(this.form()));
+      ? this.client.update(alertId, toUpdateAlert(this.form(), this.categoryName()))
+      : this.client.create(toCreateAlert(this.form(), this.categoryName()));
     request.subscribe({
       next: () => {
         this.saving.set(false);
@@ -255,7 +253,7 @@ export class AlertEditPage implements OnInit {
 
   async remove(): Promise<void> {
     const alertId = this.alertId();
-    if (alertId && (await this.removal.remove({ id: alertId, name: this.form().name }))) {
+    if (alertId && (await this.removal.remove({ id: alertId, name: alertName(this.form(), this.categoryName()) }))) {
       this.backToList();
     }
   }

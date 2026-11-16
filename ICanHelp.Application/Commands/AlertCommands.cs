@@ -7,7 +7,8 @@ namespace ICanHelp.Application.Commands;
 
 /// <summary>
 /// Nowy alert o ogłoszeniach (Krok 14). <c>Area</c> – podaj <see cref="Center"/>; <c>Route</c> – podaj
-/// <see cref="RoutePoints"/> (polilinia z serwisu routingu, min. 2 punkty). Puste <see cref="SubcategoryIds"/> = cała kategoria.
+/// <see cref="RoutePoints"/> (polilinia z serwisu routingu, min. 2 punkty); <c>Country</c> – cała Polska, bez miejsca
+/// i promienia. Puste <see cref="SubcategoryIds"/> = cała kategoria, brak <see cref="CategoryId"/> = wszystkie kategorie.
 /// </summary>
 public sealed record CreateAlert : ICommand
 {
@@ -16,7 +17,7 @@ public sealed record CreateAlert : ICommand
 
     public string Name { get; init; } = string.Empty;
     public AlertKind Kind { get; init; } = AlertKind.Area;
-    public Guid CategoryId { get; init; }
+    public Guid? CategoryId { get; init; }
     public IReadOnlyList<Guid>? SubcategoryIds { get; init; }
     public LocationDto? Center { get; init; }
     public IReadOnlyList<LocationDto>? RoutePoints { get; init; }
@@ -29,6 +30,7 @@ public sealed record CreateAlert : ICommand
 /// <summary>
 /// Częściowa zmiana alertu (PATCH): <c>null</c> = bez zmian. Rodzaju (Area/Route) zmienić się nie da.
 /// Zmiana kategorii bez <see cref="SubcategoryIds"/> czyści podkategorie (należały do starej kategorii).
+/// <see cref="AllCategories"/> = <c>true</c> – wszystkie kategorie (bez <see cref="CategoryId"/> i podkategorii).
 /// <see cref="Schedule"/> podany = zastępuje cały harmonogram. Zmiana punktów/promienia przelicza strefę w bazie.
 /// </summary>
 public sealed record UpdateAlert : ICommand
@@ -38,6 +40,7 @@ public sealed record UpdateAlert : ICommand
 
     public string? Name { get; init; }
     public Guid? CategoryId { get; init; }
+    public bool? AllCategories { get; init; }
     public IReadOnlyList<Guid>? SubcategoryIds { get; init; }
     public LocationDto? Center { get; init; }
     public IReadOnlyList<LocationDto>? RoutePoints { get; init; }

@@ -61,16 +61,22 @@ describe('AlertsPage', () => {
           schedule: { days: 'Workdays', from: '15:00:00', to: '18:00:00' },
           isEnabled: false,
         }),
+        alertFixture({ id: 'al-3', kind: 'Country', categoryId: undefined, radiusKm: 0, center: undefined }),
       ]),
     );
     const { element } = create();
 
     const items = element.querySelectorAll('[data-testid="alert-item"]');
-    expect(items).toHaveLength(2);
-    expect(items[0].textContent).toContain('W okolicy · Naprawy · 5 km · Codziennie, całą dobę');
-    expect(items[1].textContent).toContain('Po drodze · Naprawy (1) · 2 km od trasy · Dni robocze, 15:00–18:00');
+    expect(items).toHaveLength(3);
+    expect(items[0].querySelector('h2')?.textContent).toBe('Naprawy');
+    expect(items[0].textContent).toContain('do 5 km · Codziennie, całą dobę');
+    expect(items[1].querySelector('h2')?.textContent).toBe('Naprawy (1 podkategoria)');
+    expect(items[1].textContent).toContain('2 km od trasy · Dni robocze, 15:00–18:00');
+    expect(items[2].querySelector('h2')?.textContent).toBe('Wszystkie kategorie');
+    expect(items[2].textContent).toContain('cała Polska · Codziennie, całą dobę');
     expect(element.querySelector('[data-testid="add-area"]')).not.toBeNull();
     expect(element.querySelector('[data-testid="add-route"]')).not.toBeNull();
+    expect(element.querySelector('[data-testid="add-country"]')).not.toBeNull();
   });
 
   it('shows the empty state with both add buttons', () => {

@@ -26,6 +26,7 @@ import { LoadFailedComponent } from '../../shared/components/load-state/load-fai
 import { LoadingComponent } from '../../shared/components/load-state/loading.component';
 import { NotificationsBellComponent } from '../../shared/components/notifications-bell/notifications-bell.component';
 import { RemoteList } from '../../shared/data/remote-list';
+import { LikeToggleService } from '../announcements/likes/like-toggle.service';
 import { LikesService } from '../announcements/likes/likes.service';
 import { AnnouncementCardComponent } from '../announcements/list/announcement-card.component';
 
@@ -62,6 +63,7 @@ export class LikedAnnouncementsPage implements ViewWillEnter {
   private readonly client = inject(AnnouncementsClient);
   private readonly categories = inject(CategoriesService);
   protected readonly likes = inject(LikesService);
+  protected readonly likeToggle = inject(LikeToggleService);
 
   protected readonly list = new RemoteList<AnnouncementDto>(() => this.fetchLiked());
   /** Odklikane serduszko w szczegółach znika z listy od razu (bez ponownego wczytania). */

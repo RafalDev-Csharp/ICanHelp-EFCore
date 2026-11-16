@@ -10,7 +10,9 @@ namespace ICanHelp.Core.Entities.Alerts;
 /// <item><see cref="AlertKind.Area"/> – <see cref="RadiusKm"/> around one point (<see cref="Center"/>, e.g. home),</item>
 /// <item><see cref="AlertKind.Route"/> – <see cref="RadiusKm"/> on both sides of a line (<see cref="RoutePoints"/>, e.g.
 /// work → home; the polyline comes from a routing service on the client).</item>
+/// <item><see cref="AlertKind.Country"/> – everywhere (no points, <see cref="RadiusKm"/> = 0).</item>
 /// </list>
+/// No <see cref="CategoryId"/> = every category (then no subcategories either).
 /// The domain keeps plain points; the geometry (<c>Shape</c> = point or LINESTRING, <c>Zone</c> = shape buffered by the
 /// radius in metres) exists only in the database (Infrastructure), so Core stays free of NetTopologySuite.
 /// Category, subcategories and the schedule are checked here (<see cref="Matches"/>, <see cref="IsActiveAt"/>).
@@ -31,12 +33,13 @@ public class AnnouncementAlert
     public StringObject Name { get; private set; }
     public AlertKind Kind { get; private set; }
 
-    public Id CategoryId { get; private set; }
+    /// <summary><c>null</c> = every category.</summary>
+    public Id? CategoryId { get; private set; }
 
     /// <summary>Subcategories of <see cref="CategoryId"/>; empty = the whole category.</summary>
     public IReadOnlyList<Id> SubcategoryIds { get; private set; }
 
-    /// <summary>Area: exactly one point (the centre). Route: the polyline, at least two points.</summary>
+    /// <summary>Area: exactly one point (the centre). Route: the polyline, at least two points. Country: none.</summary>
     public IReadOnlyList<Location> Points { get; private set; }
 
     public double RadiusKm { get; private set; }
@@ -60,7 +63,7 @@ public class AnnouncementAlert
     {
     }
 
-    public AnnouncementAlert(Id id, UserId userId, StringObject name, AlertKind kind, Id categoryId,
+    public AnnouncementAlert(Id id, UserId userId, StringObject name, AlertKind kind, Id? categoryId,
         IEnumerable<Id> subcategoryIds, IEnumerable<Location> points, double radiusKm, DateTime createdAtUtc)
     {
         if (!Enum.IsDefined(kind))
@@ -73,9 +76,9 @@ public class AnnouncementAlert
         Kind = kind;
         Name = name;
         CategoryId = categoryId;
-        SubcategoryIds = ToSubcategories(subcategoryIds);
+        SubcategoryIds = ToSubcategories(categoryId, subcategoryIds);
         Points = ToPoints(kind, points);
-        RadiusKm = ToRadius(radiusKm);
+        RadiusKm = ToRadius(kind, radiusKm);
         ActiveDays = WeekDays.All;
         IsEnabled = true;
         CreatedAt = createdAtUtc;
@@ -94,14 +97,14 @@ public class AnnouncementAlert
     /// New values (the handler fills the ones not sent in PATCH with the current ones). The kind cannot change –
     /// a route stays a route. The database recomputes the zone when the points or the radius change.
     /// </summary>
-    public void Update(UserId actorId, StringObject name, Id categoryId, IEnumerable<Id> subcategoryIds,
+    public void Update(UserId actorId, StringObject name, Id? categoryId, IEnumerable<Id> subcategoryIds,
         IEnumerable<Location> points, double radiusKm, DateTime changedAtUtc)
     {
         EnsureOwner(actorId);
 
         var newPoints = ToPoints(Kind, points);
-        var newSubcategories = ToSubcategories(subcategoryIds);
-        var newRadius = ToRadius(radiusKm);
+        var newSubcategories = ToSubcategories(categoryId, subcategoryIds);
+        var newRadius = ToRadius(Kind, radiusKm);
 
         Name = name;
         CategoryId = categoryId;
@@ -153,7 +156,7 @@ public class AnnouncementAlert
     /// <summary>Is the alert interested in an announcement of this category/subcategory (geometry is checked by the DB)?</summary>
     public bool Matches(Id categoryId, Id subcategoryId)
         => IsEnabled
-           && CategoryId == categoryId
+           && (CategoryId is null || CategoryId == categoryId)
            && (SubcategoryIds.Count == 0 || SubcategoryIds.Contains(subcategoryId));
 
     /// <summary>
@@ -201,8 +204,14 @@ public class AnnouncementAlert
         }
     }
 
-    private static double ToRadius(double radiusKm)
+    /// <summary>Country has no zone – whatever was sent, the radius is 0.</summary>
+    private static double ToRadius(AlertKind kind, double radiusKm)
     {
+        if (kind == AlertKind.Country)
+        {
+            return 0;
+        }
+
         if (double.IsNaN(radiusKm) || radiusKm is < MinRadiusKm or > MaxRadiusKm)
         {
             throw new InvalidAlertException($"Radius must be between {MinRadiusKm} and {MaxRadiusKm} km.");
@@ -214,6 +223,16 @@ public class AnnouncementAlert
     private static Location[] ToPoints(AlertKind kind, IEnumerable<Location> points)
     {
         var list = (points ?? throw new InvalidAlertException("Points are required.")).ToArray();
+
+        if (kind == AlertKind.Country)
+        {
+            if (list.Length != 0)
+            {
+                throw new InvalidAlertException("A country alert has no points.");
+            }
+
+            return list;
+        }
 
         if (kind == AlertKind.Area)
         {
@@ -242,9 +261,14 @@ public class AnnouncementAlert
         return list;
     }
 
-    private static Id[] ToSubcategories(IEnumerable<Id>? subcategoryIds)
+    private static Id[] ToSubcategories(Id? categoryId, IEnumerable<Id>? subcategoryIds)
     {
         var list = (subcategoryIds ?? []).Distinct().ToArray();
+
+        if (categoryId is null && list.Length > 0)
+        {
+            throw new InvalidAlertException("Subcategories need a category (no category = every category).");
+        }
 
         if (list.Length > MaxSubcategories)
         {

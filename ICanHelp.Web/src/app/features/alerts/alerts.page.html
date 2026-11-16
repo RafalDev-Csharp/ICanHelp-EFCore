@@ -29,14 +29,14 @@
     <ion-item-sliding #sliding>
       <ion-item [routerLink]="['/profile/alerts', alert.id]" [detail]="false" data-testid="alert-item">
         <ion-icon
-          [name]="alert.kind === 'Area' ? 'location-outline' : 'navigate-outline'"
+          [name]="kindIcon[alert.kind]"
           slot="start"
           [color]="alert.isEnabled ? 'primary' : 'medium'"
           aria-hidden="true"
         ></ion-icon>
         <ion-label class="ion-text-wrap" [class.disabled]="!alert.isEnabled">
-          <h2>{{ alert.name }}</h2>
-          <p>{{ alert.kind === 'Area' ? 'W okolicy' : 'Po drodze' }} · {{ summary(alert) }}</p>
+          <h2>{{ what(alert) }}</h2>
+          <p>{{ summary(alert) }}</p>
         </ion-label>
         <ion-toggle
           slot="end"
@@ -44,7 +44,7 @@
           [disabled]="busy().has(alert.id)"
           (click)="$event.stopPropagation()"
           (ionChange)="setEnabled(alert, $event.detail.checked)"
-          [attr.aria-label]="(alert.isEnabled ? 'Wyłącz alert ' : 'Włącz alert ') + alert.name"
+          [attr.aria-label]="(alert.isEnabled ? 'Wyłącz alert ' : 'Włącz alert ') + what(alert)"
           data-testid="alert-toggle"
         ></ion-toggle>
       </ion-item>
@@ -76,6 +76,16 @@
     >
       <ion-icon name="navigate-outline" slot="start" aria-hidden="true"></ion-icon>
       Nowy alert po drodze
+    </ion-button>
+    <ion-button
+      expand="block"
+      fill="outline"
+      routerLink="/profile/alerts/new"
+      [queryParams]="{ kind: 'Country' }"
+      data-testid="add-country"
+    >
+      <ion-icon name="earth-outline" slot="start" aria-hidden="true"></ion-icon>
+      Nowy alert – cała Polska
     </ion-button>
     }
   </div>

@@ -13,7 +13,7 @@ namespace ICanHelp.Application.Queries;
 public sealed class GetAnnouncements : IQuery<IReadOnlyList<AnnouncementDto>>
 {
     public const double DefaultRadiusKm = 10;
-    public const double MaxRadiusKm = 100;
+    public const double MaxRadiusKm = 200;
 
     public Guid? OwnerId { get; init; }
     public Guid? CategoryId { get; init; }
@@ -26,7 +26,7 @@ public sealed class GetAnnouncements : IQuery<IReadOnlyList<AnnouncementDto>>
     /// <summary>Search centre – longitude (WGS84, -180..180). Must be given together with <see cref="Latitude"/>.</summary>
     public double? Longitude { get; init; }
 
-    /// <summary>Search radius in kilometres (default 10, max 100). Only together with a location.</summary>
+    /// <summary>Search radius in kilometres (default 10, max 200). Only together with a location.</summary>
     public double? RadiusKm { get; init; }
 
     /// <summary>

@@ -12,7 +12,7 @@
       <ion-badge class="status" [color]="statusColor(item.status)">{{ statusLabel(item.status) }}</ion-badge>
     }
     <h2>
-      @if (liked()) {
+      @if (liked() && !likeable()) {
         <ion-icon class="liked" name="heart" color="danger" aria-label="Polubione"></ion-icon>
       }
       {{ item.title }}
@@ -30,5 +30,21 @@
       }
     </p>
   </ion-label>
-  <ion-note slot="end" class="price">{{ item.budget.amount | price }}</ion-note>
+  <div slot="end" class="end">
+    <ion-note class="price">{{ item.budget.amount | price }}</ion-note>
+    @if (likeable()) {
+      <ion-button
+        class="like"
+        fill="clear"
+        size="small"
+        color="danger"
+        [disabled]="likePending()"
+        [attr.aria-label]="liked() ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'"
+        [attr.aria-pressed]="liked()"
+        (click)="toggleLike($event)"
+      >
+        <ion-icon slot="icon-only" [name]="liked() ? 'heart' : 'heart-outline'" aria-hidden="true"></ion-icon>
+      </ion-button>
+    }
+  </div>
 </ion-item>

@@ -91,12 +91,12 @@ function describeFromParameters(notification: NotificationDto): NotificationText
     }
     case 'NewAnnouncementNearby': {
       const distance = formatDistance(parseNumber(p['distanceKm']));
-      const where = p['alertKind'] === 'Route' ? 'po drodze' : 'w okolicy';
+      const where = { Route: ' po drodze', Country: '' }[p['alertKind'] ?? ''] ?? ' w okolicy';
       const details = [distance, p['categoryName'], p['alertName'] ? `alert „${p['alertName']}”` : '']
         .filter((part) => !!part)
         .join(' · ');
       return {
-        title: `Nowe ogłoszenie ${where}`,
+        title: `Nowe ogłoszenie${where}`,
         body: details ? `${title} – ${details}` : title,
         icon: 'location-outline',
       };

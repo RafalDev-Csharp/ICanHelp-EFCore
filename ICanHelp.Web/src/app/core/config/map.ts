@@ -6,14 +6,15 @@ import type { GeoPoint } from '../geo/geo-point';
  */
 export const MAP_TILES = {
   url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  attribution:
-    '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+  attribution: '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">&copy; OSM</a>',
   maxZoom: 19,
 } as const;
 
-/** Środek mapy, gdy nie ma pinezek ani pozycji użytkownika: Augustów (MVP – test w jednym mieście). */
-export const DEFAULT_MAP_CENTER: GeoPoint = { latitude: 53.8437, longitude: 22.9785 };
-export const DEFAULT_MAP_ZOOM = 12;
+/** Środek mapy, gdy nie ma pinezek ani pozycji użytkownika: środek Polski, oddalony – widać prawie cały kraj. */
+export const DEFAULT_MAP_CENTER: GeoPoint = { latitude: 52.07, longitude: 19.48 };
+export const DEFAULT_MAP_ZOOM = 6;
+/** Zbliżenie na jeden punkt (`center` bez własnego `zoom`). */
+export const POINT_MAP_ZOOM = 15;
 
 /** Link „Otwórz w mapach” – pełna mapa OSM z pinezką. */
 export function openStreetMapUrl(point: GeoPoint, zoom = 16): string {
@@ -31,6 +32,20 @@ export const GEOCODING = {
   countryCodes: 'pl',
   limit: 5,
   minIntervalMs: 1_100,
+} as const;
+
+/**
+ * Podpowiedzi adresu w trakcie pisania: Photon (komoot, dane OSM) – w przeciwieństwie do Nominatim jest do tego
+ * przeznaczony. Darmowy, bez klucza, „fair use” – dlatego dopiero od 3 znaków i po przerwie w pisaniu. Ramka = Polska.
+ */
+export const SUGGESTIONS = {
+  url: 'https://photon.komoot.io/api/',
+  minLength: 3,
+  debounceMs: 400,
+  limit: 5,
+  /** min. długość, min. szerokość, maks. długość, maks. szerokość. */
+  bbox: '14.07,49.0,24.15,54.84',
+  countryCode: 'PL',
 } as const;
 
 /**

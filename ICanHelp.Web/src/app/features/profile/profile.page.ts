@@ -36,6 +36,7 @@ import { AppSettingsComponent } from './app-settings.component';
 @Component({
   selector: 'app-profile',
   templateUrl: './profile.page.html',
+  styleUrls: ['./profile.page.scss'],
   imports: [
     BrandComponent,
     NotificationsBellComponent,

@@ -40,7 +40,7 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                     b.Property<TimeOnly?>("ActiveTo")
                         .HasColumnType("time");
 
-                    b.Property<Guid>("CategoryId")
+                    b.Property<Guid?>("CategoryId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreatedAt")
@@ -67,7 +67,6 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                         .HasColumnType("float");
 
                     b.Property<Geometry>("Shape")
-                        .IsRequired()
                         .HasColumnType("geography");
 
                     b.Property<string>("SubcategoryIds")
@@ -748,8 +747,7 @@ namespace ICanHelp.Infrastructure.DAL.Migrations
                     b.HasOne("ICanHelp.Core.Entities.Category", null)
                         .WithMany()
                         .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("ICanHelp.Core.Entities.Users.User", null)
                         .WithMany()

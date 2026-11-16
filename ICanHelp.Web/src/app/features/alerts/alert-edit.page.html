@@ -23,23 +23,10 @@
   <div class="fields">
     <section>
       <p class="intro">
-        @if (value.kind === 'Area') { Damy znać, gdy w pobliżu tego miejsca pojawi się nowe ogłoszenie z wybranej
-        kategorii. } @else { Damy znać, gdy przy Twojej trasie (np. z pracy do domu) pojawi się nowe ogłoszenie z
-        wybranej kategorii. }
+        @switch (value.kind) { @case ('Area') { Damy znać, gdy w pobliżu tego miejsca pojawi się nowe ogłoszenie. }
+        @case ('Route') { Damy znać, gdy przy Twojej trasie (np. z pracy do domu) pojawi się nowe ogłoszenie. } @default
+        { Damy znać o każdym nowym ogłoszeniu w Polsce – najlepiej z jednej kategorii, żeby nie było ich za dużo. } }
       </p>
-      <ion-input
-        fill="outline"
-        label="Nazwa"
-        labelPlacement="floating"
-        [placeholder]="value.kind === 'Area' ? 'np. Dom' : 'np. Droga z pracy'"
-        [value]="value.name"
-        [maxlength]="rules.name.max"
-        (ionInput)="setName($event.detail.value)"
-        [class.ion-invalid]="!!error.name"
-        [class.ion-touched]="!!error.name"
-        [errorText]="error.name"
-        data-testid="alert-name"
-      ></ion-input>
     </section>
 
     <section>
@@ -52,10 +39,9 @@
         cancelText="Anuluj"
         [value]="value.categoryId"
         (ionChange)="setCategory($event.detail.value)"
-        [class.ion-invalid]="!!error.categoryId"
-        [class.ion-touched]="!!error.categoryId"
-        [errorText]="error.categoryId"
+        data-testid="alert-category"
       >
+        <ion-select-option value="">Wszystkie kategorie</ion-select-option>
         @for (category of categories.categories(); track category.id) {
         <ion-select-option [value]="category.id">{{ category.name }}</ion-select-option>
         }
@@ -84,6 +70,7 @@
       }
     </section>
 
+    @if (value.kind !== 'Country') {
     <section>
       <h2>{{ value.kind === 'Area' ? 'Gdzie?' : 'Twoja trasa' }}</h2>
       @if (value.kind === 'Area') {
@@ -127,6 +114,7 @@
         </ion-range>
       </div>
     </section>
+    }
 
     <section>
       <h2>Kiedy?</h2>

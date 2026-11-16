@@ -244,15 +244,17 @@
 - Api: `DevicesController` – `GET/POST api/me/devices`, `DELETE api/me/devices/{id}` (cudze → 404 `DeviceNotFound`).
 
 ## Alerty (Krok 14)
-- `Core/Entities/Alerts/AnnouncementAlert`: obszar (1 punkt) albo trasa (2–1000 punktów), promień 0,5–50 km, kategoria + podkategorie
-  (puste = cała), `ActiveDays`/`ActiveFrom`/`ActiveTo` (czas lokalny, przez północ OK), `IsEnabled`, max 10 na użytkownika.
+- `Core/Entities/Alerts/AnnouncementAlert`: obszar (1 punkt) albo trasa (2–1000 punktów), promień 0,5–50 km, albo `Country`
+  (cała Polska: bez punktów, promień 0, `Shape`/`Zone` NULL); kategoria opcjonalna (brak = wszystkie) + podkategorie
+  (puste = cała; tylko z kategorią), `ActiveDays`/`ActiveFrom`/`ActiveTo` (czas lokalny, przez północ OK), `IsEnabled`, max 10 na użytkownika.
   Błędne dane → `InvalidAlertException` (400), limit → `DomainRuleException` (409), cudzy alert → `AlertNotFoundException` (404).
 - Tabela `AnnouncementAlerts`: `Points`/`SubcategoryIds` jako JSON (`DAL/Converters/AlertConverters.cs`, porównanie po zawartości),
   `Shape geography` (punkt / LINESTRING – ustawia `ICanHelpDbContext.ApplyAlertShapes()` przed zapisem, gdy alert nowy albo zmieniły się
   punkty), `Zone geography` (liczy trigger `TR_AnnouncementAlerts_Zone`: `Shape.MakeValid().Reduce(25).STBuffer(RadiusKm*1000)`,
   EF go nie zapisuje) + `IX_AnnouncementAlerts_Zone` (spatial, w migracji). Trigger zadeklarowany w EF (`HasTrigger`) – bez `OUTPUT`.
-- Dopasowanie (`AnnouncementAlertRepository.FindCandidatesAsync`): `IsEnabled AND CategoryId AND UserId <> właściciel AND
-  Zone.STIntersects(@punkt) = 1`, odległość `Shape.STDistance(@punkt)` (od środka albo od linii trasy). Podkategorie i harmonogram –
+- Dopasowanie (`AnnouncementAlertRepository.FindCandidatesAsync`): `IsEnabled AND (CategoryId IS NULL OR = kategoria) AND
+  UserId <> właściciel AND (Kind = Country OR Zone.STIntersects(@punkt) = 1)`, odległość `Shape.STDistance(@punkt)` (od środka
+  albo od linii trasy; Country – 0, powiadomienie bez `distanceKm`). Podkategorie i harmonogram –
   domena (`Matches`, `IsActiveAt`).
 - `Application/Notifications/NewAnnouncementAlertHandler` (`AnnouncementPublished`): tylko ogłoszenie wciąż `Open`; jeden wpis na
   użytkownika (najbliższy alert); `NewAnnouncementNearby` (announcementTitle, categoryName, alertName, alertKind, distanceKm „3.2”);
@@ -260,5 +262,5 @@
   w ciszy nocnej (`Alerts:QuietHours*`) zapis bez `INotificationSender`. Ustawienia: `Application/Alerts/AlertOptions`
   (rejestruje Infrastructure z sekcji `Alerts`).
 - Api (`AlertsController`, `api/me/alerts`): GET lista, GET `{id}`, POST (201), PATCH (null = bez zmian; nowa kategoria bez
-  podkategorii = cała kategoria; `schedule` zastępuje harmonogram), DELETE, POST `{id}/enable|disable`, GET `{id}/preview?limit=`
+  podkategorii = cała kategoria; `allCategories: true` = wszystkie kategorie; `schedule` zastępuje harmonogram), DELETE, POST `{id}/enable|disable`, GET `{id}/preview?limit=`
   (otwarte ogłoszenia w strefie teraz – `GeoPoint.STIntersects(@zone)`, podkategorie w pamięci z max 500 najnowszych).

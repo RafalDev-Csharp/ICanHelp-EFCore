@@ -33,6 +33,9 @@
     <app-announcement-card
       [announcement]="item"
       [liked]="true"
+      [likeable]="true"
+      [likePending]="likeToggle.isPending(item.id)"
+      (likeToggle)="likeToggle.toggle($event)"
       [showStatus]="item.status !== 'Open'"
     ></app-announcement-card>
     }

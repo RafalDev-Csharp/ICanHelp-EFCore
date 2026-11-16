@@ -96,9 +96,9 @@ describe('AnnouncementsPage', () => {
 
     const cards = element.querySelectorAll('app-announcement-card');
     expect(cards[0].querySelector('.offers')?.textContent).toContain('3 oferty');
-    expect(cards[0].querySelector('.liked')).not.toBeNull();
+    expect(cards[0].querySelector('.like')?.getAttribute('aria-pressed')).toBe('true');
     expect(cards[1].querySelector('.offers')).toBeNull();
-    expect(cards[1].querySelector('.liked')).toBeNull();
+    expect(cards[1].querySelector('.like')?.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('asks for the position only after "near me" is clicked and shows distances', async () => {
