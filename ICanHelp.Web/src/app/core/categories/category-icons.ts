@@ -1,10 +1,17 @@
 import { addIcons } from 'ionicons';
 import {
+  bedOutline,
+  carOutline,
   chatbubbleEllipsesOutline,
   colorPaletteOutline,
+  cubeOutline,
+  desktopOutline,
   flashOutline,
   gridOutline,
   hammerOutline,
+  leafOutline,
+  schoolOutline,
+  sparklesOutline,
   waterOutline,
 } from 'ionicons/icons';
 
@@ -12,15 +19,22 @@ import {
 export const DEFAULT_CATEGORY_ICON = 'grid-outline';
 
 /**
- * Kafelki kategorii na zakładce „Szukaj” – placeholdery z Ionicons po nazwie kategorii z seeda backendu
- * (`DbInitializer`). Docelowe kategorie i ikony – później (wtedy najlepiej pole `icon` w `CategoryDto`).
+ * Kafelki kategorii na zakładce „Szukaj” – ikony z Ionicons po nazwie kategorii z seeda backendu
+ * (`DbInitializer`, klucze małymi literami). Docelowo najlepiej pole `icon` w `CategoryDto`.
  */
 const CATEGORY_ICONS: Readonly<Record<string, string>> = {
-  plumbing: 'water-outline',
-  painting: 'color-palette-outline',
-  assembly: 'hammer-outline',
-  electrical: 'flash-outline',
-  advice: 'chatbubble-ellipses-outline',
+  hydraulika: 'water-outline',
+  elektryka: 'flash-outline',
+  'drobne naprawy domowe': 'hammer-outline',
+  'malowanie i wykończenia': 'color-palette-outline',
+  'meble i montaż': 'bed-outline',
+  'ogród i podwórko': 'leaf-outline',
+  sprzątanie: 'sparkles-outline',
+  'przeprowadzki i transport': 'cube-outline',
+  'auto i rower': 'car-outline',
+  'komputery i elektronika': 'desktop-outline',
+  'korepetycje i nauka': 'school-outline',
+  'porady i pomoc codzienna': 'chatbubble-ellipses-outline',
 };
 
 export function categoryIcon(name: string | null | undefined): string {
@@ -29,5 +43,19 @@ export function categoryIcon(name: string | null | undefined): string {
 
 /** Rejestruje ikony z mapy (wołane w konstruktorze strony z kafelkami). */
 export function registerCategoryIcons(): void {
-  addIcons({ waterOutline, colorPaletteOutline, hammerOutline, flashOutline, chatbubbleEllipsesOutline, gridOutline });
+  addIcons({
+    bedOutline,
+    carOutline,
+    chatbubbleEllipsesOutline,
+    colorPaletteOutline,
+    cubeOutline,
+    desktopOutline,
+    flashOutline,
+    gridOutline,
+    hammerOutline,
+    leafOutline,
+    schoolOutline,
+    sparklesOutline,
+    waterOutline,
+  });
 }

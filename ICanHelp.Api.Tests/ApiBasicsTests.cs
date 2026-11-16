@@ -28,9 +28,9 @@ public sealed class ApiBasicsTests
         var categories = await _client.GetFromJsonAsync<List<CategoryDto>>("/api/categories");
 
         categories.ShouldNotBeNull();
-        categories.Count.ShouldBeGreaterThanOrEqualTo(5);
-        var plumbing = categories.Single(c => c.Name == "Plumbing");
-        plumbing.Subcategories.Select(s => s.Name).ShouldContain("Leaking tap");
+        categories.Count.ShouldBeGreaterThanOrEqualTo(12);
+        var plumbing = categories.Single(c => c.Name == "Hydraulika");
+        plumbing.Subcategories.Select(s => s.Name).ShouldContain("Cieknący kran / spłuczka");
     }
 
     [Fact]
