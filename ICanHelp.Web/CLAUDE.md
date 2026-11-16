@@ -44,7 +44,7 @@ core/             jedno miejsce na całą aplikację: config/locale.ts (pl-PL, P
 shared/           components/ (EmptyStateComponent, `app-loading` / `app-load-failed` – stany „wczytuję” i „nie udało się”
                   z „Spróbuj ponownie”, `app-brand` – logo w nagłówku każdej strony → `/announcements`,
                   `app-notifications-bell` – dzwonek z plakietką w nagłówku korzeni zakładek, `app-map` – Leaflet: pinezki, okrąg promienia, trasa z pasem, tryb poglądowy,
-                  `app-place-search` – moja pozycja + adres),
+                  `app-place-search` – moja pozycja + adres, `app-scroll-row` – poziomy wiersz: palec / strzałki przy myszy / kółko),
                   data/ (`RemoteList` / `PagedList` – lista z API ze stanem `loading | ready | failed`, odświeżanie i
                   doładowywanie; `RemoteData` / `RemoteItem` – jeden zasób, 404 → `not-found`; `runExclusive` – jedna akcja
                   naraz; `completeIonEvent`), forms/ (`validators`: `notBlank`, `cents`, `minLengthIfPresent`),

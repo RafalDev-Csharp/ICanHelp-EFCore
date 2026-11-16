@@ -21,7 +21,6 @@ import {
   IonSelectOption,
   IonSkeletonText,
   IonSpinner,
-  IonTitle,
   IonToolbar,
 } from '@ionic/angular';
 import type { ViewWillEnter } from '@ionic/angular';
@@ -47,6 +46,7 @@ import { LoadFailedComponent } from '../../shared/components/load-state/load-fai
 import type { MapCircle, MapMarker } from '../../shared/components/map/map.component';
 import { MapComponent } from '../../shared/components/map/map.component';
 import { NotificationsBellComponent } from '../../shared/components/notifications-bell/notifications-bell.component';
+import { ScrollRowComponent } from '../../shared/components/scroll-row/scroll-row.component';
 import { completeIonEvent } from '../../shared/data/ion-events';
 import { formatPrice } from '../../shared/pipes/price.pipe';
 import { pluralPl } from '../../shared/text/plural';
@@ -75,10 +75,10 @@ function optionalId(value: unknown): string | undefined {
   imports: [
     BrandComponent,
     NotificationsBellComponent,
+    ScrollRowComponent,
     IonSearchbar,
     IonHeader,
     IonToolbar,
-    IonTitle,
     IonButtons,
     IonContent,
     IonSegment,

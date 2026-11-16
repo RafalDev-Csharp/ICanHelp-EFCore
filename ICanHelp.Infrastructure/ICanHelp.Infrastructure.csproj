@@ -29,6 +29,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Zdjęcia do danych testowych (DemoDataSeeder): rysowane ilustracje 800×600, ~60–110 KB. -->
+    <EmbeddedResource Include="DemoData\Images\*.jpg" LogicalName="DemoImages.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\ICanHelp.Application\ICanHelp.Application.csproj" />
     <ProjectReference Include="..\ICanHelp.Core\ICanHelp.Core.csproj" />
   </ItemGroup>

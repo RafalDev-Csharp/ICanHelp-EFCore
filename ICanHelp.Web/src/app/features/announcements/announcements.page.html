@@ -1,27 +1,26 @@
 @let current = filters();
 <ion-header [translucent]="true">
+  <!-- Logo · wyszukiwarka · dzwonek w jednym wierszu (bez tytułu „Szukaj” – zakładkę i pole i tak widać). -->
   <ion-toolbar>
-    <ion-buttons slot="start">
-      <app-brand></app-brand>
-    </ion-buttons>
-    <ion-title>Szukaj</ion-title>
-    <ion-buttons slot="end">
-      <app-notifications-bell></app-notifications-bell>
-    </ion-buttons>
-  </ion-toolbar>
-  <ion-toolbar>
-    <ion-searchbar
-      class="page-column"
-      placeholder="Czego szukasz? np. kran, malowanie"
-      aria-label="Szukaj w ogłoszeniach"
-      inputmode="search"
-      [debounce]="400"
-      [value]="current.phrase ?? ''"
-      (ionInput)="setPhrase($event.detail.value)"
-    ></ion-searchbar>
+    <div class="search-row page-column">
+      <ion-buttons>
+        <app-brand></app-brand>
+      </ion-buttons>
+      <ion-searchbar
+        placeholder="Szukaj, np. kran"
+        aria-label="Szukaj w ogłoszeniach"
+        inputmode="search"
+        [debounce]="400"
+        [value]="current.phrase ?? ''"
+        (ionInput)="setPhrase($event.detail.value)"
+      ></ion-searchbar>
+      <ion-buttons>
+        <app-notifications-bell></app-notifications-bell>
+      </ion-buttons>
+    </div>
   </ion-toolbar>
   <ion-toolbar class="filters-toolbar">
-    <div class="category-tiles page-column" role="group" aria-label="Kategorie">
+    <app-scroll-row class="category-tiles page-column" label="Kategorie" role="group" aria-label="Kategorie">
       <button
         type="button"
         class="category-tile"
@@ -45,7 +44,7 @@
         <span>{{ category.name }}</span>
       </button>
       }
-    </div>
+    </app-scroll-row>
   </ion-toolbar>
   <!-- F11 F: jeden wiersz – Lista / Mapa (ikony) + filtry, wyśrodkowany i zawijany zamiast nachodzenia. -->
   <ion-toolbar class="filters-toolbar">

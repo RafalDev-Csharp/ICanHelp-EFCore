@@ -140,6 +140,8 @@ cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /ap
   szczegóły i wątek = store + sekcje + czyste funkcje, wspólne listy / okna / komendy API (`verify.cmd -SkipBackend`: Vitest 425/425).
 - [x] Przed testem z ludźmi 16.11.2026: kategorie po polsku, dane testowe `DemoDataSeeder` (Development, pusta baza), nowe logo
   (uścisk dłoni) i pomarańczowy kolor główny, motyw jasny / ciemny / systemowy w Konto → Aplikacja, większe Lista / Mapa (dotnet 610/610, Vitest 425/425).
+  Potem: dane testowe Łódź / Warszawa ze zdjęciami (`DemoData/Images`), „Szukaj” bez tytułu, kategorie ze strzałkami
+  (`app-scroll-row`), zoom mapy kółkiem (`verify.cmd`: dotnet 610/610, Vitest 434/434).
 - [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)

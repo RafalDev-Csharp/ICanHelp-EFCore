@@ -47,7 +47,7 @@ export class MapComponent implements OnDestroy {
   readonly route = input<MapRoute>();
   /** Pozycja użytkownika – tylko dla niego samego (nigdy nie pokazujemy jej innym). */
   readonly userPosition = input<GeoPoint>();
-  /** `false` – mapa poglądowa (np. w szczegółach): bez przesuwania i zoomu, nie przechwytuje przewijania strony. */
+  /** `false` – mapa poglądowa (np. w szczegółach): bez przesuwania i zoomu (także kółkiem myszy), nie przechwytuje przewijania strony. */
   readonly interactive = input(true);
   readonly markerClick = output<string>();
   /** Dotknięcie mapy poza pinezką (tylko mapa interaktywna) – np. wskazanie miejsca ogłoszenia. */
@@ -83,7 +83,9 @@ export class MapComponent implements OnDestroy {
       doubleClickZoom: interactive,
       boxZoom: interactive,
       keyboard: interactive,
-      scrollWheelZoom: false,
+      // Kółko myszy przybliża / oddala tylko mapę interaktywną; poglądowa nie przechwytuje przewijania strony.
+      scrollWheelZoom: interactive,
+      wheelPxPerZoomLevel: 90,
     });
     L.tileLayer(MAP_TILES.url, { attribution: MAP_TILES.attribution, maxZoom: MAP_TILES.maxZoom }).addTo(this.map);
     this.layers = L.layerGroup().addTo(this.map);

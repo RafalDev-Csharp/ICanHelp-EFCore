@@ -44,12 +44,27 @@
   }
 }
 
-.category-tiles {
+/* Logo, wyszukiwarka i dzwonek w jednym wierszu – na komputerze w kolumnie strony, razem z listą. */
+.search-row {
   display: flex;
-  gap: 8px;
-  padding: 0 12px 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  align-items: center;
+  gap: 4px;
+  padding-inline: 4px;
+
+  ion-buttons {
+    flex: 0 0 auto;
+  }
+
+  ion-searchbar {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-inline: 4px;
+  }
+}
+
+/* Przewijanie (palec / strzałki / kółko) i przycięcie robi `app-scroll-row`; odstępy jak w kartach listy. */
+.category-tiles {
+  padding: 0 16px 8px;
 }
 
 .category-tile {

@@ -486,5 +486,14 @@
   motyw przed startem Angulara (bez mignięcia). Sekcja „Aplikacja” widoczna zawsze (też bez logowania). Vitest 430/430.
   Nowe kategorie i dane testowe wymagają czystej bazy (`dotnet ef database drop -f -p ICanHelp.Infrastructure -s ICanHelp.Api`).
   `verify.cmd`: dotnet 610/610 (Core 267, Application 225, integracyjne 118), Vitest 425/425, lint + build zielone.
+- [x] Dane testowe i „Szukaj” na komputerze (16.11.2026): `DemoDataSeeder` – Łódź, Warszawa i po drodze (Skierniewice,
+  Łowicz; Marek dojeżdża Łódź – Warszawa), 18 zdjęć (1–2 na ogłoszenie) przez prawdziwy `AddAnnouncementImage` zaraz po
+  utworzeniu. Zdjęcia to rysowane ilustracje 800×600 JPEG (~60–110 KB, canvas w przeglądarce) w
+  `Infrastructure/DemoData/Images`, osadzone w dll (`LogicalName="DemoImages.<plik>"`). „Szukaj”: bez tytułu – logo,
+  wyszukiwarka („Szukaj, np. kran”) i dzwonek w jednym wierszu w kolumnie strony; kafelki kategorii w nowym
+  `shared/components/scroll-row` (`app-scroll-row`: przycięcie do kolumny, wygaszanie krawędzi, strzałki tylko przy myszy
+  i tylko po stronie z ukrytą treścią, kółko myszy przewija w poziomie; `scrollEdges` + spec). `app-map`: zoom kółkiem
+  myszy na mapie interaktywnej (poglądowa bez zmian). Baza deweloperska wyczyszczona i zasiana od nowa.
+  `verify.cmd`: dotnet 610/610 (Core 267, Application 225, integracyjne 118), Vitest 434/434, lint + build zielone.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny
