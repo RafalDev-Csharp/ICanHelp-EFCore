@@ -1,0 +1,41 @@
+.notification ion-icon[slot='start'] {
+  color: var(--ion-color-medium);
+  font-size: 22px;
+}
+
+.notification.unread {
+  --background: rgba(var(--ion-color-primary-rgb), 0.06);
+}
+
+.notification.unread h2 {
+  font-weight: 700;
+}
+
+.notification.unread ion-icon[slot='start'] {
+  color: var(--ion-color-primary);
+}
+
+.body {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+  align-self: flex-start;
+  margin-top: 12px;
+  font-size: 0.75rem;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ion-color-primary);
+}

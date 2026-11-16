@@ -1,0 +1,108 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/profile"></ion-back-button>
+      <app-brand></app-brand>
+    </ion-buttons>
+    <ion-title>Oceny</ion-title>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-segment
+      class="page-column"
+      [value]="tab()"
+      (ionChange)="selectTab($event.detail.value)"
+      aria-label="Rodzaj ocen"
+    >
+      <ion-segment-button value="pending">
+        <ion-label>Do wystawienia{{ pending().length ? ' (' + pending().length + ')' : '' }}</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="Helper">
+        <ion-label>Jako pomocnik</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="Client">
+        <ion-label>Jako zleceniodawca</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="page-column">
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  @switch (state()) { @case ('loading') {
+  <app-loading></app-loading>
+  } @case ('failed') {
+  <app-load-failed heading="Nie udało się wczytać ocen" (retry)="load()"></app-load-failed>
+  } @case ('ready') { @if (tab() === 'pending') { @if (pending().length === 0) {
+  <app-empty-state
+    icon="star-outline"
+    heading="Nic do oceny"
+    message="Po zakończonym zleceniu ocenisz tu drugą stronę."
+  ></app-empty-state>
+  } @else {
+  <ion-list inset="true">
+    @for (item of pending(); track item.announcementId; let last = $last) {
+    <ion-item data-testid="pending-rating" [lines]="last ? 'none' : 'inset'">
+      <ion-thumbnail slot="start">
+        @if (thumbnail(item.thumbnailUrl); as url) {
+        <img [src]="url" alt="" loading="lazy" />
+        } @else {
+        <div class="no-photo"><ion-icon name="image-outline" aria-hidden="true"></ion-icon></div>
+        }
+      </ion-thumbnail>
+      <ion-label>
+        <h2>
+          <a [routerLink]="['/announcements', item.announcementId]">{{ item.announcementTitle }}</a>
+        </h2>
+        <p>{{ item.myRole === 'Client' ? 'Oceń pomocnika' : 'Oceń zleceniodawcę' }}: {{ item.otherParty.userName }}</p>
+      </ion-label>
+      <ion-button slot="end" (click)="rate(item)" [disabled]="busy()">Oceń</ion-button>
+    </ion-item>
+    }
+  </ion-list>
+  } } @else { @let received = receivedView(); @if (received.groups.length === 0) {
+  <app-empty-state
+    icon="star-outline"
+    heading="Brak ocen"
+    [message]="tab() === 'Helper' ? 'Oceny od zleceniodawców, którym pomogłeś, pojawią się tutaj.' : 'Oceny od pomocników przy Twoich zleceniach pojawią się tutaj.'"
+  ></app-empty-state>
+  } @else {
+  <div class="summary" data-testid="ratings-summary">
+    <span class="stars" aria-hidden="true"><app-rating-stars [value]="received.average"></app-rating-stars></span>
+    <strong>{{ received.summary }}</strong>
+  </div>
+  <p class="summary-hint ion-padding-horizontal" data-testid="ratings-hint">
+    Kilka ocen od tej samej osoby liczy się jako jedna – ich średnia (ocena grupowa).
+  </p>
+  <ion-list inset="true">
+    @for (group of received.groups; track group.raterId; let last = $last) {
+    <ion-item data-testid="rater-group" [lines]="last ? 'none' : 'inset'">
+      <ion-label class="ion-text-wrap">
+        @if (group.ratings.length > 1) {
+        <p class="group-head" data-testid="rater-group-head">
+          <span class="stars" aria-hidden="true"><app-rating-stars [value]="group.average"></app-rating-stars></span>
+          <strong>&#64;{{ group.userName }}</strong> · {{ groupLabel(group) }}
+        </p>
+        } @for (rating of group.ratings; track rating.id) {
+        <div class="rating" [class.in-group]="group.ratings.length > 1" data-testid="received-rating">
+          <p class="stars" [attr.aria-label]="rating.rate + ' na 5'">
+            <app-rating-stars [value]="rating.rate"></app-rating-stars>
+            <span class="when">{{ rating.createdAt | timeAgo }}</span>
+          </p>
+          @if (rating.comment) {
+          <h3 class="comment">„{{ rating.comment }}”</h3>
+          }
+          <p>
+            @if (group.ratings.length === 1) { &#64;{{ rating.rater.userName }} · }
+            <a [routerLink]="['/announcements', rating.announcementId]">{{ rating.announcementTitle }}</a>
+          </p>
+        </div>
+        }
+      </ion-label>
+    </ion-item>
+    }
+  </ion-list>
+  } } }}
+</ion-content>

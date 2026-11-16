@@ -1,0 +1,91 @@
+/* Sekcje leżą bezpośrednio w treści strony (bez dodatkowego pudełka). */
+:host {
+  display: contents;
+}
+
+.gallery {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+/* Całe zdjęcie (bez przycinania i powiększania) na tle – pionowe i panoramiczne też. */
+.gallery-item {
+  flex: 0 0 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 50vh;
+  scroll-snap-align: center;
+  background: var(--ion-color-light);
+
+  img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+}
+
+.summary {
+  padding-bottom: 0;
+
+  h1 {
+    margin: 8px 0 4px;
+    font-size: 1.375rem;
+    font-weight: 700;
+  }
+}
+
+.budget {
+  margin: 0;
+  color: var(--ion-color-primary);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.meta {
+  margin: 4px 0 0;
+  color: var(--ion-color-medium);
+  font-size: 0.875rem;
+}
+
+h2 {
+  margin: 16px 0 8px;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.description {
+  margin: 0;
+  white-space: pre-line;
+}
+
+/* Proporcje zamiast stałej wysokości – na szerszym ekranie mapa nie jest wąskim paskiem. */
+.detail-map {
+  aspect-ratio: 16 / 9;
+  min-height: 200px;
+  max-height: 50vh;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+/* Metadane (kategoria, trudność, oferty) jako etykiety – czytelniej niż rozciągnięte wiersze listy. */
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding-top: 12px;
+  list-style: none;
+
+  ion-chip {
+    margin: 0;
+    font-size: 0.9375rem;
+    cursor: default;
+  }
+
+  ion-icon {
+    font-size: 1.125rem;
+  }
+}

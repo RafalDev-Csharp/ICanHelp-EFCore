@@ -1,5 +1,6 @@
 using ICanHelp.Core.Entities.Negotiations;
 using ICanHelp.Core.Enums;
+using ICanHelp.Core.Events;
 using ICanHelp.Core.Exceptions;
 using ICanHelp.Core.ValueObjects;
 
@@ -9,13 +10,19 @@ namespace ICanHelp.Core.Entities;
 /// Aggregate root: a problem published by a user together with the negotiation (offers) about it.
 /// All changes of offers go through this class, so the rules are enforced in one place.
 /// Other aggregates (user, category) are referenced by id only.
+/// Raises domain events (published, edited, offers) – the unit of work saves them to the outbox.
+/// <para>
+/// One class in four files, by area: this one – the content and its revisions; <c>Announcement.Images.cs</c> – photos;
+/// <c>Announcement.Negotiation.cs</c> – offers and the conversation; <c>Announcement.Job.cs</c> – the work after
+/// an offer is accepted (start, done, exits, rating).
+/// </para>
 /// </summary>
-public class Announcement
+public partial class Announcement : AggregateRoot
 {
-    public const int MaxImages = 5;
-
     private readonly List<Offer> _offers = new();
     private readonly List<Image> _images = new();
+    private readonly List<AnnouncementChange> _changes = new();
+    private readonly List<JobExit> _jobExits = new();
 
     public Id Id { get; private set; }
     public UserId OwnerId { get; private set; }
@@ -37,8 +44,33 @@ public class Announcement
     /// <summary>The offer chosen by the owner (null until an offer is accepted).</summary>
     public Id? AcceptedOfferId { get; private set; }
 
+    /// <summary>
+    /// Version of the content: 0 = as published, +1 for every edit that really changes something.
+    /// Every offer remembers the revision it was made on (<see cref="Offer.AnnouncementRevision"/>).
+    /// Also used as a concurrency token: two simultaneous changes of the same announcement cannot both win.
+    /// </summary>
+    public int Revision { get; private set; }
+
+    /// <summary>When the content was last edited (null if never).</summary>
+    public DateTime? UpdatedAt { get; private set; }
+
+    /// <summary>When the accepted helper reported the work as done (null until then) – the owner confirms it.</summary>
+    public DateTime? DoneReportedAt { get; private set; }
+
+    /// <summary>F11 H: when the current offer was accepted (null while open; cleared when the job is abandoned).</summary>
+    public DateTime? AcceptedAt { get; private set; }
+
+    /// <summary>F11 H: when the owner confirmed the work (null until <see cref="Complete"/>).</summary>
+    public DateTime? CompletedAt { get; private set; }
+
     public IReadOnlyCollection<Offer> Offers => _offers.AsReadOnly();
     public IReadOnlyCollection<Image> Images => _images.AsReadOnly();
+
+    /// <summary>History of edits, one entry per revision.</summary>
+    public IReadOnlyCollection<AnnouncementChange> Changes => _changes.AsReadOnly();
+
+    /// <summary>F11 E: abandonments (before the start) and the interruption (during the work), oldest first.</summary>
+    public IReadOnlyCollection<JobExit> JobExits => _jobExits.AsReadOnly();
 
     // Required by EF Core.
     private Announcement()
@@ -62,14 +94,50 @@ public class Announcement
         Location = location;
         CreatedAt = createdAtUtc;
         Status = AnnouncementStatus.Open;
+        Revision = 0;
+
+        AddDomainEvent(new AnnouncementPublished(Id, OwnerId, CategoryId, SubcategoryId, Location.Latitude,
+            Location.Longitude, createdAtUtc));
     }
 
-    public void Update(Id categoryId, Id subcategoryId, DifficultyLevel difficulty, StringObject title,
-        Description description, Price budget, Location location)
+    // ---------- content and revisions ----------
+
+    /// <summary>
+    /// The owner corrects the announcement while it is still open (typo, more details, other budget...).
+    /// Returns the parts that really changed. If nothing changed, no new revision is created,
+    /// so pending offers do not become outdated without a reason.
+    /// </summary>
+    public AnnouncementFields Update(UserId actorId, Id categoryId, Id subcategoryId, DifficultyLevel difficulty,
+        StringObject title, Description description, Price budget, Location location, DateTime changedAtUtc)
     {
         EnsureStatus(AnnouncementStatus.Open, "be edited");
+        EnsureOwner(actorId, "edit");
         EnsureBudget(budget);
         EnsureDifficulty(difficulty);
+
+        // Compared as text – the same text is stored as "before/after", so the UI can show exactly what changed.
+        // Even one letter counts: it can change the meaning of the job.
+        var fields = new List<AnnouncementFieldChange>();
+        void Compare(AnnouncementFields field, string oldValue, string newValue)
+        {
+            if (!string.Equals(oldValue, newValue, StringComparison.Ordinal))
+            {
+                fields.Add(new AnnouncementFieldChange(field, oldValue, newValue));
+            }
+        }
+
+        // Budget ("150.00 PLN") and Location ("50.0614, 19.9366") – the culture-independent text of the value objects.
+        Compare(AnnouncementFields.Category, $"{CategoryId}/{SubcategoryId}", $"{categoryId}/{subcategoryId}");
+        Compare(AnnouncementFields.Difficulty, Difficulty.ToString(), difficulty.ToString());
+        Compare(AnnouncementFields.Title, Title.Value, title.Value);
+        Compare(AnnouncementFields.Description, Description.Value, description.Value);
+        Compare(AnnouncementFields.Budget, Budget.ToString(), budget.ToString());
+        Compare(AnnouncementFields.Location, Location.ToString(), location.ToString());
+
+        if (fields.Count == 0)
+        {
+            return AnnouncementFields.None;
+        }
 
         CategoryId = categoryId;
         SubcategoryId = subcategoryId;
@@ -78,163 +146,47 @@ public class Announcement
         Description = description;
         Budget = budget;
         Location = location;
+
+        return RecordChange(fields, changedAtUtc);
     }
 
-    // ---------- images ----------
+    /// <summary>
+    /// What is different now compared to the given revision, per field: the value then → the value now.
+    /// Several edits of one field are merged (150 → 300 → 500 gives 150 → 500), so a later edit cannot hide
+    /// an earlier one: whatever is still different from that revision is listed. A field that was changed and then
+    /// changed back to exactly the same text is not listed – there is no difference to show (the edits are still
+    /// counted by <see cref="GetEditsSince"/> and kept in <see cref="Changes"/>).
+    /// </summary>
+    public IReadOnlyList<AnnouncementFieldDiff> GetFieldChangesSince(int revision)
+        => _changes
+            .Where(c => c.Revision > revision)
+            .OrderBy(c => c.Revision)
+            .SelectMany(c => c.Fields)
+            .GroupBy(f => f.Field)
+            .Select(g => new AnnouncementFieldDiff(g.Key, g.First().OldValue, g.Last().NewValue))
+            .Where(d => !string.Equals(d.OldValue, d.NewValue, StringComparison.Ordinal))
+            .OrderBy(d => d.Field)
+            .ToList();
 
-    public Image AddImage(Id imageId, StringObject fileName, StringObject fileExtension, StringObject filePath)
+    /// <summary>All parts that are different now compared to the given revision (None if the same).</summary>
+    public AnnouncementFields GetChangesSince(int revision)
+        => GetFieldChangesSince(revision).Aggregate(AnnouncementFields.None, (all, diff) => all | diff.Field);
+
+    /// <summary>How many edits were made after the given revision (also those that were later reverted).</summary>
+    public int GetEditsSince(int revision) => Math.Max(0, Revision - revision);
+
+    // Every real change of the content (edit, image added/removed): new revision + history entry + event.
+    private AnnouncementFields RecordChange(IReadOnlyCollection<AnnouncementFieldChange> fields, DateTime changedAtUtc)
     {
-        if (_images.Count >= MaxImages)
-        {
-            throw new DomainRuleException($"An announcement cannot have more than {MaxImages} images.");
-        }
-
-        var image = new Image(imageId, Id, fileName, fileExtension, filePath);
-        _images.Add(image);
-        return image;
+        Revision++;
+        UpdatedAt = changedAtUtc;
+        var change = new AnnouncementChange(Id, Revision, changedAtUtc, fields);
+        _changes.Add(change);
+        AddDomainEvent(new AnnouncementEdited(Id, OwnerId, Revision, change.ChangedFields, changedAtUtc));
+        return change.ChangedFields;
     }
 
-    public void RemoveImage(Id imageId)
-    {
-        var image = _images.FirstOrDefault(i => i.Id == imageId)
-            ?? throw new DomainRuleException($"Image with id: {imageId} does not belong to this announcement.");
-
-        _images.Remove(image);
-    }
-
-    // ---------- negotiation ----------
-
-    /// <summary>A helper proposes to solve the problem for a given price and time.</summary>
-    public Offer AddOffer(Id offerId, UserId helperId, Price price, DateTime proposedStart, DateTime proposedEnd,
-        Description? message, DateTime createdAtUtc)
-    {
-        EnsureStatus(AnnouncementStatus.Open, "receive offers");
-
-        if (helperId == OwnerId)
-        {
-            throw new DomainRuleException("The owner cannot make an offer on his own announcement.");
-        }
-
-        if (_offers.Any(o => o.HelperId == helperId && o.Status == OfferStatus.Pending))
-        {
-            throw new DomainRuleException("This helper already has a pending offer. Counter or withdraw it instead.");
-        }
-
-        var offer = new Offer(offerId, Id, helperId, OfferParty.Helper, price, proposedStart, proposedEnd,
-            message, createdAtUtc, parentOfferId: null);
-
-        _offers.Add(offer);
-        return offer;
-    }
-
-    /// <summary>The other side answers an offer with different terms (price, dates).</summary>
-    public Offer CounterOffer(Id offerId, Id newOfferId, UserId actorId, Price price, DateTime proposedStart,
-        DateTime proposedEnd, Description? message, DateTime createdAtUtc)
-    {
-        EnsureStatus(AnnouncementStatus.Open, "receive counter-offers");
-
-        var original = GetPendingOffer(offerId);
-        var party = ResolveParty(original, actorId);
-
-        if (party == original.ProposedBy)
-        {
-            throw new DomainRuleException("You cannot counter your own offer.");
-        }
-
-        // The new offer is created first: if its data is invalid, the original stays untouched.
-        var counter = new Offer(newOfferId, Id, original.HelperId, party, price, proposedStart, proposedEnd,
-            message, createdAtUtc, original.Id);
-
-        original.MarkAsCountered();
-        _offers.Add(counter);
-        return counter;
-    }
-
-    /// <summary>The side that did not propose the offer accepts it; all other pending offers are rejected.</summary>
-    public void AcceptOffer(Id offerId, UserId actorId)
-    {
-        EnsureStatus(AnnouncementStatus.Open, "accept an offer");
-
-        var offer = GetPendingOffer(offerId);
-        var party = ResolveParty(offer, actorId);
-
-        if (party == offer.ProposedBy)
-        {
-            throw new DomainRuleException("You cannot accept your own offer.");
-        }
-
-        offer.Accept();
-
-        foreach (var other in _offers.Where(o => o.Id != offer.Id && o.Status == OfferStatus.Pending))
-        {
-            other.Reject();
-        }
-
-        AcceptedOfferId = offer.Id;
-        Status = AnnouncementStatus.Accepted;
-    }
-
-    public void RejectOffer(Id offerId, UserId actorId)
-    {
-        EnsureStatus(AnnouncementStatus.Open, "reject an offer");
-
-        var offer = GetPendingOffer(offerId);
-        var party = ResolveParty(offer, actorId);
-
-        if (party == offer.ProposedBy)
-        {
-            throw new DomainRuleException("You cannot reject your own offer. Withdraw it instead.");
-        }
-
-        offer.Reject();
-    }
-
-    public void WithdrawOffer(Id offerId, UserId actorId)
-    {
-        EnsureStatus(AnnouncementStatus.Open, "have an offer withdrawn");
-
-        var offer = GetPendingOffer(offerId);
-        var party = ResolveParty(offer, actorId);
-
-        if (party != offer.ProposedBy)
-        {
-            throw new DomainRuleException("Only the author of an offer can withdraw it.");
-        }
-
-        offer.Withdraw();
-    }
-
-    // ---------- lifecycle ----------
-
-    /// <summary>Work begins. Either participant can mark it: the owner or the helper of the accepted offer.</summary>
-    public void Start(UserId actorId)
-    {
-        EnsureStatus(AnnouncementStatus.Accepted, "be started");
-        EnsureParticipant(actorId);
-
-        Status = AnnouncementStatus.InProgress;
-    }
-
-    /// <summary>Only the owner (the client) confirms that the work is done.</summary>
-    public void Complete(UserId actorId)
-    {
-        EnsureStatus(AnnouncementStatus.InProgress, "be completed");
-        EnsureOwner(actorId, "complete");
-
-        Status = AnnouncementStatus.Completed;
-    }
-
-    public void Cancel(UserId actorId)
-    {
-        if (Status is not (AnnouncementStatus.Open or AnnouncementStatus.Accepted))
-        {
-            throw new DomainRuleException($"Announcement in status {Status} cannot be cancelled.");
-        }
-
-        EnsureOwner(actorId, "cancel");
-
-        Status = AnnouncementStatus.Cancelled;
-    }
+    // ---------- participants ----------
 
     /// <summary>The helper whose offer was accepted (null while no offer is accepted).</summary>
     public UserId? GetAcceptedHelperId()
@@ -244,54 +196,7 @@ public class Announcement
     public bool IsParticipant(UserId userId)
         => userId == OwnerId || userId == GetAcceptedHelperId();
 
-    // ---------- rating ----------
-
-    /// <summary>
-    /// After completion each participant can rate the other one: the owner rates the helper and the other way round.
-    /// Rating is a separate aggregate; the "only once" rule is checked by the application layer (and a unique index).
-    /// </summary>
-    public Rating CreateRating(Id ratingId, UserId raterId, Rate rate, Description? comment, DateTime createdAtUtc)
-    {
-        EnsureStatus(AnnouncementStatus.Completed, "be rated");
-        EnsureParticipant(raterId);
-
-        var rateeId = raterId == OwnerId ? GetAcceptedHelperId()! : OwnerId;
-
-        return new Rating(ratingId, Id, raterId, rateeId, rate, comment, createdAtUtc);
-    }
-
-    // ---------- helpers ----------
-
-    private Offer GetOffer(Id offerId)
-        => _offers.FirstOrDefault(o => o.Id == offerId) ?? throw new OfferNotFoundException(offerId);
-
-    private Offer GetPendingOffer(Id offerId)
-    {
-        var offer = GetOffer(offerId);
-
-        if (offer.Status != OfferStatus.Pending)
-        {
-            throw new DomainRuleException($"Offer in status {offer.Status} cannot be changed.");
-        }
-
-        return offer;
-    }
-
-    // Decides on whose side the user acts in the negotiation: the owner is the client, the offer's helper is the helper.
-    private OfferParty ResolveParty(Offer offer, UserId actorId)
-    {
-        if (actorId == OwnerId)
-        {
-            return OfferParty.Client;
-        }
-
-        if (actorId == offer.HelperId)
-        {
-            return OfferParty.Helper;
-        }
-
-        throw new DomainRuleException("The user is not a participant of this negotiation.");
-    }
+    // ---------- rules shared by all areas ----------
 
     private void EnsureParticipant(UserId actorId)
     {
@@ -299,6 +204,17 @@ public class Announcement
         {
             throw new DomainRuleException("Only the owner or the accepted helper can do this.");
         }
+    }
+
+    private UserId EnsureAcceptedHelper(UserId actorId, string action)
+    {
+        var helperId = GetAcceptedHelperId();
+        if (helperId is null || actorId != helperId)
+        {
+            throw new DomainRuleException($"Only the accepted helper can {action} the work.");
+        }
+
+        return helperId;
     }
 
     private void EnsureOwner(UserId actorId, string action)

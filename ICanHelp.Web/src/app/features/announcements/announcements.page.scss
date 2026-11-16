@@ -1,0 +1,161 @@
+.filters-toolbar {
+  --min-height: 0;
+}
+
+/*
+ * F11 F: Lista / Mapa i filtry w jednym wierszu, wyśrodkowane; gdy się nie mieszczą (wąski telefon, podkategoria) –
+ * zawijają się do drugiej linii z odstępem, zamiast nachodzić na siebie.
+ */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px 8px;
+
+  .near-me,
+  .clear-filters {
+    flex: 0 0 auto;
+    margin: 0;
+  }
+}
+
+/* Duże, podpisane przyciski Lista / Mapa – czytelne i łatwe do trafienia palcem (min. 44 px wysokości). */
+.view-switch {
+  flex: 0 0 auto;
+  width: 200px;
+  min-height: 44px;
+
+  ion-segment-button {
+    min-width: 0;
+    min-height: 44px;
+    --padding-start: 10px;
+    --padding-end: 10px;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  ion-icon {
+    font-size: 1.5rem;
+    margin-inline-end: 6px;
+  }
+}
+
+.category-tiles {
+  display: flex;
+  gap: 8px;
+  padding: 0 12px 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.category-tile {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 84px;
+  min-height: 68px;
+  padding: 8px 4px;
+  border: 1px solid var(--ion-color-step-200, #ccc);
+  border-radius: 12px;
+  background: var(--ion-background-color);
+  color: var(--ion-text-color);
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+
+  ion-icon {
+    font-size: 1.5rem;
+    color: var(--ion-color-primary);
+  }
+
+  &.selected {
+    border-color: var(--ion-color-primary);
+    background: var(--ion-color-primary);
+    color: var(--ion-color-primary-contrast);
+
+    ion-icon {
+      color: inherit;
+    }
+  }
+}
+
+.filter {
+  flex: 0 0 auto;
+  max-width: 220px;
+  min-height: 32px;
+  --padding-start: 12px;
+  --padding-end: 8px;
+  font-size: 0.875rem;
+}
+
+.skeleton {
+  display: flex;
+  gap: 16px;
+  padding: 12px 16px;
+}
+
+.skeleton-photo {
+  width: 64px;
+  height: 64px;
+  margin: 0;
+  border-radius: 8px;
+}
+
+.skeleton-text {
+  flex: 1;
+}
+
+.map-layer {
+  position: absolute;
+  inset: 0;
+
+  app-map {
+    height: 100%;
+  }
+}
+
+.map-summary {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 12px;
+  transform: translateX(-50%);
+  border-radius: 16px;
+  background: var(--ion-background-color);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.map-preview {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  left: 8px;
+  z-index: 500;
+}
+
+.map-preview-close {
+  display: block;
+  width: fit-content;
+  margin: 0 0 4px auto;
+}
+
+.map-card {
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 30%);
+}

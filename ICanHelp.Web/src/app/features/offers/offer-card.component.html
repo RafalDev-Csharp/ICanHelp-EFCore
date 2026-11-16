@@ -1,0 +1,58 @@
+@let item = view(); @let offer = item.offer;
+@if (item.previous) {
+  <details class="offer previous" [id]="'offer-' + offer.id">
+    <summary>Poprzednia wersja · {{ item.author }} · {{ offer.price.amount | price }}</summary>
+    <p class="offer-term">{{ formatOfferTerm(offer.proposedStart, offer.proposedEnd) }}</p>
+    @if (offer.message) {
+      <p class="offer-message">{{ offer.message }}</p>
+    }
+    <span class="when">{{ at() | timeAgo }}</span>
+  </details>
+} @else {
+  <article
+    class="offer"
+    [id]="'offer-' + offer.id"
+    [class.mine]="item.mine"
+    [class.awaiting]="!!item.changes"
+    [class.highlight]="highlighted()"
+  >
+    <header>
+      <ion-icon name="pricetag-outline" aria-hidden="true"></ion-icon>
+      <span class="offer-title">{{ item.kindLabel }} · {{ item.author }}</span>
+      <ion-badge [color]="item.stateColor">{{ item.stateLabel }}</ion-badge>
+    </header>
+    <p class="offer-price">{{ offer.price.amount | price }}</p>
+    <p class="offer-term">{{ formatOfferTerm(offer.proposedStart, offer.proposedEnd) }}</p>
+    @if (offer.message) {
+      <p class="offer-message">{{ offer.message }}</p>
+    }
+    @if (item.changes) {
+      <p class="offer-changes">
+        <ion-icon
+          [name]="item.changes === 'respond' ? 'create-outline' : 'hourglass-outline'"
+          aria-hidden="true"
+        ></ion-icon>
+        {{ item.changesNote }}
+      </p>
+    }
+    @if (item.buttons.length > 0) {
+      <div class="offer-actions">
+        @for (button of item.buttons; track button.action) {
+          <ion-button
+            size="small"
+            [fill]="button.fill"
+            [color]="button.color"
+            (click)="action.emit(button.action)"
+            [disabled]="busy()"
+          >
+            @if (button.icon) {
+              <ion-icon [name]="button.icon" slot="start" aria-hidden="true"></ion-icon>
+            }
+            {{ button.label }}
+          </ion-button>
+        }
+      </div>
+    }
+    <span class="when">{{ at() | timeAgo }}</span>
+  </article>
+}

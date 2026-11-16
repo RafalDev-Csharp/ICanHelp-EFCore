@@ -1,0 +1,143 @@
+/*
+ * App Global CSS
+ * ----------------------------------------------------------------------------
+ * Put style rules here that you want to apply globally. These styles are for
+ * the entire app and not just one component. Additionally, this file can be
+ * used as an entry point to import other CSS/Sass files to be included in the
+ * output CSS.
+ * For more information on global stylesheets, visit the documentation:
+ * https://ionicframework.com/docs/layout/global-stylesheets
+ */
+
+/* Core CSS required for Ionic components to work properly */
+@import '@ionic/angular/css/core.css';
+
+/* Basic CSS for apps built with Ionic */
+@import '@ionic/angular/css/normalize.css';
+@import '@ionic/angular/css/structure.css';
+@import '@ionic/angular/css/typography.css';
+@import '@ionic/angular/css/display.css';
+
+/* Optional CSS utils that can be commented out */
+@import '@ionic/angular/css/padding.css';
+@import '@ionic/angular/css/float-elements.css';
+@import '@ionic/angular/css/text-alignment.css';
+@import '@ionic/angular/css/text-transformation.css';
+@import '@ionic/angular/css/flex-utils.css';
+
+/**
+ * Ionic Dark Mode
+ * -----------------------------------------------------
+ * For more info, please see:
+ * https://ionicframework.com/docs/theming/dark-mode
+ */
+
+/* Ciemny motyw przez klasę `ion-palette-dark` na <html> – ustawia ją `ThemeService` (Konto → Aplikacja → Motyw:
+   systemowy / jasny / ciemny) i skrypt w `index.html` przed startem aplikacji. */
+@import '@ionic/angular/css/palettes/dark.class.css';
+
+/* Style Leaflet (mapy, F3) – razem z pozostałymi importami, przed regułami. */
+@import 'leaflet/dist/leaflet.css';
+
+/*
+ * Kolor główny = pomarańcz z logo (uścisk dłoni). Jasny motyw: ciemniejszy odcień (#C9500B, kontrast z białym 4,5:1),
+ * ciemny motyw: jasny pomarańcz logo (#FF7A1A) z ciemnym tekstem na przyciskach. Po imporcie palety dark.class –
+ * nadpisuje jej primary.
+ */
+:root {
+  --ion-color-primary: #c9500b;
+  --ion-color-primary-rgb: 201, 80, 11;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #b1460a;
+  --ion-color-primary-tint: #ce6123;
+}
+
+:root.ion-palette-dark {
+  --ion-color-primary: #ff7a1a;
+  --ion-color-primary-rgb: 255, 122, 26;
+  --ion-color-primary-contrast: #000000;
+  --ion-color-primary-contrast-rgb: 0, 0, 0;
+  --ion-color-primary-shade: #e06b17;
+  --ion-color-primary-tint: #ff8731;
+}
+
+/*
+ * Szeroki ekran (F11): treść stron w wyśrodkowanej kolumnie – na komputerze zdjęcia, mapy i listy nie rozciągają się
+ * na całą szerokość okna. `ion-content.page-column` dokłada boczny odstęp do przewijanej części (zachowuje własne
+ * `--padding-*`, np. `ion-padding`); warstwy `slot="fixed"` (mapa ogłoszeń, refresher) zostają na całą szerokość.
+ * Klasa `.page-column` na zwykłym elemencie (stopka, nagłówek) – ta sama szerokość.
+ */
+:root {
+  --app-column-width: 720px;
+}
+
+ion-content.page-column::part(scroll) {
+  padding-inline-start: calc(var(--padding-start, 0px) + max(0px, (100% - var(--app-column-width)) / 2));
+  padding-inline-end: calc(var(--padding-end, 0px) + max(0px, (100% - var(--app-column-width)) / 2));
+}
+
+:not(ion-content).page-column {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--app-column-width);
+  margin-inline: auto;
+}
+
+/*
+ * Krok zlecenia (F11 D, `jobStep`): notka w stopce wątku i szczegółów – na co czekamy; `.highlight` – pomocnik zgłosił
+ * wykonanie, zleceniodawca ma potwierdzić.
+ */
+.job-note {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  margin: 4px 16px 8px;
+  color: var(--ion-color-medium);
+  font-size: 0.875rem;
+  text-align: center;
+
+  &.highlight {
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(var(--ion-color-success-rgb), 0.12);
+    color: var(--ion-color-success-shade);
+    font-weight: 600;
+  }
+}
+
+/* Mapy (Leaflet, F3): kolory warstw rysowanych przez `app-map` (poza widokiem komponentu). */
+.leaflet-container {
+  font: inherit;
+}
+
+.leaflet-container path.map-pin {
+  fill: var(--ion-color-primary);
+  stroke: #fff;
+}
+
+.leaflet-container path.map-user {
+  fill: var(--ion-color-tertiary);
+  stroke: #fff;
+}
+
+/* Alert trasy (F8): pas wokół drogi (grubość = 2 × promień, liczy `app-map`) i sama droga. */
+.leaflet-container path.map-corridor {
+  stroke: var(--ion-color-primary);
+  stroke-opacity: 0.12;
+  fill: none;
+}
+
+.leaflet-container path.map-route {
+  stroke: var(--ion-color-primary);
+  stroke-opacity: 0.9;
+  fill: none;
+}
+
+.leaflet-container path.map-radius {
+  fill: var(--ion-color-primary);
+  fill-opacity: 0.08;
+  stroke: var(--ion-color-primary);
+  stroke-width: 1;
+}

@@ -1,0 +1,14 @@
+import { DEFAULT_CATEGORY_ICON, categoryIcon } from './category-icons';
+
+describe('categoryIcon', () => {
+  it('maps seeded categories by name, ignoring case', () => {
+    expect(categoryIcon('Hydraulika')).toBe('water-outline');
+    expect(categoryIcon(' ELEKTRYKA ')).toBe('flash-outline');
+    expect(categoryIcon('Ogród i podwórko')).toBe('leaf-outline');
+  });
+
+  it('falls back to the default icon', () => {
+    expect(categoryIcon('Gardening')).toBe(DEFAULT_CATEGORY_ICON);
+    expect(categoryIcon(undefined)).toBe(DEFAULT_CATEGORY_ICON);
+  });
+});

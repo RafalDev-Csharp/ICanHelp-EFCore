@@ -1,0 +1,112 @@
+import { Component, inject } from '@angular/core';
+import { NonNullableFormBuilder } from '@angular/forms';
+import { Router } from '@angular/router';
+import {
+  IonButton,
+  IonButtons,
+  IonContent,
+  IonFooter,
+  IonHeader,
+  IonSpinner,
+  IonTitle,
+  IonToolbar,
+} from '@ionic/angular';
+import type { ViewWillEnter } from '@ionic/angular';
+import { map, switchMap } from 'rxjs';
+
+import { AnnouncementsClient } from '../../core/api/api-client';
+import { CategoriesService } from '../../core/categories/categories.service';
+import { PushService } from '../../core/pwa/push.service';
+import { ToastService } from '../../core/ui/toast.service';
+import { BrandComponent } from '../../shared/components/brand/brand.component';
+import { NotificationsBellComponent } from '../../shared/components/notifications-bell/notifications-bell.component';
+
+import { toCreateCommand } from './form/announcement-form';
+import { AnnouncementFormState } from './form/announcement-form-state';
+import { AnnouncementFormComponent } from './form/announcement-form.component';
+import { syncPhotos } from './form/photo-upload';
+
+/**
+ * Nowe ogłoszenie (zakładka „Dodaj”, tylko zalogowani): formularz → `POST api/announcements` → zdjęcia po kolei
+ * → szczegóły nowego ogłoszenia. Zakładka zostaje w pamięci, więc po sukcesie czyścimy formularz.
+ * F11 E: `/add?copyOf=<id>` („Wystaw ponownie” po przerwanym zleceniu) – formularz wypełniony kopią ogłoszenia
+ * (kategoria, trudność, tytuł, opis, budżet, miejsce); zdjęć nie kopiujemy – dodaje się je od nowa.
+ */
+@Component({
+  selector: 'app-add-announcement',
+  templateUrl: './add-announcement.page.html',
+  imports: [
+    BrandComponent,
+    NotificationsBellComponent,
+    IonHeader,
+    IonToolbar,
+    IonButtons,
+    IonTitle,
+    IonContent,
+    IonFooter,
+    IonButton,
+    IonSpinner,
+    AnnouncementFormComponent,
+  ],
+})
+export class AddAnnouncementPage implements ViewWillEnter {
+  private readonly client = inject(AnnouncementsClient);
+  private readonly categories = inject(CategoriesService);
+  private readonly router = inject(Router);
+  private readonly toast = inject(ToastService);
+  private readonly push = inject(PushService);
+
+  /** Pola, miejsce i zdjęcia nowego ogłoszenia. */
+  readonly draft = new AnnouncementFormState(inject(NonNullableFormBuilder));
+
+  ionViewWillEnter(): void {
+    this.categories.load().subscribe({ error: () => undefined });
+    const copyOf = this.router.parseUrl(this.router.url).queryParams['copyOf'];
+    if (typeof copyOf === 'string' && copyOf) {
+      this.fillCopyOf(copyOf);
+    }
+  }
+
+  /** Kopia ogłoszenia do formularza; potem adres bez `copyOf` (ponowne wejście w zakładkę nie nadpisze zmian). */
+  private fillCopyOf(announcementId: string): void {
+    this.client.getById(announcementId).subscribe({
+      next: (announcement) => {
+        this.draft.fill(announcement);
+        void this.toast.info('Formularz wypełniony kopią ogłoszenia – zdjęcia dodaj od nowa.');
+        void this.router.navigate(['/add'], { replaceUrl: true });
+      },
+      // Błąd pokazał interceptor – zostaje pusty formularz.
+      error: () => undefined,
+    });
+  }
+
+  submit(): void {
+    const input = this.draft.validated();
+    if (!input) {
+      void this.toast.error('Uzupełnij zaznaczone pola.');
+      return;
+    }
+    if (this.draft.saving()) {
+      return;
+    }
+
+    const photos = this.draft.photos();
+    this.draft.saving.set(true);
+    this.client
+      .create(toCreateCommand(input.value, input.location))
+      .pipe(switchMap(({ id }) => syncPhotos(this.client, id, photos).pipe(map((failed) => ({ id, failed })))))
+      .subscribe({
+        next: ({ id, failed }) => {
+          this.draft.saving.set(false);
+          void (failed > 0
+            ? this.toast.info('Ogłoszenie dodane, ale nie wszystkie zdjęcia – możesz je dodać w edycji.')
+            : this.toast.success('Ogłoszenie dodane.'));
+          this.draft.clear();
+          void this.router.navigate(['/announcements', id]);
+          void this.push.suggest('Powiadomić Cię, gdy ktoś złoży ofertę do tego ogłoszenia?');
+        },
+        // Komunikat (np. zła kategoria) pokazał interceptor – formularz zostaje, można poprawić i wysłać znowu.
+        error: () => this.draft.saving.set(false),
+      });
+  }
+}

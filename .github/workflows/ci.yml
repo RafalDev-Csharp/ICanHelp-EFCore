@@ -1,4 +1,4 @@
-# Build + testy przy każdym pushu i pull requeście.
+# Build + testy przy każdym pushu i pull requeście: backend (.NET) i frontend (ICanHelp.Web, osobny job).
 # Testy integracyjne (ICanHelp.Api.Tests) same stawiają SQL Server przez Testcontainers –
 # runner ubuntu-latest ma Dockera, więc nie potrzeba sekcji "services".
 name: CI
@@ -62,3 +62,34 @@ jobs:
           name: test-results
           path: TestResults
           if-no-files-found: ignore
+
+  # Frontend (ICanHelp.Web): lint (ESLint + Prettier + typecheck e2e), testy jednostkowe (Vitest), build produkcyjny.
+  # Testy e2e (Playwright) uruchamiane lokalnie – `npm run test:e2e`.
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: ICanHelp.Web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ICanHelp.Web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build -- --configuration production,ci

@@ -1,0 +1,41 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <app-brand></app-brand>
+    </ion-buttons>
+    <ion-title>Ulubione</ion-title>
+    <ion-buttons slot="end">
+      <app-notifications-bell></app-notifications-bell>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="page-column">
+  <ion-refresher slot="fixed" (ionRefresh)="list.refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  @switch (list.state()) { @case ('loading') {
+  <app-loading></app-loading>
+  } @case ('failed') {
+  <app-load-failed heading="Nie udało się wczytać ulubionych" (retry)="list.reload()"></app-load-failed>
+  } @case ('ready') { @if (items().length === 0) {
+  <app-empty-state
+    icon="heart-outline"
+    heading="Nie masz jeszcze ulubionych"
+    message="Dotknij serduszka w ogłoszeniu, żeby mieć je pod ręką."
+  >
+    <ion-button routerLink="/announcements" fill="outline">Szukaj ogłoszeń</ion-button>
+  </app-empty-state>
+  } @else {
+  <ion-list>
+    @for (item of items(); track item.id) {
+    <app-announcement-card
+      [announcement]="item"
+      [liked]="true"
+      [showStatus]="item.status !== 'Open'"
+    ></app-announcement-card>
+    }
+  </ion-list>
+  } } }
+</ion-content>

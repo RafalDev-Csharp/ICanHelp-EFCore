@@ -6,7 +6,7 @@ using static ICanHelp.Core.Tests.Entities.AnnouncementTestData;
 
 namespace ICanHelp.Core.Tests.Entities;
 
-/// <summary>Tworzenie, edycja, zdjęcia i cykl życia ogłoszenia (bez negocjacji).</summary>
+/// <summary>Tworzenie, edycja i cykl życia ogłoszenia (bez negocjacji; zdjęcia: AnnouncementImageTests).</summary>
 public class AnnouncementTests
 {
     // ---------- tworzenie ----------
@@ -40,8 +40,8 @@ public class AnnouncementTests
         var categoryId = Id.New();
         var subcategoryId = Id.New();
 
-        announcement.Update(categoryId, subcategoryId, DifficultyLevel.Hard, "Malowanie ściany",
-            "Pomalować ścianę w salonie.", Price.Pln(300), new Location(50.0647, 19.9450));
+        announcement.Update(OwnerId, categoryId, subcategoryId, DifficultyLevel.Hard, "Malowanie ściany",
+            "Pomalować ścianę w salonie.", Price.Pln(300), new Location(50.0647, 19.9450), Now.AddHours(1));
 
         announcement.CategoryId.ShouldBe(categoryId);
         announcement.SubcategoryId.ShouldBe(subcategoryId);
@@ -57,9 +57,9 @@ public class AnnouncementTests
     {
         var announcement = CreateAnnouncement();
 
-        Should.Throw<DomainRuleException>(() => announcement.Update(announcement.CategoryId,
+        Should.Throw<DomainRuleException>(() => announcement.Update(OwnerId, announcement.CategoryId,
             announcement.SubcategoryId, announcement.Difficulty, announcement.Title, announcement.Description,
-            Price.Pln(0), announcement.Location));
+            Price.Pln(0), announcement.Location, Now.AddHours(1)));
 
         announcement.Budget.ShouldBe(Price.Pln(150));
     }
@@ -73,57 +73,9 @@ public class AnnouncementTests
     {
         var announcement = InStatus(status);
 
-        Should.Throw<DomainRuleException>(() => announcement.Update(announcement.CategoryId,
+        Should.Throw<DomainRuleException>(() => announcement.Update(OwnerId, announcement.CategoryId,
             announcement.SubcategoryId, announcement.Difficulty, "Nowy tytuł", announcement.Description,
-            announcement.Budget, announcement.Location));
-    }
-
-    // ---------- zdjęcia ----------
-
-    [Fact]
-    public void AddImage_AddsImageLinkedToAnnouncement()
-    {
-        var announcement = CreateAnnouncement();
-        var imageId = Id.New();
-
-        var image = announcement.AddImage(imageId, "kran", ".jpg", "images/kran.jpg");
-
-        image.Id.ShouldBe(imageId);
-        image.AnnouncementId.ShouldBe(announcement.Id);
-        announcement.Images.ShouldHaveSingleItem().ShouldBeSameAs(image);
-    }
-
-    [Fact]
-    public void AddImage_MoreThanMax_Throws()
-    {
-        var announcement = CreateAnnouncement();
-        for (var i = 0; i < Announcement.MaxImages; i++)
-        {
-            announcement.AddImage(Id.New(), $"img{i}", ".jpg", $"images/img{i}.jpg");
-        }
-
-        Should.Throw<DomainRuleException>(() => announcement.AddImage(Id.New(), "extra", ".jpg", "images/extra.jpg"));
-
-        announcement.Images.Count.ShouldBe(Announcement.MaxImages);
-    }
-
-    [Fact]
-    public void RemoveImage_ExistingImage_RemovesIt()
-    {
-        var announcement = CreateAnnouncement();
-        var image = announcement.AddImage(Id.New(), "kran", ".jpg", "images/kran.jpg");
-
-        announcement.RemoveImage(image.Id);
-
-        announcement.Images.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void RemoveImage_UnknownImage_Throws()
-    {
-        var announcement = CreateAnnouncement();
-
-        Should.Throw<DomainRuleException>(() => announcement.RemoveImage(Id.New()));
+            announcement.Budget, announcement.Location, Now.AddHours(1)));
     }
 
     // ---------- cykl życia ----------
@@ -133,7 +85,7 @@ public class AnnouncementTests
     {
         var announcement = InStatus(AnnouncementStatus.Accepted);
 
-        announcement.Start(OwnerId);
+        announcement.Start(Helper, Now.AddDays(1));
 
         announcement.Status.ShouldBe(AnnouncementStatus.InProgress);
     }
@@ -147,31 +99,32 @@ public class AnnouncementTests
     {
         var announcement = InStatus(status);
 
-        Should.Throw<DomainRuleException>(() => announcement.Start(OwnerId));
+        Should.Throw<DomainRuleException>(() => announcement.Start(Helper, Now.AddDays(3)));
 
         announcement.Status.ShouldBe(status);
     }
 
-    [Fact]
-    public void Complete_WhenInProgress_ChangesStatusToCompleted()
+    [Theory]
+    [InlineData(AnnouncementStatus.InProgress)]
+    [InlineData(AnnouncementStatus.Accepted)] // pomocnik nie kliknął „Rozpocznij” – zlecenie nie może utknąć
+    public void Complete_WhenInProgressOrAccepted_ChangesStatusToCompleted(AnnouncementStatus status)
     {
-        var announcement = InStatus(AnnouncementStatus.InProgress);
+        var announcement = InStatus(status);
 
-        announcement.Complete(OwnerId);
+        announcement.Complete(OwnerId, Now.AddDays(3));
 
         announcement.Status.ShouldBe(AnnouncementStatus.Completed);
     }
 
     [Theory]
     [InlineData(AnnouncementStatus.Open)]
-    [InlineData(AnnouncementStatus.Accepted)]
     [InlineData(AnnouncementStatus.Completed)]
     [InlineData(AnnouncementStatus.Cancelled)]
-    public void Complete_WhenNotInProgress_Throws(AnnouncementStatus status)
+    public void Complete_WhenNotAcceptedNorInProgress_Throws(AnnouncementStatus status)
     {
         var announcement = InStatus(status);
 
-        Should.Throw<DomainRuleException>(() => announcement.Complete(OwnerId));
+        Should.Throw<DomainRuleException>(() => announcement.Complete(OwnerId, Now.AddDays(3)));
 
         announcement.Status.ShouldBe(status);
     }
@@ -207,13 +160,16 @@ public class AnnouncementTests
         var announcement = CreateAnnouncement();
         var offer = announcement.AddHelperOffer(Helper);
 
-        announcement.AcceptOffer(offer.Id, OwnerId);
+        announcement.AcceptOffer(offer.Id, OwnerId, Now);
         announcement.Status.ShouldBe(AnnouncementStatus.Accepted);
 
-        announcement.Start(Helper);
+        announcement.Start(Helper, Now.AddDays(1));
         announcement.Status.ShouldBe(AnnouncementStatus.InProgress);
 
-        announcement.Complete(OwnerId);
+        announcement.ReportDone(Helper, Now.AddDays(1).AddHours(2));
+        announcement.Status.ShouldBe(AnnouncementStatus.InProgress);
+
+        announcement.Complete(OwnerId, Now.AddDays(2));
         announcement.Status.ShouldBe(AnnouncementStatus.Completed);
         announcement.AcceptedOfferId.ShouldBe(offer.Id);
     }

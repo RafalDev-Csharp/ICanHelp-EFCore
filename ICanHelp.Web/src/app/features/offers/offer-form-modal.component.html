@@ -1,0 +1,72 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="cancel()">Anuluj</ion-button>
+    </ion-buttons>
+    <ion-title>{{ heading }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  @if (note) {
+    <p class="offer-note">
+      <ion-icon name="warning-outline" color="warning" aria-hidden="true"></ion-icon>
+      {{ note }}
+    </p>
+  }
+  <form class="offer-fields" [formGroup]="form" (ngSubmit)="submit()">
+    <ion-input
+      formControlName="price"
+      type="number"
+      inputmode="decimal"
+      label="Cena (zł)"
+      labelPlacement="floating"
+      fill="outline"
+      [min]="rules.price.min"
+      [max]="rules.price.max"
+      step="any"
+      [errorText]="'Kwota od ' + rules.price.min + ' do ' + rules.price.max + ' zł, najwyżej 2 miejsca po przecinku.'"
+    ></ion-input>
+    <ion-input
+      formControlName="start"
+      type="datetime-local"
+      label="Od"
+      labelPlacement="stacked"
+      fill="outline"
+      errorText="Podaj początek."
+    ></ion-input>
+    <ion-input
+      formControlName="end"
+      type="datetime-local"
+      label="Do"
+      labelPlacement="stacked"
+      fill="outline"
+      errorText="Podaj koniec."
+    ></ion-input>
+    @if (datesError(); as error) {
+      <ion-text color="danger"
+        ><p class="offer-error">{{ error }}</p></ion-text
+      >
+    }
+    <ion-textarea
+      formControlName="message"
+      label="Wiadomość (opcjonalnie)"
+      labelPlacement="floating"
+      fill="outline"
+      [autoGrow]="true"
+      [rows]="3"
+      [counter]="true"
+      [maxlength]="rules.message.max"
+      placeholder="np. Mam własne narzędzia, wezmę uszczelki."
+      [errorText]="'Od ' + rules.message.min + ' do ' + rules.message.max + ' znaków.'"
+    ></ion-textarea>
+  </form>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <div class="ion-padding-horizontal">
+      <ion-button expand="block" (click)="submit()">Wyślij</ion-button>
+    </div>
+  </ion-toolbar>
+</ion-footer>

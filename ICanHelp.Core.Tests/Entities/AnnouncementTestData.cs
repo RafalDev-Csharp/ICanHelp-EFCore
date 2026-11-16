@@ -36,10 +36,7 @@ internal static class AnnouncementTestData
         => announcement.AddOffer(
             Id.New(),
             helperId,
-            Price.Pln(price),
-            Now.AddDays(1),
-            Now.AddDays(1).AddHours(2),
-            "Mogę wpaść po pracy.",
+            new OfferTerms(Price.Pln(price), Now.AddDays(1), Now.AddDays(1).AddHours(2), "Mogę wpaść po pracy."),
             Now);
 
     /// <summary>Kontroferta złożona przez <paramref name="actorId"/> godzinę później (pojutrze, 2 godziny).</summary>
@@ -48,10 +45,7 @@ internal static class AnnouncementTestData
             offer.Id,
             Id.New(),
             actorId,
-            Price.Pln(price),
-            Now.AddDays(2),
-            Now.AddDays(2).AddHours(2),
-            null,
+            new OfferTerms(Price.Pln(price), Now.AddDays(2), Now.AddDays(2).AddHours(2)),
             Now.AddHours(1));
 
     /// <summary>Buduje ogłoszenie w podanym statusie, przechodząc przez prawdziwe metody domenowe.</summary>
@@ -71,19 +65,25 @@ internal static class AnnouncementTestData
         }
 
         var offer = announcement.AddHelperOffer(Helper);
-        announcement.AcceptOffer(offer.Id, OwnerId);
+        announcement.AcceptOffer(offer.Id, OwnerId, Now);
         if (status == AnnouncementStatus.Accepted)
         {
             return announcement;
         }
 
-        announcement.Start(OwnerId);
+        announcement.Start(Helper, Now.AddDays(1));
         if (status == AnnouncementStatus.InProgress)
         {
             return announcement;
         }
 
-        announcement.Complete(OwnerId);
+        if (status == AnnouncementStatus.Interrupted)
+        {
+            announcement.Interrupt(Helper, JobExitReason.NoContact, null, Now.AddDays(2));
+            return announcement;
+        }
+
+        announcement.Complete(OwnerId, Now.AddDays(2));
         return announcement;
     }
 }

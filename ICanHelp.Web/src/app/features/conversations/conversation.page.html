@@ -1,0 +1,198 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/conversations"></ion-back-button>
+      <app-brand></app-brand>
+    </ion-buttons>
+    <ion-title>{{ title() }}</ion-title>
+  </ion-toolbar>
+  @if (conversation(); as thread) {
+  <ion-toolbar>
+    <app-conversation-subject
+      [thread]="thread"
+      [thumbnailUrl]="thumbnailUrl()"
+      [otherReliability]="otherReliability()"
+    ></app-conversation-subject>
+  </ion-toolbar>
+  }
+</ion-header>
+
+<ion-content class="page-column">
+  @switch (state()) { @case ('loading') {
+  <app-loading></app-loading>
+  } @case ('not-found') {
+  <app-empty-state
+    icon="alert-circle-outline"
+    heading="Nie ma takiej rozmowy"
+    message="Rozmowę widzą tylko jej dwaj uczestnicy."
+  ></app-empty-state>
+  } @case ('failed') {
+  <app-load-failed heading="Nie udało się wczytać rozmowy" (retry)="load()"></app-load-failed>
+  } @case ('ready') {
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="timeline">
+    @if (questionsOnly() && items().length > 0) {
+    <p class="change questions-note">
+      <ion-icon name="help-circle-outline" aria-hidden="true"></ion-icon>
+      Pytania i odpowiedzi – oferty jeszcze nie ma{{ canMakeOffer() ? ', złożysz ją przyciskiem poniżej' : '' }}.
+    </p>
+    } @for (item of items(); track item.key) { @if (item.kind === 'message') {
+    <div class="message" [class.mine]="item.mine">
+      <p class="bubble">{{ item.message.text }}</p>
+      <span class="when">{{ item.at | timeAgo }}</span>
+    </div>
+    } @else if (item.kind === 'offer') {
+    <app-offer-card
+      [view]="item"
+      [at]="item.at"
+      [busy]="busy()"
+      [highlighted]="highlightedOfferId() === item.offer.id"
+      (action)="offerAction($event, item.offer)"
+    ></app-offer-card>
+    } @else if (item.kind === 'exit') {
+    <p class="change exit" [class.mine]="item.mine">
+      <ion-icon
+        [name]="item.exit.kind === 'Abandoned' ? 'exit-outline' : 'stop-circle-outline'"
+        aria-hidden="true"
+      ></ion-icon>
+      {{ item.title }} · {{ formatDateTime(item.at) }}<br />
+      Powód: {{ item.reason }} @if (item.exit.response) {<br />
+      <span class="exit-response">{{ item.responseAuthor }}: {{ item.exit.response }}</span>
+      } @if (item.canRespond) {
+      <ion-button
+        size="small"
+        fill="clear"
+        class="change-link respond-action"
+        (click)="respondToExit(item.exit.number)"
+        [disabled]="busy()"
+        >Dodaj swoje stanowisko</ion-button
+      >
+      }
+    </p>
+    } @else {
+    <p class="change" [class.mine]="item.mine">
+      <ion-icon [name]="item.mine ? 'checkmark-done-outline' : 'create-outline'" aria-hidden="true"></ion-icon>
+      @if (item.mine) { Edytowałeś ogłoszenie{{ item.fields ? ': ' + item.fields : '' }} · {{ formatDateTime(item.at) }}
+      <span class="saved">zapisano</span> } @else { Zleceniodawca zmienił ogłoszenie{{ item.fields ? ': ' + item.fields
+      : '' }} · {{ item.at | timeAgo }} } @if (item.changes.length > 0) {
+      <ion-button size="small" fill="clear" class="change-link" (click)="showChange(item.changes)"
+        >zobacz zmiany</ion-button
+      >
+      }
+    </p>
+    } } @empty {
+    <p class="change">
+      {{ conversation()?.myRole === 'Helper' ? 'Zadaj pytanie o zlecenie albo złóż ofertę – zleceniodawca zobaczy je
+      tutaj.' : 'Pomocnik nie napisał jeszcze nic w tej rozmowie.' }}
+    </p>
+    }
+  </div>
+  } }
+</ion-content>
+
+@if (conversation(); as thread) {
+<ion-footer>
+  @if (jobView(); as step) {
+  <ion-toolbar>
+    <div class="job page-column">
+      @if (step.note; as note) {
+      <p class="job-note" [class.highlight]="note.highlight">
+        <ion-icon [name]="note.icon" aria-hidden="true"></ion-icon>
+        {{ note.text }}
+      </p>
+      } @if (step.action; as action) {
+      <ion-button
+        expand="block"
+        class="ion-padding-horizontal job-action"
+        [color]="action.color"
+        [fill]="action.fill"
+        (click)="runJobAction()"
+        [disabled]="busy()"
+      >
+        <ion-icon [name]="action.icon" slot="start" aria-hidden="true"></ion-icon>
+        {{ action.label }}
+      </ion-button>
+      } @if (step.exit; as exit) {
+      <ion-button
+        expand="block"
+        fill="clear"
+        color="danger"
+        size="small"
+        class="ion-padding-horizontal job-exit"
+        (click)="exitJob()"
+        [disabled]="busy()"
+      >
+        <ion-icon [name]="exit.icon" slot="start" aria-hidden="true"></ion-icon>
+        {{ exit.label }}
+      </ion-button>
+      }
+    </div>
+  </ion-toolbar>
+  } @if (interrupted()) {
+  <ion-toolbar>
+    <p class="job-note page-column">
+      <ion-icon name="stop-circle-outline" aria-hidden="true"></ion-icon>
+      {{ interruptedNote }}
+    </p>
+  </ion-toolbar>
+  } @if (notice(); as current) {
+  <ion-toolbar>
+    <div class="notice page-column">
+      <ion-button
+        expand="block"
+        class="ion-padding-horizontal"
+        [fill]="current.kind === 'changes' ? 'solid' : 'outline'"
+        (click)="openNotice(current)"
+        [disabled]="busy()"
+      >
+        <ion-icon
+          [name]="current.kind === 'changes' ? 'eye-outline' : 'arrow-down-circle-outline'"
+          slot="start"
+          aria-hidden="true"
+        ></ion-icon>
+        {{ current.text }}
+      </ion-button>
+    </div>
+  </ion-toolbar>
+  } @if (thread.canWrite) { @if (canMakeOffer()) {
+  <ion-toolbar>
+    <ion-button
+      expand="block"
+      fill="outline"
+      class="ion-padding-horizontal page-column"
+      (click)="makeOffer()"
+      [disabled]="busy()"
+    >
+      <ion-icon name="pricetag-outline" slot="start" aria-hidden="true"></ion-icon>
+      Złóż ofertę
+    </ion-button>
+  </ion-toolbar>
+  }
+  <ion-toolbar>
+    <div class="composer page-column">
+      <ion-textarea
+        [(ngModel)]="draft"
+        aria-label="Wiadomość"
+        [placeholder]="placeholder()"
+        [autoGrow]="true"
+        [rows]="1"
+        [maxlength]="maxMessage"
+      ></ion-textarea>
+      <ion-button (click)="send()" [disabled]="busy() || draft.trim().length < 2" aria-label="Wyślij">
+        <ion-icon slot="icon-only" name="send"></ion-icon>
+      </ion-button>
+    </div>
+  </ion-toolbar>
+  } @else {
+  <ion-toolbar>
+    <p class="footer-note">
+      <ion-icon name="lock-closed-outline" aria-hidden="true"></ion-icon>
+      {{ readOnlyReason() }}
+    </p>
+  </ion-toolbar>
+  }
+</ion-footer>
+}

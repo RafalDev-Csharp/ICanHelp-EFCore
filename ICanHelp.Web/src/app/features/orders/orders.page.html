@@ -1,0 +1,80 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <app-brand></app-brand>
+    </ion-buttons>
+    <ion-title>Zlecenia</ion-title>
+    <ion-buttons slot="end">
+      <ion-button routerLink="/conversations/all" aria-label="Wszystkie rozmowy">
+        <ion-icon slot="icon-only" name="chatbubbles-outline" aria-hidden="true"></ion-icon>
+      </ion-button>
+      <app-notifications-bell></app-notifications-bell>
+    </ion-buttons>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-segment [value]="role()" (ionChange)="setRole($event.detail.value)" aria-label="Moja rola">
+      <ion-segment-button value="Client"><ion-label>Zlecam</ion-label></ion-segment-button>
+      <ion-segment-button value="Helper"><ion-label>Pomagam</ion-label></ion-segment-button>
+    </ion-segment>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="page-column">
+  @let list = current();
+  <ion-refresher slot="fixed" (ionRefresh)="list.refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  @switch (list.state()) { @case ('loading') {
+  <app-loading></app-loading>
+  } @case ('failed') {
+  <app-load-failed heading="Nie udało się wczytać zleceń" (retry)="list.reload()"></app-load-failed>
+  } @case ('ready') { @if (groups().length > 0) {
+  <ion-list>
+    @for (group of groups(); track group.key) {
+    <ion-item-group [attr.data-group]="group.key" [class.finished]="group.key === 'finished'">
+      @if (group.key === 'finished') {
+      <ion-item-divider
+        class="finished-toggle"
+        sticky="true"
+        button
+        (click)="toggleFinished()"
+        [attr.aria-expanded]="finishedOpen()"
+      >
+        <ion-label>{{ group.label }} ({{ group.count }})</ion-label>
+        <ion-icon slot="end" [name]="finishedOpen() ? 'chevron-up' : 'chevron-down'" aria-hidden="true"></ion-icon>
+      </ion-item-divider>
+      } @else {
+      <ion-item-divider sticky="true">
+        <ion-label>{{ group.label }} ({{ group.count }})</ion-label>
+      </ion-item-divider>
+      } @if (group.key !== 'finished' || finishedOpen()) { @for (item of group.announcements; track item.id) {
+      <app-announcement-card [announcement]="item" [showStatus]="true"></app-announcement-card>
+      } @for (item of group.conversations; track item.conversationId) {
+      <app-conversation-item [conversation]="item"></app-conversation-item>
+      } }
+    </ion-item-group>
+    }
+  </ion-list>
+  } @else if (role() === 'Client') {
+  <app-empty-state
+    icon="briefcase-outline"
+    heading="Nie masz jeszcze zleceń"
+    message="Opisz, w czym potrzebujesz pomocy – sąsiedzi z okolicy zadadzą pytania i złożą oferty."
+  >
+    <ion-button routerLink="/add">Dodaj ogłoszenie</ion-button>
+  </app-empty-state>
+  } @else {
+  <app-empty-state
+    icon="hand-left-outline"
+    heading="Jeszcze nikomu nie pomagasz"
+    message="Znajdź ogłoszenie w okolicy – zapytaj o szczegóły albo od razu złóż ofertę."
+  >
+    <ion-button routerLink="/announcements" fill="outline">Szukaj ogłoszeń</ion-button>
+  </app-empty-state>
+  }
+  <ion-infinite-scroll [disabled]="list.complete()" (ionInfinite)="list.loadMore($event)">
+    <ion-infinite-scroll-content></ion-infinite-scroll-content>
+  </ion-infinite-scroll>
+  } }
+</ion-content>

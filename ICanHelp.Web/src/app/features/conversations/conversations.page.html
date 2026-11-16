@@ -1,0 +1,48 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/conversations" text="Zlecenia"></ion-back-button>
+      <app-brand></app-brand>
+    </ion-buttons>
+    <ion-title>Wszystkie rozmowy</ion-title>
+    <ion-buttons slot="end">
+      <app-notifications-bell></app-notifications-bell>
+    </ion-buttons>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-segment [value]="role()" (ionChange)="setRole($event.detail.value)" aria-label="Rola w rozmowie">
+      <ion-segment-button value="all"><ion-label>Wszystkie</ion-label></ion-segment-button>
+      <ion-segment-button value="Client"><ion-label>Zlecam</ion-label></ion-segment-button>
+      <ion-segment-button value="Helper"><ion-label>Pomagam</ion-label></ion-segment-button>
+    </ion-segment>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="page-column">
+  <ion-refresher slot="fixed" (ionRefresh)="list.refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  @switch (list.state()) { @case ('loading') {
+  <app-loading></app-loading>
+  } @case ('failed') {
+  <app-load-failed heading="Nie udało się wczytać rozmów" (retry)="list.reload()"></app-load-failed>
+  } @case ('ready') { @if (list.items().length === 0) {
+  <app-empty-state
+    icon="chatbubbles-outline"
+    heading="Brak rozmów"
+    message="Tu pojawią się Twoje pytania i negocjacje – jako zleceniodawca i jako pomocnik."
+  >
+    <ion-button routerLink="/announcements" fill="outline">Przeglądaj ogłoszenia</ion-button>
+  </app-empty-state>
+  } @else {
+  <ion-list>
+    @for (item of list.items(); track item.conversationId) {
+    <app-conversation-item [conversation]="item"></app-conversation-item>
+    }
+  </ion-list>
+  <ion-infinite-scroll [disabled]="list.complete()" (ionInfinite)="list.loadMore($event)">
+    <ion-infinite-scroll-content></ion-infinite-scroll-content>
+  </ion-infinite-scroll>
+  } } }
+</ion-content>

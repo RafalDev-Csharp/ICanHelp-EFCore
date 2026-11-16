@@ -22,12 +22,14 @@ internal static class Extensions
             .Validate(o => Encoding.UTF8.GetByteCount(o.SigningKey ?? string.Empty) >= 32,
                 "Auth:SigningKey must be at least 32 bytes long (set it e.g. with the Auth__SigningKey variable).")
             .Validate(o => o.Expiry > TimeSpan.Zero, "Auth:Expiry must be positive.")
+            .Validate(o => o.RefreshTokenExpiry > o.Expiry, "Auth:RefreshTokenExpiry must be longer than Auth:Expiry.")
             // Zły config wywala aplikację przy starcie, a nie przy pierwszym logowaniu.
             .ValidateOnStart();
 
         services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddSingleton<IPasswordManager, PasswordManager>();
         services.AddSingleton<IAuthenticator, Authenticator>();
+        services.AddSingleton<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<ITokenStorage, TokenStorage>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
@@ -52,6 +54,33 @@ internal static class Extensions
                     ClockSkew = TimeSpan.FromSeconds(30),
                     NameClaimType = AuthClaims.UserName,
                     RoleClaimType = AuthClaims.Role
+                };
+
+                jwt.Events = new JwtBearerEvents
+                {
+                    // WebSockets (SignalR, /hubs/...) cannot send the Authorization header – the token comes in the query.
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+                        if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                        {
+                            context.Token = accessToken;
+                        }
+
+                        return Task.CompletedTask;
+                    },
+
+                    // A token that does not say who the user is (claim "sub" with a Guid) is not a token of this API.
+                    // Rejected here, once (→ 401), so every [Authorize] action can simply read the id.
+                    OnTokenValidated = context =>
+                    {
+                        if (context.Principal is null || !context.Principal.TryGetUserId(out _))
+                        {
+                            context.Fail("The token does not identify a user.");
+                        }
+
+                        return Task.CompletedTask;
+                    }
                 };
             });
 

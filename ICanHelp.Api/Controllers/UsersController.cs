@@ -4,16 +4,14 @@ using ICanHelp.Application.DTO;
 using ICanHelp.Application.Queries;
 using ICanHelp.Application.Security;
 using ICanHelp.Core.Enums;
-using ICanHelp.Infrastructure.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ICanHelp.Api.Controllers;
 
 /// <summary>Użytkownicy: rejestracja, logowanie, profil, oceny i polubienia.</summary>
-[ApiController]
 [Route("api/users")]
-public sealed class UsersController : ControllerBase
+public sealed class UsersController : ApiController
 {
     /// <summary>Rejestracja nowego konta (rola zawsze User). Zwraca adres utworzonego użytkownika.</summary>
     [HttpPost("sign-up")]
@@ -32,7 +30,10 @@ public sealed class UsersController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { userId }, null);
     }
 
-    /// <summary>Logowanie e-mailem i hasłem. Zwraca JWT do nagłówka <c>Authorization: Bearer ...</c>.</summary>
+    /// <summary>
+    /// Logowanie e-mailem i hasłem. Zwraca JWT do nagłówka <c>Authorization: Bearer ...</c> (ważny 1 h)
+    /// i refresh token do <c>POST api/users/refresh</c> (ważny 30 dni).
+    /// </summary>
     [HttpPost("sign-in")]
     [AllowAnonymous]
     [ProducesResponseType<JwtDto>(StatusCodes.Status200OK)]
@@ -49,6 +50,44 @@ public sealed class UsersController : ControllerBase
         return Ok(tokenStorage.Get());
     }
 
+    /// <summary>
+    /// Nowa para tokenów za refresh token z logowania (bez hasła). Użyty token przestaje działać – zapisz nowy.
+    /// 401 <c>InvalidRefreshToken</c> = trzeba zalogować się ponownie.
+    /// </summary>
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    [ProducesResponseType<JwtDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<JwtDto>> Refresh(
+        [FromBody] RefreshSession command,
+        [FromServices] ICommandHandler<RefreshSession> handler,
+        [FromServices] ITokenStorage tokenStorage,
+        CancellationToken cancellationToken)
+    {
+        await handler.HandleAsync(command, cancellationToken);
+
+        return Ok(tokenStorage.Get());
+    }
+
+    /// <summary>
+    /// Wylogowanie: unieważnia refresh token (token dostępu wygaśnie sam). Nie wymaga ważnego tokenu dostępu –
+    /// wystarczy refresh token. Zawsze 204, także dla nieznanego tokenu.
+    /// </summary>
+    [HttpPost("sign-out")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Logout(
+        [FromBody] EndSession command,
+        [FromServices] ICommandHandler<EndSession> handler,
+        CancellationToken cancellationToken)
+    {
+        await handler.HandleAsync(command, cancellationToken);
+
+        return NoContent();
+    }
+
     /// <summary>Profil zalogowanego użytkownika (wymaga tokenu).</summary>
     [HttpGet("me")]
     [Authorize]
@@ -58,16 +97,7 @@ public sealed class UsersController : ControllerBase
     public async Task<ActionResult<UserDto>> Me(
         [FromServices] IQueryHandler<GetUserById, UserDto?> handler,
         CancellationToken cancellationToken)
-    {
-        if (!Guid.TryParse(User.FindFirst(AuthClaims.UserId)?.Value, out var userId))
-        {
-            return Unauthorized();
-        }
-
-        var user = await handler.HandleAsync(new GetUserById { UserId = userId }, cancellationToken);
-
-        return user is null ? NotFound() : Ok(user);
-    }
+        => OkOrNotFound(await handler.HandleAsync(new GetUserById { UserId = CurrentUserId }, cancellationToken));
 
     /// <summary>Lista wszystkich kont z pełnymi danymi – tylko dla admina.</summary>
     [HttpGet]
@@ -89,11 +119,34 @@ public sealed class UsersController : ControllerBase
         Guid userId,
         [FromServices] IQueryHandler<GetUserPublicById, UserPublicDto?> handler,
         CancellationToken cancellationToken)
-    {
-        var user = await handler.HandleAsync(new GetUserPublicById { UserId = userId }, cancellationToken);
+        => OkOrNotFound(await handler.HandleAsync(new GetUserPublicById { UserId = userId }, cancellationToken));
 
-        return user is null ? NotFound() : Ok(user);
-    }
+    /// <summary>
+    /// F11 E: publiczne liczniki – ile zleceń użytkownik sam zerwał przed rozpoczęciem (<c>abandonedCount</c>)
+    /// i przerwał w trakcie (<c>interruptedCount</c>). Rezygnacja drugiej strony się nie liczy.
+    /// </summary>
+    [HttpGet("{userId:guid}/reliability")]
+    [ProducesResponseType<UserReliabilityDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<UserReliabilityDto>> GetReliability(
+        Guid userId,
+        [FromServices] IQueryHandler<GetUserReliability, UserReliabilityDto?> handler,
+        CancellationToken cancellationToken)
+        => OkOrNotFound(await handler.HandleAsync(new GetUserReliability { UserId = userId }, cancellationToken));
+
+    /// <summary>
+    /// F11 G: publiczny profil – dane publiczne, statystyki „Pomagam” / „Zlecam” (średnia ocen tylko z zakończonych
+    /// zleceń, zakończone, przerwane i rezygnacje – przez niego / przez drugą stronę) i przerwane zlecenia z powodem
+    /// i stanowiskiem drugiej strony.
+    /// </summary>
+    [HttpGet("{userId:guid}/profile")]
+    [ProducesResponseType<UserProfileDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<UserProfileDto>> GetProfile(
+        Guid userId,
+        [FromServices] IQueryHandler<GetUserProfile, UserProfileDto?> handler,
+        CancellationToken cancellationToken)
+        => OkOrNotFound(await handler.HandleAsync(new GetUserProfile { UserId = userId }, cancellationToken));
 
     /// <summary>Oceny, które użytkownik otrzymał – podstawa jego reputacji.</summary>
     [HttpGet("{userId:guid}/ratings")]
@@ -144,6 +197,5 @@ public sealed class UsersController : ControllerBase
 
     /// <summary>Czy zalogowany użytkownik to <paramref name="userId"/> albo admin.</summary>
     private bool IsSelfOrAdmin(Guid userId)
-        => User.IsInRole(nameof(UserRole.Admin))
-           || (Guid.TryParse(User.FindFirst(AuthClaims.UserId)?.Value, out var currentUserId) && currentUserId == userId);
+        => User.IsInRole(nameof(UserRole.Admin)) || CurrentUserId == userId;
 }

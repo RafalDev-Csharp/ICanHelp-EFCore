@@ -5,27 +5,20 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ICanHelp.Infrastructure.DAL.Repositories;
 
-internal sealed class CategoryRepository : ICategoryRepository
+internal sealed class CategoryRepository(ICanHelpDbContext db) : ICategoryRepository
 {
-    private readonly ICanHelpDbContext _db;
-
-    public CategoryRepository(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public Task<Category?> GetByIdAsync(Id id, CancellationToken cancellationToken = default)
-        => _db.Categories
+        => db.Categories
             .Include(c => c.Subcategories)
             .SingleOrDefaultAsync(c => c.Id == id, cancellationToken);
 
     public async Task<IReadOnlyList<Category>> GetAllAsync(CancellationToken cancellationToken = default)
-        => await _db.Categories
+        => await db.Categories
             .Include(c => c.Subcategories)
             .ToListAsync(cancellationToken);
 
     public async Task AddAsync(Category category, CancellationToken cancellationToken = default)
-        => await _db.Categories.AddAsync(category, cancellationToken);
+        => await db.Categories.AddAsync(category, cancellationToken);
 
-    public void Remove(Category category) => _db.Categories.Remove(category);
+    public void Remove(Category category) => db.Categories.Remove(category);
 }

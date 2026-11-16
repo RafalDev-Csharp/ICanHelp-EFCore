@@ -2,7 +2,7 @@ using ICanHelp.Core.Exceptions;
 
 namespace ICanHelp.Application.Exceptions;
 
-public class EmailAlreadyInUseException : CustomExceptions
+public class EmailAlreadyInUseException : AlreadyExistsException
 {
     public string Email { get; }
 

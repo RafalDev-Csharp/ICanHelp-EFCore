@@ -23,16 +23,80 @@ public sealed record CreateAnnouncement : ICommand
     public LocationDto Location { get; init; } = new();
 }
 
+/// <summary>
+/// Częściowa edycja ogłoszenia (PATCH): pole <c>null</c> albo pominięte = bez zmian. Tylko właściciel, tylko status Open.
+/// Każda realna zmiana tworzy nową rewizję – oczekujące oferty stają się nieaktualne (<c>OfferDto.IsOutdated</c>).
+/// </summary>
+public sealed record UpdateAnnouncement : ICommand
+{
+    [JsonIgnore] public Guid AnnouncementId { get; init; }
+    [JsonIgnore] public Guid ActorId { get; init; }
+
+    /// <summary>Zmiana kategorii wymaga podania też podkategorii (która musi do niej należeć).</summary>
+    public Guid? CategoryId { get; init; }
+    public Guid? SubcategoryId { get; init; }
+    public DifficultyLevel? Difficulty { get; init; }
+    public string? Title { get; init; }
+    public string? Description { get; init; }
+    public PriceDto? Budget { get; init; }
+    public LocationDto? Location { get; init; }
+
+    /// <summary>
+    /// Rewizja, którą klient edytował (z <c>AnnouncementDto.Revision</c>). Jeśli ogłoszenie zmieniło się w międzyczasie
+    /// (np. edycja w drugiej karcie, dodane zdjęcie) → <c>ConcurrencyConflict</c> (409) zamiast nadpisania. Pominięte = bez sprawdzania.
+    /// </summary>
+    public int? ExpectedRevision { get; init; }
+}
+
 /// <summary>Anulowanie ogłoszenia (tylko właściciel, status Open albo Accepted).</summary>
 public sealed record CancelAnnouncement(Guid AnnouncementId, Guid ActorId) : ICommand;
 
-/// <summary>Rozpoczęcie pracy (właściciel albo pomocnik z zaakceptowanej oferty).</summary>
+/// <summary>Rozpoczęcie pracy (tylko pomocnik z zaakceptowanej oferty, status Accepted).</summary>
 public sealed record StartAnnouncement(Guid AnnouncementId, Guid ActorId) : ICommand;
 
-/// <summary>Potwierdzenie wykonania (tylko właściciel). Potem obie strony mogą się ocenić.</summary>
+/// <summary>Pomocnik zgłasza wykonanie (status InProgress, raz) – zleceniodawca potwierdza przez <see cref="CompleteAnnouncement"/>.</summary>
+public sealed record ReportAnnouncementDone(Guid AnnouncementId, Guid ActorId) : ICommand;
+
+/// <summary>Potwierdzenie wykonania (tylko właściciel, Accepted albo InProgress). Potem obie strony mogą się ocenić.</summary>
 public sealed record CompleteAnnouncement(Guid AnnouncementId, Guid ActorId) : ICommand;
 
-/// <summary>Ocena drugiej strony po zakończeniu ogłoszenia (raz na ogłoszenie).</summary>
+/// <summary>
+/// F11 E: wyjście ze zlecenia z powodem – „Zrezygnuj” przed rozpoczęciem (<see cref="AbandonJob"/>) albo
+/// „Przerwij zlecenie” w trakcie (<see cref="InterruptJob"/>). Każda strona (właściciel albo przyjęty pomocnik).
+/// </summary>
+public abstract record JobExitCommand : ICommand
+{
+    [JsonIgnore] public Guid AnnouncementId { get; init; }
+    [JsonIgnore] public Guid ActorId { get; init; }
+
+    /// <summary>CannotMakeIt, TermsDiffer, NoContact, Disagreement (tylko przerwanie) albo Other (wtedy wymagany opis).</summary>
+    public JobExitReason Reason { get; init; }
+
+    /// <summary>Opis (2–500 znaków); wymagany przy Other, w pozostałych – opcjonalny.</summary>
+    public string? Note { get; init; }
+}
+
+/// <summary>Rezygnacja przed rozpoczęciem (Accepted): ogłoszenie wraca do Open, przyjęta oferta → Abandoned. Bez ocen.</summary>
+public sealed record AbandonJob : JobExitCommand;
+
+/// <summary>Przerwanie w trakcie (InProgress → Interrupted). Rozmowa tylko do odczytu, bez ocen – druga strona dodaje stanowisko.</summary>
+public sealed record InterruptJob : JobExitCommand;
+
+/// <summary>
+/// F11 G: stanowisko drugiej strony do rezygnacji / przerwania (numer wpisu z <c>JobExitDto.Number</c>) – raz,
+/// tylko ta strona, która nie wyszła ze zlecenia.
+/// </summary>
+public sealed record RespondToJobExit : ICommand
+{
+    [JsonIgnore] public Guid AnnouncementId { get; init; }
+    [JsonIgnore] public int Number { get; init; }
+    [JsonIgnore] public Guid ActorId { get; init; }
+
+    /// <summary>2–500 znaków.</summary>
+    public string Text { get; init; } = string.Empty;
+}
+
+/// <summary>Ocena drugiej strony po zakończeniu ogłoszenia (raz na ogłoszenie; F11 G: nie po przerwaniu).</summary>
 public sealed record RateAnnouncement : ICommand
 {
     [JsonIgnore] public Guid AnnouncementId { get; init; }
@@ -43,3 +107,9 @@ public sealed record RateAnnouncement : ICommand
     public int Rate { get; init; }
     public string? Comment { get; init; }
 }
+
+/// <summary>Polubienie ogłoszenia (zakładka „Polubione”). Ponowne polubienie niczego nie zmienia.</summary>
+public sealed record LikeAnnouncement(Guid AnnouncementId, Guid UserId) : ICommand;
+
+/// <summary>Cofnięcie polubienia. Gdy polubienia nie było – nic się nie dzieje.</summary>
+public sealed record UnlikeAnnouncement(Guid AnnouncementId, Guid UserId) : ICommand;

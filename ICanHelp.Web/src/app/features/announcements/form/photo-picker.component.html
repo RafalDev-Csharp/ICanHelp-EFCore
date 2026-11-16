@@ -1,0 +1,35 @@
+<div class="grid">
+  @for (photo of photos(); track photo.id; let index = $index) {
+    <figure class="photo">
+      <img [src]="photo.url" [alt]="'Zdjęcie ' + (index + 1)" />
+      @if (index === 0) {
+        <figcaption>Miniatura</figcaption>
+      }
+      <button type="button" class="remove" (click)="remove(photo)" [attr.aria-label]="'Usuń zdjęcie ' + (index + 1)">
+        <ion-icon name="close-circle" aria-hidden="true"></ion-icon>
+      </button>
+    </figure>
+  }
+  @if (processing()) {
+    <div class="photo placeholder" aria-busy="true" aria-label="Przygotowuję zdjęcie">
+      <ion-spinner name="crescent"></ion-spinner>
+    </div>
+  }
+</div>
+
+@if (free() > 0) {
+  <div class="actions">
+    <ion-button fill="outline" size="small" (click)="camera.click()" [disabled]="processing()">
+      <ion-icon name="camera-outline" slot="start" aria-hidden="true"></ion-icon>
+      Zrób zdjęcie
+    </ion-button>
+    <ion-button fill="outline" size="small" (click)="gallery.click()" [disabled]="processing()">
+      <ion-icon name="images-outline" slot="start" aria-hidden="true"></ion-icon>
+      Z galerii
+    </ion-button>
+  </div>
+}
+<ion-note class="hint">{{ photos().length }} z {{ max }} zdjęć · pierwsze jest miniaturą na liście.</ion-note>
+
+<input #camera type="file" accept="image/*" capture="environment" hidden (change)="add($event)" />
+<input #gallery type="file" accept="image/*" multiple hidden (change)="add($event)" />

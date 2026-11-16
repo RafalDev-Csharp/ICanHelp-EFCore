@@ -1,0 +1,69 @@
+.person {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+
+  > ion-icon {
+    flex: 0 0 auto;
+    font-size: 3.5rem;
+    color: var(--ion-color-medium);
+  }
+
+  h1 {
+    margin: 4px 0;
+    font-size: 1.375rem;
+  }
+
+  p {
+    margin: 0 0 4px;
+    color: var(--ion-color-medium);
+  }
+
+  .description {
+    color: inherit;
+    white-space: pre-line;
+  }
+}
+
+.roles {
+  margin: 0 16px;
+  width: auto;
+}
+
+.rating {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--ion-color-medium);
+}
+
+.interruptions {
+  a {
+    color: inherit;
+  }
+
+  .reason {
+    color: var(--ion-text-color);
+  }
+
+  .response {
+    white-space: pre-line;
+
+    ion-icon {
+      vertical-align: middle;
+    }
+
+    &.none {
+      font-style: italic;
+    }
+  }
+}

@@ -1,7 +1,10 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
 using ICanHelp.Api.ErrorHandling;
+using ICanHelp.Api.Frontend;
+using ICanHelp.Api.Notifications;
 using ICanHelp.Application;
+using ICanHelp.Application.Notifications;
 using ICanHelp.Infrastructure;
 using Microsoft.OpenApi.Models;
 
@@ -24,12 +27,26 @@ builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
 });
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 
+// Powiadomienia na żywo (Krok 13). Enumy jako tekst – tak jak w kontrolerach.
+builder.Services.AddSignalR()
+    .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+// Kanał SignalR; push (Krok 15) rejestruje Application, a wysyłacz FCM – Infrastructure.
+builder.Services.AddSingleton<INotificationChannel, SignalRNotificationSender>();
+
 builder.Services.AddHealthChecks();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(o =>
 {
     o.SwaggerDoc("v1", new() { Title = "ICanHelp API", Version = "v1" });
+
+    // Niepuste stringi w DTO nie są „nullable” – klient TS dostaje `userName: string`, a nie `string | undefined`.
+    o.SupportNonNullableReferenceTypes();
+
+    // Stałe operationId "Kontroler_Akcja" (np. "Users_Login") – NSwag (frontend, npm run api) robi z nich
+    // klasy i metody klienta: UsersClient.login(...).
+    o.CustomOperationIds(api =>
+        $"{api.ActionDescriptor.RouteValues["controller"]}_{api.ActionDescriptor.RouteValues["action"]}");
 
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     o.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFile));
@@ -54,6 +71,9 @@ builder.Services.AddSwaggerGen(o =>
 
 var app = builder.Build();
 
+// Krok F10: zbudowany frontend (wwwroot / Frontend:Path) – null, gdy go nie ma (praca na ng serve + proxy).
+var frontend = FrontendExtensions.FindFrontend(app.Configuration, app.Environment);
+
 // Wyjątek -> DomainExceptionHandler (400/404/409), a jeśli go nie obsłuży -> 500 jako ProblemDetails.
 app.UseExceptionHandler();
 // Puste odpowiedzi 4xx/5xx (np. nieistniejący adres) też dostają ciało ProblemDetails.
@@ -63,8 +83,11 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
-    // Wygoda: http://localhost:5080/ -> Swagger.
-    app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
+    if (frontend is null)
+    {
+        // Wygoda: http://localhost:5080/ -> Swagger (z frontendem "/" to aplikacja).
+        app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
+    }
 }
 else
 {
@@ -72,12 +95,22 @@ else
     app.UseHttpsRedirection();
 }
 
+if (frontend is not null)
+{
+    app.UseFrontendFiles(frontend);
+}
+
 // Najpierw "kim jesteś" (JWT z nagłówka Authorization), potem "czy możesz" ([Authorize]).
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<NotificationsHub>(NotificationsHub.Path);
 app.MapHealthChecks("/health");
+if (frontend is not null)
+{
+    app.MapFrontendFallback(frontend);
+}
 
 app.Run();
 

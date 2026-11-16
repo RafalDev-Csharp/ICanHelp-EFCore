@@ -1,0 +1,67 @@
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.intro,
+.empty {
+  margin: 0;
+  color: var(--ion-color-medium);
+}
+
+.error {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+.hint {
+  display: block;
+  font-size: 0.8125rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+
+  ion-chip {
+    margin: 0;
+  }
+}
+
+.days ion-chip {
+  min-width: 44px;
+  justify-content: center;
+}
+
+.hours {
+  display: flex;
+  gap: 8px;
+
+  ion-input {
+    flex: 1;
+  }
+}
+
+.radius ion-range {
+  padding-top: 0;
+}
+
+.preview ion-list {
+  margin: 0 -16px;
+}

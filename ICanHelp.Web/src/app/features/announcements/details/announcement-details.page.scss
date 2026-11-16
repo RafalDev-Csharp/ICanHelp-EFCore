@@ -1,0 +1,23 @@
+/* Style sekcji są przy ich komponentach (treść, zleceniodawca, negocjacje) – tu szkielet wczytywania i stopka. */
+.skeleton-gallery {
+  height: 200px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 8px;
+
+  .primary-action {
+    flex: 1;
+  }
+}
+
+.footer-note {
+  margin: 0;
+  padding: 12px 16px;
+  color: var(--ion-color-medium);
+  text-align: center;
+}

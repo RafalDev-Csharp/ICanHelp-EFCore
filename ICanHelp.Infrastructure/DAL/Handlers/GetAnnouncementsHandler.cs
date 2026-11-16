@@ -1,27 +1,33 @@
 using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.DTO;
 using ICanHelp.Application.Queries;
+using ICanHelp.Core.Entities;
 using ICanHelp.Core.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 
 namespace ICanHelp.Infrastructure.DAL.Handlers;
 
-internal sealed class GetAnnouncementsHandler : IQueryHandler<GetAnnouncements, IReadOnlyList<AnnouncementDto>>
+internal sealed class GetAnnouncementsHandler(ICanHelpDbContext db)
+    : IQueryHandler<GetAnnouncements, IReadOnlyList<AnnouncementDto>>
 {
-    private readonly ICanHelpDbContext _db;
-
-    public GetAnnouncementsHandler(ICanHelpDbContext db)
-    {
-        _db = db;
-    }
-
     public async Task<IReadOnlyList<AnnouncementDto>> HandleAsync(GetAnnouncements query,
         CancellationToken cancellationToken = default)
     {
         // Read side: no tracking, no aggregate rules - just data for the screen.
-        var announcements = _db.Announcements.AsNoTracking();
+        var announcements = ApplyFilters(db.Announcements.AsNoTracking(), query);
 
+        // Throws InvalidDistanceFilterException (→ 400) for incomplete/out-of-range parameters.
+        var page = query.GetDistanceFilter() is { } near
+            ? NearestFirst(announcements, near, query)
+            : announcements.OrderByDescending(a => a.CreatedAt).TakePage(query.Page, query.PageSize).ToListRows();
+
+        var rows = await page.ToListAsync(cancellationToken);
+        return rows.Select(row => row.AsDto()).ToList();
+    }
+
+    private static IQueryable<Announcement> ApplyFilters(IQueryable<Announcement> announcements, GetAnnouncements query)
+    {
         if (query.OwnerId is { } ownerId)
         {
             var id = new UserId(ownerId);
@@ -45,35 +51,32 @@ internal sealed class GetAnnouncementsHandler : IQueryHandler<GetAnnouncements, 
             announcements = announcements.Where(a => a.Status == status);
         }
 
-        var (skip, take) = Extensions.ToSkipTake(query.Page, query.PageSize);
-
-        // Throws InvalidDistanceFilterException (→ 400) for incomplete/out-of-range parameters.
-        if (query.GetDistanceFilter() is { } near)
+        // Throws InvalidSearchPhraseException (→ 400) for a too long phrase. Title/Description have value converters,
+        // so the columns are compared as plain strings via the (string)(object) cast; the default collation of
+        // SQL Server is case-insensitive.
+        if (query.GetPhrasePattern() is { } pattern)
         {
-            var origin = Spatial.CreatePoint(near.Latitude, near.Longitude);
-
-            // geography: Distance/IsWithinDistance are in metres. IsWithinDistance → STDistance(...) <= @radius,
-            // which can use the spatial index IX_Announcements_GeoPoint.
-            var nearest = await announcements
-                .Where(a => EF.Property<Point>(a, Spatial.GeoPoint).IsWithinDistance(origin, near.RadiusMeters))
-                .Select(a => new { Announcement = a, Distance = EF.Property<Point>(a, Spatial.GeoPoint).Distance(origin) })
-                .OrderBy(x => x.Distance)
-                .ThenByDescending(x => x.Announcement.CreatedAt)
-                .Skip(skip)
-                .Take(take)
-                .ToListAsync(cancellationToken);
-
-            return nearest
-                .Select(x => x.Announcement.AsDto() with { DistanceKm = Math.Round(x.Distance / 1000, 2) })
-                .ToList();
+            announcements = announcements.Where(a =>
+                EF.Functions.Like((string)(object)a.Title, pattern, @"\")
+                || EF.Functions.Like((string)(object)a.Description, pattern, @"\"));
         }
 
-        var page = await announcements
-            .OrderByDescending(a => a.CreatedAt)
-            .Skip(skip)
-            .Take(take)
-            .ToListAsync(cancellationToken);
+        return announcements;
+    }
 
-        return page.Select(a => a.AsDto()).ToList();
+    // geography: Distance/IsWithinDistance are in metres. IsWithinDistance → STDistance(...) <= @radius,
+    // which can use the spatial index IX_Announcements_GeoPoint.
+    private static IQueryable<AnnouncementListRow> NearestFirst(IQueryable<Announcement> announcements,
+        DistanceFilter near, GetAnnouncements query)
+    {
+        var origin = Spatial.CreatePoint(near.Latitude, near.Longitude);
+        var radiusMeters = near.RadiusMeters;
+
+        return announcements
+            .Where(a => EF.Property<Point>(a, Spatial.GeoPoint).IsWithinDistance(origin, radiusMeters))
+            .OrderBy(a => EF.Property<Point>(a, Spatial.GeoPoint).Distance(origin))
+            .ThenByDescending(a => a.CreatedAt)
+            .TakePage(query.Page, query.PageSize)
+            .ToListRows(origin);
     }
 }

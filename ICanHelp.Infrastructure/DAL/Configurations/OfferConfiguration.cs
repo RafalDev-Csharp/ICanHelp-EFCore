@@ -18,6 +18,7 @@ internal sealed class OfferConfiguration : IEntityTypeConfiguration<Offer>
         builder.Property(x => x.ProposedEnd).IsRequired();
         builder.Property(x => x.CreatedAt).IsRequired();
         builder.Property(x => x.Message).IsRequired(false);
+        builder.Property(x => x.AnnouncementRevision).IsRequired();
 
         builder.ComplexProperty(x => x.Price, price =>
         {

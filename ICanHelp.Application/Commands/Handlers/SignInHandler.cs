@@ -1,27 +1,16 @@
 using ICanHelp.Application.Abstractions;
 using ICanHelp.Application.Exceptions;
 using ICanHelp.Application.Security;
+using ICanHelp.Application.Time;
 using ICanHelp.Core.Repositories;
 using ICanHelp.Core.ValueObjects;
 
 namespace ICanHelp.Application.Commands.Handlers;
 
-internal sealed class SignInHandler : ICommandHandler<SignIn>
+internal sealed class SignInHandler(IUserRepository users, IPasswordManager passwordManager,
+    SessionTokenIssuer tokenIssuer, ITokenStorage tokenStorage, IUnitOfWork unitOfWork, IClock clock)
+    : ICommandHandler<SignIn>
 {
-    private readonly IUserRepository _users;
-    private readonly IPasswordManager _passwordManager;
-    private readonly IAuthenticator _authenticator;
-    private readonly ITokenStorage _tokenStorage;
-
-    public SignInHandler(IUserRepository users, IPasswordManager passwordManager, IAuthenticator authenticator,
-        ITokenStorage tokenStorage)
-    {
-        _users = users;
-        _passwordManager = passwordManager;
-        _authenticator = authenticator;
-        _tokenStorage = tokenStorage;
-    }
-
     public async Task HandleAsync(SignIn command, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(command.Email) || string.IsNullOrWhiteSpace(command.Password))
@@ -29,9 +18,9 @@ internal sealed class SignInHandler : ICommandHandler<SignIn>
             throw new InvalidCredentialsException();
         }
 
-        var user = await _users.GetByEmailAsync(new Email(command.Email), cancellationToken);
+        var user = await users.GetByEmailAsync(new Email(command.Email), cancellationToken);
 
-        if (user is null || !_passwordManager.Validate(command.Password, user.PasswordHash))
+        if (user is null || !passwordManager.Validate(command.Password, user.PasswordHash))
         {
             throw new InvalidCredentialsException();
         }
@@ -42,7 +31,11 @@ internal sealed class SignInHandler : ICommandHandler<SignIn>
             throw new UserLockedException();
         }
 
-        var jwt = _authenticator.CreateToken(user.Id, user.UserName, user.Role);
-        _tokenStorage.Set(jwt);
+        // Krok F2: oprócz JWT – refresh token (każde logowanie = osobna sesja, np. telefon i komputer).
+        await unitOfWork.ExecuteAsync(async () =>
+        {
+            var jwt = await tokenIssuer.IssueAsync(user, clock.UtcNow, cancellationToken);
+            tokenStorage.Set(jwt);
+        }, cancellationToken);
     }
 }

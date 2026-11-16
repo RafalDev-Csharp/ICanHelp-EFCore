@@ -8,19 +8,12 @@ namespace ICanHelp.Infrastructure.Security;
 /// Używa <see cref="PasswordHasher{TUser}"/> z ASP.NET Core Identity (PBKDF2-HMAC-SHA512, 100 000 iteracji, losowa sól).
 /// Format hasha zawiera wersję, więc w przyszłości można podnieść parametry bez migracji danych.
 /// </summary>
-internal sealed class PasswordManager : IPasswordManager
+internal sealed class PasswordManager(IPasswordHasher<User> passwordHasher) : IPasswordManager
 {
-    private readonly IPasswordHasher<User> _passwordHasher;
-
-    public PasswordManager(IPasswordHasher<User> passwordHasher)
-    {
-        _passwordHasher = passwordHasher;
-    }
-
     // PasswordHasher nie używa obiektu użytkownika – dlatego null.
-    public string Secure(string password) => _passwordHasher.HashPassword(null!, password);
+    public string Secure(string password) => passwordHasher.HashPassword(null!, password);
 
     public bool Validate(string password, string passwordHash)
-        => _passwordHasher.VerifyHashedPassword(null!, passwordHash, password)
+        => passwordHasher.VerifyHashedPassword(null!, passwordHash, password)
             is PasswordVerificationResult.Success or PasswordVerificationResult.SuccessRehashNeeded;
 }

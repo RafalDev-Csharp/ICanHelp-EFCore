@@ -3,6 +3,14 @@
 GET {{baseUrl}}/health
 
 ###
+# Krok F10: frontend z wwwroot (serve-local.cmd) – adres aplikacji → index.html; bez builda w wwwroot → 404 / Swagger
+GET {{baseUrl}}/announcements
+
+###
+# Worker PWA – zawsze Cache-Control: no-cache
+GET {{baseUrl}}/app-sw.js
+
+###
 GET {{baseUrl}}/api/categories
 
 ###
@@ -15,6 +23,10 @@ GET {{baseUrl}}/api/announcements?latitude=52.2297&longitude=21.0122&radiusKm=5&
 ###
 # 400 (InvalidDistanceFilter) – sama szerokość bez długości
 GET {{baseUrl}}/api/announcements?latitude=52.2297
+
+###
+# F11 B: wyszukiwanie tekstowe w tytule i opisie (bez rozróżniania wielkości liter, maks. 100 znaków → inaczej 400 InvalidSearchPhrase)
+GET {{baseUrl}}/api/announcements?phrase=kran&status=Open
 
 ###
 # 404 jako ProblemDetails
@@ -42,7 +54,7 @@ Content-Type: application/json
 }
 
 ###
-# Logowanie -> { accessToken, expiresAtUtc }
+# Logowanie -> { accessToken, expiresAtUtc, refreshToken, refreshTokenExpiresAtUtc }
 # @name signIn
 POST {{baseUrl}}/api/users/sign-in
 Content-Type: application/json
@@ -56,6 +68,25 @@ Content-Type: application/json
 # Profil zalogowanego (bez tokenu -> 401)
 GET {{baseUrl}}/api/users/me
 Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+###
+# Krok F2: nowa para tokenów za refresh token (jednorazowy – drugie użycie tego samego -> 401 InvalidRefreshToken)
+# @name refresh
+POST {{baseUrl}}/api/users/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{signIn.response.body.$.refreshToken}}"
+}
+
+###
+# Wylogowanie: unieważnia refresh token (zawsze 204)
+POST {{baseUrl}}/api/users/sign-out
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refresh.response.body.$.refreshToken}}"
+}
 
 ###
 # Publiczny profil – bez danych kontaktowych (podmień id na swoje z nagłówka Location po sign-up)
@@ -116,6 +147,116 @@ Content-Type: application/json
 }
 
 ###
+# Właściciel poprawia ogłoszenie (PATCH: tylko zmieniane pola) -> 204.
+# Oferta wyżej staje się nieaktualna: w GET ogłoszenia "isOutdated": true, "changedSinceOffer": ["Description"],
+# a próba jej akceptacji -> 409. Kontroferta (niżej) powstaje już na nowej rewizji, więc da się ją zaakceptować.
+PATCH {{baseUrl}}/api/announcements/{{announcementId}}
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "description": "Kran cieknie od tygodnia, mam nową uszczelkę. Syfon pod zlewem też do wymiany."
+}
+
+###
+# PATCH z "expectedRevision": ogłoszenie ma już rewizję 1 (po edycji wyżej), więc 0 -> 409 ConcurrencyConflict.
+PATCH {{baseUrl}}/api/announcements/{{announcementId}}
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Cieknący kran w kuchni",
+  "expectedRevision": 0
+}
+
+###
+GET {{baseUrl}}/api/announcements/{{announcementId}}
+
+###
+# F4: polubienie (idempotentne) -> 204; w GET ogłoszenia z tokenem "isLiked": true. DELETE cofa (też 204).
+PUT {{baseUrl}}/api/announcements/{{announcementId}}/like
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+DELETE {{baseUrl}}/api/announcements/{{announcementId}}/like
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+### ======== Krok 11: rozmowa (wątek negocjacji) ========
+# Pomocnik otwiera wątek z właścicielem -> 201 { id } (już istnieje, np. po ofercie wyżej -> 200 z tym samym id).
+# Można to zrobić przed ofertą, żeby o coś zapytać.
+# @name startConversation
+POST {{baseUrl}}/api/announcements/{{announcementId}}/conversations
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+@conversationId = {{startConversation.response.body.$.id}}
+
+# Wiadomość pomocnika (2–500 znaków) -> 201 { id }
+POST {{baseUrl}}/api/conversations/{{conversationId}}/messages
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "text": "Czy syfon pod zlewem też jest do wymiany?"
+}
+
+###
+# Wątek oczami właściciela: "timeline" = Message / Offer / AnnouncementChanged (od najstarszych), "unreadCount".
+# Obcy -> 404.
+GET {{baseUrl}}/api/conversations/{{conversationId}}
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+###
+# Właściciel przeczytał wątek -> 204 (unreadCount = 0)
+POST {{baseUrl}}/api/conversations/{{conversationId}}/read
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+###
+# Prywatność ofert: bez tokenu "offers" jest puste, widać tylko "helperCount"
+GET {{baseUrl}}/api/announcements/{{announcementId}}
+
+### ======== Krok 12: moje negocjacje ========
+# Lista wątków zalogowanego użytkownika, od ostatniej aktywności: podgląd ogłoszenia, ostatnia oferta i wiadomość,
+# "unreadCount", "announcementChangedSinceLastRead" (ostrzeżenie dla pomocnika). Filtry: role=Client|Helper, status=Open|...
+GET {{baseUrl}}/api/me/conversations
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+###
+# Pomocnik: tylko trwające negocjacje
+GET {{baseUrl}}/api/me/conversations?role=Helper&status=Open&page=1&pageSize=20
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# F5: właściciel – wątki jednego ogłoszenia (link do rozmowy przy każdej ofercie w szczegółach)
+GET {{baseUrl}}/api/me/conversations?announcementId={{announcementId}}
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+### ======== Krok 10: zdjęcia ========
+# Właściciel dodaje zdjęcie (multipart, pole "file"; JPEG/PNG/WebP, max 5 MB, max 5) -> 201 { id }, Location = adres pliku.
+# To też zmiana treści: nowa rewizja, w ofercie "changesSinceOffer" z polem "Images" (stare/nowe id zdjęć).
+# Podmień ścieżkę na dowolny plik .jpg na dysku. Plik tekstowy -> 400 InvalidImage, nie-właściciel -> 409.
+# @name addImage
+POST {{baseUrl}}/api/announcements/{{announcementId}}/images
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+Content-Type: multipart/form-data; boundary=ICanHelpBoundary
+
+--ICanHelpBoundary
+Content-Disposition: form-data; name="file"; filename="kran.jpg"
+Content-Type: image/jpeg
+
+< ./kran.jpg
+--ICanHelpBoundary--
+
+###
+# Plik zdjęcia (publiczny) – ten sam adres jest w "images[].url" i "thumbnailUrl"
+GET {{baseUrl}}/api/announcements/{{announcementId}}/images/{{addImage.response.body.$.id}}
+
+###
+# Usunięcie zdjęcia (tylko właściciel, Open) -> 204; kolejna rewizja
+DELETE {{baseUrl}}/api/announcements/{{announcementId}}/images/{{addImage.response.body.$.id}}
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+###
 # Kontroferta właściciela -> 201 { id nowej oferty }
 # @name counterOffer
 POST {{baseUrl}}/api/announcements/{{announcementId}}/offers/{{makeOffer.response.body.$.id}}/counter
@@ -129,6 +270,21 @@ Content-Type: application/json
 }
 
 ###
+# Autor zmienia własną OCZEKUJĄCĄ ofertę (aktualną albo nieaktualną po edycji ogłoszenia) -> 201 { id nowej oferty },
+# stara oferta -> "Revised", druga strona dostaje powiadomienie OfferRevised. Cudza / już rozpatrzona oferta -> 409.
+# Przykład: po PATCH ogłoszenia właściciel aktualizuje swoją kontrofertę.
+POST {{baseUrl}}/api/announcements/{{announcementId}}/offers/{{counterOffer.response.body.$.id}}/revise
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "price": { "amount": 110, "currency": "PLN" },
+  "proposedStart": "2026-12-02T16:00:00Z",
+  "proposedEnd": "2026-12-02T18:00:00Z",
+  "message": "Po zmianie opisu – nowa propozycja."
+}
+
+###
 # Pomocnik akceptuje kontrofertę -> 204
 POST {{baseUrl}}/api/announcements/{{announcementId}}/offers/{{counterOffer.response.body.$.id}}/accept
 Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
@@ -139,12 +295,70 @@ GET {{baseUrl}}/api/announcements/{{announcementId}}/contact
 Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
 
 ###
-# Start (pomocnik albo właściciel) -> 204
+# Start (tylko przyjęty pomocnik; właściciel -> 409) -> 204, zleceniodawca dostaje powiadomienie JobStarted
 POST {{baseUrl}}/api/announcements/{{announcementId}}/start
 Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
 
 ###
-# Zakończenie (tylko właściciel) -> 204
+# F11 D: pomocnik zgłasza wykonanie (InProgress, raz; drugi raz -> 409) -> 204. Status zostaje InProgress,
+# w szczegółach i wątku pojawia się doneReportedAt; zleceniodawca dostaje powiadomienie JobDoneReported.
+POST {{baseUrl}}/api/announcements/{{announcementId}}/report-done
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# F11 E: rezygnacja przed rozpoczęciem (status Accepted, właściciel albo przyjęty pomocnik) -> 204. Powód:
+# CannotMakeIt | TermsDiffer | NoContact | Other (wtedy note wymagane; Disagreement tylko przy przerwaniu -> 400).
+# Ogłoszenie wraca do Open, oferta -> Abandoned, ten pomocnik nie złoży już oferty (409), jego wątek – tylko do odczytu.
+# Druga strona dostaje JobAbandoned. Zamiast tego kroku w przepływie powyżej – alternatywa do „start”.
+POST {{baseUrl}}/api/announcements/{{announcementId}}/abandon
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "reason": "CannotMakeIt",
+  "note": "Wypadł mi wyjazd."
+}
+
+###
+# F11 E: przerwanie w trakcie (status InProgress, każda strona) -> 204, status Interrupted (końcowy). F11 G: bez ocen
+# (POST …/ratings -> 409); druga strona dostaje JobInterrupted i może dodać stanowisko. Powód jak wyżej + Disagreement.
+POST {{baseUrl}}/api/announcements/{{announcementId}}/interrupt
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "reason": "Disagreement",
+  "note": "Inny zakres prac niż ustaliliśmy."
+}
+
+###
+# F11 G: stanowisko drugiej strony do wpisu nr 1 (jobExits[].number) – tylko strona, która nie wyszła, raz (drugi raz /
+# autor wyjścia -> 409, tekst < 2 znaków -> 400) -> 204. Ten, kto wyszedł, dostaje JobExitResponded.
+POST {{baseUrl}}/api/announcements/{{announcementId}}/job-exits/1/response
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "text": "Zakres prac był inny niż w ogłoszeniu."
+}
+
+###
+# F11 G: publiczny profil (bez logowania): statystyki asHelper / asClient (średnia ocen tylko z zakończonych,
+# zakończone, przerwane i rezygnacje – przez niego / przez drugą stronę) i przerwane zlecenia z obiema wersjami.
+# F11 H: averageRating = jeden głos na osobę (średnia jej ocen: 2 i 4 → 3), bez zleceń potwierdzonych < 30 min po przyjęciu i powtórek
+# z tym samym partnerem w ciągu 7 dni; ratingCount = wszystkie oceny, raterCount = osoby w średniej,
+# partnerCount = różni partnerzy, mostJobsWithOnePartner = najwięcej zleceń z jedną osobą
+@profileUserId = 3fa85f64-5717-4562-b3fc-2c963f66afa6
+GET {{baseUrl}}/api/users/{{profileUserId}}/profile
+
+###
+# F11 E: publiczne liczniki – ile zleceń użytkownik sam zerwał (abandonedCount) i przerwał (interruptedCount);
+# id użytkownika np. z „helperId” oferty albo „ownerId” ogłoszenia; nieznany -> 404
+@reliabilityUserId = 3fa85f64-5717-4562-b3fc-2c963f66afa6
+GET {{baseUrl}}/api/users/{{reliabilityUserId}}/reliability
+
+###
+# Potwierdzenie wykonania (tylko właściciel, z InProgress albo Accepted) -> 204, pomocnik dostaje JobCompleted
 POST {{baseUrl}}/api/announcements/{{announcementId}}/complete
 Authorization: Bearer {{signIn.response.body.$.accessToken}}
 
@@ -161,3 +375,141 @@ Content-Type: application/json
 
 ###
 GET {{baseUrl}}/api/announcements/{{announcementId}}/ratings
+
+###
+# Moje otrzymane oceny (F11 F): myRole = Client (jako zleceniodawca) / Helper (jako pomocnik), rater, tytuł ogłoszenia
+GET {{baseUrl}}/api/me/ratings
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# Do wystawienia: zakończone zlecenia (właściciel / przyjęty pomocnik) bez mojej oceny -> otherParty do ocenienia
+GET {{baseUrl}}/api/me/ratings/pending
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+###
+# ---------- Powiadomienia (Krok 13) ----------
+# Powstają w tle (outbox, co ~2 s) po ofercie, kontrofercie, akceptacji, odrzuceniu, wycofaniu, wiadomości i edycji.
+# Na żywo: SignalR /hubs/notifications?access_token=JWT, metoda "notification".
+GET {{baseUrl}}/api/me/notifications?unreadOnly=true&page=1&pageSize=20
+Authorization: Bearer {{signIn.response.body.$.accessToken}}
+
+###
+# @name myNotifications
+GET {{baseUrl}}/api/me/notifications
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+GET {{baseUrl}}/api/me/notifications/unread-count
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# Jedno przeczytane -> 204 (cudze / nieistniejące -> 404)
+POST {{baseUrl}}/api/me/notifications/{{myNotifications.response.body.$[0].id}}/read
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# Wszystkie przeczytane -> 204
+POST {{baseUrl}}/api/me/notifications/read-all
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# Tylko z jednego wątku (aplikacja otworzyła rozmowę) -> 204
+POST {{baseUrl}}/api/me/notifications/read-all?conversationId={{myNotifications.response.body.$[0].conversationId}}
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# ---------- Urządzenia z push (Krok 15) ----------
+# Token FCM z aplikacji (Firebase getToken). Każde powiadomienie idzie też pushem na wszystkie urządzenia odbiorcy
+# (title/body jak w NotificationDto, data: notificationId, type, announcementId, conversationId, url).
+# Bez klucza (Push:Enabled=false / brak Push:Fcm:CredentialsJson) push tylko w logu.
+# Ten sam token ponownie -> to samo urządzenie (200, nowe lastSeenAt). Pusty token -> 400.
+# @name registerDevice
+POST {{baseUrl}}/api/me/devices
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "token": "fcm-token-z-przegladarki-123",
+  "platform": "Web"
+}
+
+###
+GET {{baseUrl}}/api/me/devices
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# Wylogowanie / wyłączenie powiadomień -> 204 (cudze / nieistniejące -> 404)
+DELETE {{baseUrl}}/api/me/devices/{{registerDevice.response.body.$.id}}
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# ---------- Alerty o nowych ogłoszeniach (Krok 14) ----------
+# Pasujące nowe ogłoszenie (strefa + kategoria/podkategoria, nie własne) -> powiadomienie NewAnnouncementNearby
+# (announcementTitle, categoryName, alertName, alertKind, distanceKm). Powyżej Alerts:DailyLimit dziennie -> jeden skrót
+# NewAnnouncementsDigest (count). Cisza nocna (Alerts:QuietHours*) -> wpis na liście, bez SignalR.
+# Obszar: 5 km od domu w Augustowie, tylko w dni robocze 15-18 -> 201 (11. alert -> 409, promień spoza 0,5-50 km -> 400)
+# @name createAreaAlert
+POST {{baseUrl}}/api/me/alerts
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Dom – Augustów",
+  "kind": "Area",
+  "categoryId": "{{categoryId}}",
+  "subcategoryIds": [],
+  "center": { "latitude": 53.84, "longitude": 22.98 },
+  "radiusKm": 5,
+  "schedule": { "days": "Workdays", "from": "15:00:00", "to": "18:00:00" }
+}
+
+###
+# Trasa: 5 km od drogi Suwałki -> Augustów (polilinię daje serwis routingu po stronie aplikacji, 2-1000 punktów)
+# @name createRouteAlert
+POST {{baseUrl}}/api/me/alerts
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Suwałki → Augustów",
+  "kind": "Route",
+  "categoryId": "{{categoryId}}",
+  "routePoints": [
+    { "latitude": 54.10, "longitude": 22.93 },
+    { "latitude": 53.97, "longitude": 22.95 },
+    { "latitude": 53.84, "longitude": 22.98 }
+  ],
+  "radiusKm": 5
+}
+
+###
+GET {{baseUrl}}/api/me/alerts
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+# Zmiana promienia / punktów przelicza strefę w bazie (trigger). Rodzaju (Area/Route) zmienić się nie da.
+PATCH {{baseUrl}}/api/me/alerts/{{createAreaAlert.response.body.$.id}}
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "radiusKm": 10,
+  "schedule": { "days": "All" }
+}
+
+###
+# Podgląd: otwarte ogłoszenia, które pasują teraz (z distanceKm od punktu / trasy)
+GET {{baseUrl}}/api/me/alerts/{{createRouteAlert.response.body.$.id}}/preview?limit=20
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+POST {{baseUrl}}/api/me/alerts/{{createAreaAlert.response.body.$.id}}/disable
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+POST {{baseUrl}}/api/me/alerts/{{createAreaAlert.response.body.$.id}}/enable
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}
+
+###
+DELETE {{baseUrl}}/api/me/alerts/{{createAreaAlert.response.body.$.id}}
+Authorization: Bearer {{signInHelper.response.body.$.accessToken}}

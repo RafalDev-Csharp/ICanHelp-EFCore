@@ -1,0 +1,48 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="cancel()">Anuluj</ion-button>
+    </ion-buttons>
+    <ion-title>{{ heading }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <p>{{ intro }}</p>
+  <h2>Powód</h2>
+  <ion-list lines="none">
+    <ion-radio-group [value]="reason()" (ionChange)="reason.set($event.detail.value)">
+      @for (option of reasons; track option.value) {
+        <ion-item>
+          <ion-radio [value]="option.value" justify="start" labelPlacement="end">{{ option.label }}</ion-radio>
+        </ion-item>
+      }
+    </ion-radio-group>
+  </ion-list>
+  @if (submitted() && !reason()) {
+    <ion-text color="danger"><p>Wybierz powód.</p></ion-text>
+  }
+  <ion-textarea
+    [(ngModel)]="note"
+    [label]="reason() === 'Other' ? 'Opis' : 'Opis (opcjonalnie)'"
+    labelPlacement="floating"
+    fill="outline"
+    [autoGrow]="true"
+    [rows]="3"
+    [counter]="true"
+    [maxlength]="maxNote"
+  ></ion-textarea>
+  @if (submitted() && noteError(); as error) {
+    <ion-text color="danger"
+      ><p>{{ error }}</p></ion-text
+    >
+  }
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <div class="ion-padding-horizontal">
+      <ion-button expand="block" color="danger" (click)="submit()">{{ submitLabel }}</ion-button>
+    </div>
+  </ion-toolbar>
+</ion-footer>

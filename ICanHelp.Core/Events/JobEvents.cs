@@ -1,0 +1,59 @@
+using ICanHelp.Core.Enums;
+
+namespace ICanHelp.Core.Events;
+
+// F11 D: realizacja zlecenia (po przyjęciu oferty). Każde zdarzenie zna obie strony – handler wybiera odbiorcę bez wczytywania.
+
+/// <summary>The accepted helper started the work (Accepted → InProgress).</summary>
+public sealed record JobStarted(
+    Guid AnnouncementId,
+    Guid OwnerId,
+    Guid HelperId,
+    DateTime OccurredAt) : IDomainEvent;
+
+/// <summary>The accepted helper reported the work as done – the owner should confirm it.</summary>
+public sealed record JobDoneReported(
+    Guid AnnouncementId,
+    Guid OwnerId,
+    Guid HelperId,
+    DateTime OccurredAt) : IDomainEvent;
+
+/// <summary>The owner confirmed the work (→ Completed) – both sides can rate each other.</summary>
+public sealed record JobCompleted(
+    Guid AnnouncementId,
+    Guid OwnerId,
+    Guid HelperId,
+    DateTime OccurredAt) : IDomainEvent;
+
+/// <summary>F11 E: one side abandoned the job before the start (Accepted → Open). The other side gets the reason.</summary>
+public sealed record JobAbandoned(
+    Guid AnnouncementId,
+    Guid OwnerId,
+    Guid HelperId,
+    Guid ActorId,
+    OfferParty ActorParty,
+    JobExitReason Reason,
+    string? Note,
+    DateTime OccurredAt) : IDomainEvent;
+
+/// <summary>F11 G: the other side added its statement to an abandonment / interruption – the one who left is told.</summary>
+public sealed record JobExitResponded(
+    Guid AnnouncementId,
+    Guid OwnerId,
+    Guid HelperId,
+    int Number,
+    Guid ExitActorId,
+    Guid ResponderId,
+    string Preview,
+    DateTime OccurredAt) : IDomainEvent;
+
+/// <summary>F11 E: one side interrupted the work (InProgress → Interrupted). No ratings (F11 G) – statements instead.</summary>
+public sealed record JobInterrupted(
+    Guid AnnouncementId,
+    Guid OwnerId,
+    Guid HelperId,
+    Guid ActorId,
+    OfferParty ActorParty,
+    JobExitReason Reason,
+    string? Note,
+    DateTime OccurredAt) : IDomainEvent;

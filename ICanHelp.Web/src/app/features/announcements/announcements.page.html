@@ -1,0 +1,217 @@
+@let current = filters();
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <app-brand></app-brand>
+    </ion-buttons>
+    <ion-title>Szukaj</ion-title>
+    <ion-buttons slot="end">
+      <app-notifications-bell></app-notifications-bell>
+    </ion-buttons>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-searchbar
+      class="page-column"
+      placeholder="Czego szukasz? np. kran, malowanie"
+      aria-label="Szukaj w ogłoszeniach"
+      inputmode="search"
+      [debounce]="400"
+      [value]="current.phrase ?? ''"
+      (ionInput)="setPhrase($event.detail.value)"
+    ></ion-searchbar>
+  </ion-toolbar>
+  <ion-toolbar class="filters-toolbar">
+    <div class="category-tiles page-column" role="group" aria-label="Kategorie">
+      <button
+        type="button"
+        class="category-tile"
+        data-testid="category-all"
+        [class.selected]="!current.categoryId"
+        [attr.aria-pressed]="!current.categoryId"
+        (click)="setCategory(undefined)"
+      >
+        <ion-icon name="apps-outline" aria-hidden="true"></ion-icon>
+        <span>Wszystkie</span>
+      </button>
+      @for (category of categories.categories(); track category.id) {
+      <button
+        type="button"
+        class="category-tile"
+        [class.selected]="current.categoryId === category.id"
+        [attr.aria-pressed]="current.categoryId === category.id"
+        (click)="toggleCategory(category.id)"
+      >
+        <ion-icon [name]="categoryIcon(category.name)" aria-hidden="true"></ion-icon>
+        <span>{{ category.name }}</span>
+      </button>
+      }
+    </div>
+  </ion-toolbar>
+  <!-- F11 F: jeden wiersz – Lista / Mapa (ikony) + filtry, wyśrodkowany i zawijany zamiast nachodzenia. -->
+  <ion-toolbar class="filters-toolbar">
+    <div class="filters page-column">
+      <ion-segment
+        class="view-switch"
+        [value]="view()"
+        (ionChange)="setView($event.detail.value)"
+        aria-label="Widok ogłoszeń"
+      >
+        <ion-segment-button value="list" layout="icon-start">
+          <ion-icon name="list-outline" aria-hidden="true"></ion-icon>
+          <ion-label>Lista</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="map" layout="icon-start">
+          <ion-icon name="map-outline" aria-hidden="true"></ion-icon>
+          <ion-label>Mapa</ion-label>
+        </ion-segment-button>
+      </ion-segment>
+
+      <ion-button
+        class="near-me"
+        size="small"
+        shape="round"
+        [fill]="current.near ? 'solid' : 'outline'"
+        [disabled]="locating()"
+        [attr.aria-pressed]="!!current.near"
+        (click)="toggleNearMe()"
+      >
+        @if (locating()) {
+        <ion-spinner slot="start" name="dots" aria-hidden="true"></ion-spinner>
+        } @else {
+        <ion-icon slot="start" name="locate-outline" aria-hidden="true"></ion-icon>
+        } Blisko mnie
+      </ion-button>
+
+      @if (current.near) {
+      <ion-select
+        class="filter"
+        aria-label="Promień"
+        interface="popover"
+        fill="outline"
+        [value]="current.radiusKm"
+        (ionChange)="setRadius($event.detail.value)"
+      >
+        @for (radius of radiusOptions; track radius) {
+        <ion-select-option [value]="radius">do {{ radius }} km</ion-select-option>
+        }
+        <ion-select-option [value]="noRadiusLimit">Bez limitu</ion-select-option>
+      </ion-select>
+      } @if (subcategories().length > 0) {
+      <ion-select
+        class="filter"
+        aria-label="Podkategoria"
+        interface="action-sheet"
+        fill="outline"
+        cancelText="Anuluj"
+        placeholder="Podkategoria"
+        [value]="current.subcategoryId ?? ''"
+        (ionChange)="setSubcategory($event.detail.value)"
+      >
+        <ion-select-option value="">Wszystkie</ion-select-option>
+        @for (subcategory of subcategories(); track subcategory.id) {
+        <ion-select-option [value]="subcategory.id">{{ subcategory.name }}</ion-select-option>
+        }
+      </ion-select>
+      } @if (hasFilters()) {
+      <ion-chip class="clear-filters" data-testid="clear-filters" (click)="clearFilters()">
+        <ion-icon name="close-circle" aria-hidden="true"></ion-icon>
+        <ion-label>Wyczyść filtry</ion-label>
+      </ion-chip>
+      }
+    </div>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="page-column">
+  @if (view() === 'list') {
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  @if (store.items().length > 0) {
+  <ion-list>
+    @for (announcement of store.items(); track announcement.id) {
+    <app-announcement-card
+      [announcement]="announcement"
+      [liked]="likes.isLiked(announcement.id)"
+    ></app-announcement-card>
+    }
+  </ion-list>
+  <ion-infinite-scroll [disabled]="store.complete()" (ionInfinite)="loadMore($event)">
+    <ion-infinite-scroll-content loadingText="Wczytuję kolejne…"></ion-infinite-scroll-content>
+  </ion-infinite-scroll>
+  } @else if (!store.loaded() && store.loading()) {
+  <ion-list aria-busy="true" aria-label="Wczytywanie ogłoszeń">
+    @for (skeleton of skeletons; track skeleton) {
+    <div class="skeleton">
+      <ion-skeleton-text [animated]="true" class="skeleton-photo"></ion-skeleton-text>
+      <div class="skeleton-text">
+        <ion-skeleton-text [animated]="true" style="width: 70%"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 45%"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 30%"></ion-skeleton-text>
+      </div>
+    </div>
+    }
+  </ion-list>
+  } @else if (store.failed()) {
+  <app-load-failed heading="Nie udało się wczytać ogłoszeń" (retry)="store.reload()"></app-load-failed>
+  } @else if (hasFilters()) {
+  <app-empty-state
+    icon="search-outline"
+    heading="Brak ogłoszeń dla tych filtrów"
+    [message]="
+          current.near
+            ? 'W tym promieniu nikt teraz nie szuka pomocy – zwiększ promień albo zmień kategorię.'
+            : 'Zmień szukany tekst lub kategorię albo wyczyść filtry.'
+        "
+  >
+    <ion-button fill="outline" (click)="clearFilters()">Wyczyść filtry</ion-button>
+  </app-empty-state>
+  } @else {
+  <app-empty-state
+    icon="megaphone-outline"
+    heading="Na razie nie ma ogłoszeń"
+    message="Gdy ktoś z okolicy poprosi o pomoc, zobaczysz to tutaj – na liście i na mapie."
+  ></app-empty-state>
+  } } @else {
+  <div slot="fixed" class="map-layer">
+    <app-map
+      [markers]="markers()"
+      [circle]="searchCircle()"
+      [userPosition]="current.near"
+      (markerClick)="selectMarker($event)"
+    ></app-map>
+
+    <div class="map-summary">
+      <span>{{ mapSummary() }}</span>
+      @if (store.loading()) {
+      <ion-spinner name="dots" aria-label="Wczytywanie"></ion-spinner>
+      } @else if (!store.complete()) {
+      <ion-button size="small" fill="clear" (click)="store.loadMore()">Pokaż więcej</ion-button>
+      }
+    </div>
+
+    @if (selected(); as announcement) {
+    <div class="map-preview">
+      <ion-button
+        class="map-preview-close"
+        shape="round"
+        size="small"
+        color="light"
+        aria-label="Zamknij podgląd"
+        (click)="selectedId.set(null)"
+      >
+        <ion-icon slot="icon-only" name="close" aria-hidden="true"></ion-icon>
+      </ion-button>
+      <div class="map-card">
+        <app-announcement-card
+          [announcement]="announcement"
+          [liked]="likes.isLiked(announcement.id)"
+          lines="none"
+        ></app-announcement-card>
+      </div>
+    </div>
+    }
+  </div>
+  }
+</ion-content>

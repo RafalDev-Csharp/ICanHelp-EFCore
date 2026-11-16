@@ -14,7 +14,11 @@ public sealed class AuthOptions
     /// <summary>Klucz HMAC-SHA256, min. 32 bajty.</summary>
     public string SigningKey { get; set; } = string.Empty;
 
+    /// <summary>Ważność tokenu dostępu (JWT).</summary>
     public TimeSpan Expiry { get; set; } = TimeSpan.FromHours(1);
+
+    /// <summary>Ważność refresh tokenu (Krok F2). Każde użycie daje nowy, więc aktywny użytkownik nie musi się logować.</summary>
+    public TimeSpan RefreshTokenExpiry { get; set; } = TimeSpan.FromDays(30);
 
     internal SymmetricSecurityKey CreateSigningKey() => new(Encoding.UTF8.GetBytes(SigningKey));
 }

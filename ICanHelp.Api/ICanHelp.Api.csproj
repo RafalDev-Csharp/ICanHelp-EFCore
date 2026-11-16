@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -7,6 +7,7 @@
     <!-- Komentarze /// trafiają do Swaggera. 1591 = brak komentarza XML przy publicznym typie. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
+    <UserSecretsId>1ed66605-5199-415f-bbc1-daa93c867b75</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

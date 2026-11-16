@@ -1,169 +1,151 @@
 # ICanHelpApp – kontekst projektu dla asystenta AI
 
-> Ten plik czyta agent AI na początku każdej sesji. Dzięki niemu nie musi przeszukiwać całego repo.
-> Aktualizuj sekcję **Stan prac** po każdym kroku. Trzymaj plik krótki (< 150 linii).
+> Ten plik czyta agent AI na początku każdej sesji. Trzymaj go krótkim (< 150 linii): szczegóły obszarów → `docs/ARCHITEKTURA.md`,
+> pełny opis kroku → `docs/HISTORIA-KROKOW.md`. Po kroku zaktualizuj tylko „Stan prac” (jedna linia).
 
 ## Pomysł
-Marketplace drobnej pomocy sąsiedzkiej. **Zleceniodawca (Client)** publikuje ogłoszenie z problemem
-(cieknący kran, malowanie ściany, powieszenie obrazu, porada). **Pomocnik (Helper)**, który zna się na rzeczy
-i najlepiej często przejeżdża w pobliżu (np. wracając z pracy), składa ofertę z ceną. Strony mogą negocjować
-(kontroferty). Zleceniodawca akceptuje najlepszą ofertę → zlecenie przypisane → wykonane → wzajemne oceny.
-
-Jeden użytkownik może być raz klientem, raz pomocnikiem (rola w transakcji, nie rola konta).
+Marketplace drobnej pomocy sąsiedzkiej. **Zleceniodawca (Client)** publikuje ogłoszenie z problemem (cieknący kran, malowanie,
+porada). **Pomocnik (Helper)**, który zna się na rzeczy i najlepiej przejeżdża w pobliżu, składa ofertę z ceną. Strony negocjują
+(kontroferty), zleceniodawca akceptuje → zlecenie → wykonane → wzajemne oceny. Rola to rola w transakcji, nie rola konta.
 
 ## Stack
-- .NET 9, C# (Nullable enabled), EF Core 9 + SQL Server
-- Clean Architecture: `Core` (domena) ← `Application` (CQRS: komendy/zapytania, DTO) ← `Infrastructure` (EF, repozytoria) ← `Api` (ASP.NET Core, kontrolery)
-- Testy: xUnit + Shouldly (`ICanHelp.Core.Tests`, `ICanHelp.Application.Tests` – handlery z ręcznymi fake'ami w `Fakes/`,
-  `ICanHelp.Api.Tests` – integracyjne: `WebApplicationFactory` + SQL Server z Testcontainers, `[Trait("Category","Integration")]`).
-  Nie FluentAssertions 8+ – ma płatną licencję komercyjną.
+- .NET 9, C# (Nullable), EF Core 9 + SQL Server. Clean Architecture: `Core` (domena) ← `Application` (CQRS, DTO) ←
+  `Infrastructure` (EF, repozytoria) ← `Api` (ASP.NET Core). Frontend: `ICanHelp.Web` (Angular + Ionic PWA, własny `CLAUDE.md`).
+- Testy: xUnit + Shouldly – `Core.Tests`, `Application.Tests` (ręczne fake'i w `Fakes/`), `Api.Tests` (integracyjne:
+  `WebApplicationFactory` + SQL Server z Testcontainers, `[Trait("Category","Integration")]`). Nie FluentAssertions 8+ (licencja płatna).
 
 ## Zasady w kodzie (stosuj zawsze)
 1. **Core nie zależy od niczego** (żadnego EF, ASP.NET). Tylko czysty C#.
-2. Encje: `private set`, prywatny bezparametrowy konstruktor dla EF, publiczny konstruktor przyjmujący **tylko wartości**
-   (nigdy nawigacje ani kolekcje). Części agregatu (`Offer`, `Image`, `Subcategory`) mają konstruktor `internal` –
-   tworzy je tylko korzeń (`announcement.AddOffer(...)`, `category.AddSubcategory(...)`).
+2. Encje: `private set`, prywatny bezparametrowy konstruktor dla EF, publiczny konstruktor przyjmujący **tylko wartości**.
+   Części agregatu (`Offer`, `Image`, `Subcategory`) mają konstruktor `internal` – tworzy je korzeń (`announcement.AddOffer(...)`).
 3. Kolekcje: `private readonly List<T> _items = new(); public IReadOnlyCollection<T> Items => _items.AsReadOnly();`
 4. Logika biznesowa w encjach (np. `announcement.AcceptOffer(offerId)`), nie w handlerach.
-5. Value objects jako `sealed record`, walidacja w konstruktorze. Wyjątki są public i dziedziczą po `CustomExceptions`;
-   łamanie reguły biznesowej → `DomainRuleException`. Identyfikatory to VO `Id` i `UserId` (Guid, nie może być pusty).
-6. Daty: `DateTime` UTC. Domena **nie woła** `DateTime.UtcNow` – czas dostaje parametrem (`createdAtUtc`), co ułatwia testy.
-   W Application czas daje `IClock` (`Application/Time`, implementacja `Infrastructure/Time/Clock`). Nie waliduj „przeszłości” w VO – waliduj w metodzie domenowej.
+5. VO jako `sealed record` z walidacją w konstruktorze. Wyjątki public, dziedziczą po `CustomExceptions`; łamanie reguły biznesowej →
+   `DomainRuleException` (409), złe dane → własny `Invalid*Exception` (400), brak zasobu → klasa po `NotFoundException` (404),
+   „już istnieje” → po `AlreadyExistsException` (409). Identyfikatory: VO `Id` i `UserId`.
+6. Daty `DateTime` UTC. Domena **nie woła** `DateTime.UtcNow` – czas dostaje parametrem; w Application czas daje `IClock`.
 7. Status zamiast wielu booli (`AnnouncementStatus`, `OfferStatus`).
-8. Konfiguracja EF: każdą relację konfiguruj **raz** (relacje wewnątrz agregatu – w konfiguracji korzenia agregatu).
-   Konwertery VO globalnie w `ConfigureConventions`. VO z kilkoma polami jako `ComplexProperty`/`OwnsOne`.
-9. Na SQL Server unikaj wielu ścieżek kaskadowych – domyślnie `DeleteBehavior.Restrict`, `Cascade` tylko dla części agregatu.
-10. Async wszędzie (`Task`, `CancellationToken`), repozytorium per agregat (interfejs w Core, implementacja w Infrastructure).
-    Repozytoria **nie** wołają `SaveChanges` – robi to `IUnitOfWork.ExecuteAsync(...)` (interfejs w `Core/Repositories`,
-    implementacja `SqlUnitOfWork` = transakcja + SaveChanges).
-11. Nazewnictwo po angielsku w kodzie, komentarze mogą być po polsku.
+8. EF: każdą relację konfiguruj **raz** (wewnątrz agregatu – w konfiguracji korzenia). Konwertery VO i enumy (jako string) globalnie
+   w `ConfigureConventions`. VO z kilkoma polami → `ComplexProperty`/`OwnsOne`. Między agregatami tylko FK, bez nawigacji.
+9. SQL Server: domyślnie `DeleteBehavior.Restrict`, `Cascade` tylko dla części agregatu.
+10. Async wszędzie (`CancellationToken`), repozytorium per agregat (interfejs w Core). Repozytoria **nie** wołają `SaveChanges` –
+    robi to `IUnitOfWork.ExecuteAsync(...)` (`SqlUnitOfWork` = transakcja + SaveChanges + przeniesienie zdarzeń do outboksa).
+11. Nazwy w kodzie po angielsku, komentarze mogą być po polsku.
+12. Klasy z zależnościami z DI (handlery, repozytoria, serwisy): konstruktor główny `class X(IDep dep) : IFoo` – bez pól `_dep`
+    i przypisań. Powtarzalne kroki do wspólnych miejsc (niżej), nie kopiuj ich do kolejnego handlera / kontrolera.
 
-## Model domeny (zaimplementowany w Core)
-- `User` (agregat): UserName, FullName, PasswordHash, Role (enum User/Admin), CreatedAt, IsLocked, Description?,
-  ContactData (VO: Email, PhoneNumber, Country, City, PostalCode – w tabeli Users, Email unikalny)
-- `Announcement` (agregat): OwnerId, CategoryId, SubcategoryId, Difficulty (enum), Title, Description, Budget (Price),
-  Location (VO lat/lon), Status, CreatedAt, AcceptedOfferId?, **Offers**, **Images** (max 5)
-  - metody: `AddOffer`, `CounterOffer`, `AcceptOffer`, `RejectOffer`, `WithdrawOffer`, `AddImage`, `RemoveImage`,
-    `Start(actor)`, `Complete(actor)`, `Cancel(actor)`, `GetAcceptedHelperId()`, `IsParticipant(user)`, `CreateRating(...)`
-  - `Offer` (część agregatu): HelperId, ProposedBy (Client/Helper), Price, ProposedStart/End, Message?, Status, ParentOfferId?
-    (kontroferta = nowy `Offer` wskazujący poprzedni; poprzedni dostaje status `Countered`)
-- `Category` (agregat) → `Subcategory` (część agregatu, unikalna nazwa w kategorii)
-- `Rating`: AnnouncementId, RaterId, RateeId, Rate (1–5), Comment?; unikalne (AnnouncementId, RaterId)
-- `LikedAnnouncement` (UserId, AnnouncementId) i `LikedUser` (LikerId, LikedId) – klucze złożone, istnienie wiersza = polubione
-- Później: `HelperProfile` z obszarem działania / trasą dojazdu (punkt + promień) → wyszukiwanie „po drodze”
+## Model domeny (Core) – szczegóły metod i reguł: `docs/ARCHITEKTURA.md` „Model domeny”
+- `User` (+ `ContactData`), `RefreshToken` (hash, rotacja), `UserDevice` (token FCM, max 10) – `Entities/Users`
+- `Announcement` (agregat): Offers, Images (max 5), Revision (token współbieżności, +1 przy realnej edycji), Changes; `AggregateRoot`
+  z `DomainEvents`. Klasa `partial` w 4 plikach: `Announcement.cs` (treść, rewizje), `.Images.cs`, `.Negotiation.cs` (oferty –
+  warunki w VO `OfferTerms`), `.Job.cs` (realizacja, wyjścia, ocena). `Category` → `Subcategory`. `Rating` (raz na ogłoszenie
+  i oceniającego). `LikedAnnouncement`, `LikedUser`.
+- `Conversation` (`Entities/Negotiations`): jeden wątek na (ogłoszenie, pomocnik), wiadomości, znaczniki przeczytania.
+- `Notification` (`Entities/Notifications`): powstaje w tle z outboksa. `AnnouncementAlert` (`Entities/Alerts`): obszar / trasa.
 
 ## Przepływ statusów
-Announcement: `Open` → (AcceptOffer) `Accepted` → (Start) `InProgress` → (Complete) `Completed`; `Open`/`Accepted` → `Cancelled`
-Offer: `Pending` → `Accepted` | `Rejected` | `Withdrawn` | `Countered` (zastąpiona kontrofertą)
-Akceptuje/odrzuca/kontruje zawsze **druga strona** niż autor oferty; wycofać może tylko autor.
-Oferty przyjmowane tylko w statusie `Open`. Po akceptacji pozostałe `Pending` → `Rejected`.
-`Start` – właściciel albo zaakceptowany pomocnik; `Complete` i `Cancel` – tylko właściciel. Ocena (`CreateRating`) tylko po `Completed`,
-przez uczestnika; ocenianego (druga strona) wybiera domena. „Raz na ogłoszenie” – handler (`AlreadyRatedException`) + unikalny indeks.
+Announcement: `Open` → (AcceptOffer) `Accepted` → (Start) `InProgress` → (Complete) `Completed`; `Open`/`Accepted` → `Cancelled`;
+F11 E: `Accepted` → (Abandon, każda strona, z powodem) `Open`; `InProgress` → (Interrupt) `Interrupted` (końcowy, bez ocen;
+F11 G: druga strona dopisuje raz stanowisko – `RespondToJobExit`).
+Offer: `Pending` → `Accepted` | `Rejected` | `Withdrawn` | `Countered` (zastąpiona kontrofertą) | `Revised` (autor zaktualizował nieaktualną);
+`Accepted` → `Abandoned` (zlecenie zerwane przed startem – ten pomocnik nie złoży już oferty, jego wątek tylko do odczytu).
+Akceptuje/odrzuca/kontruje **druga strona** niż autor oferty; wycofuje tylko autor. Oferty tylko w `Open`; po akceptacji pozostałe
+`Pending` → `Rejected`. Oferta sprzed ostatniej edycji jest nieaktualna (`IsOutdated`) – nie da się jej przyjąć; druga strona może kontrować,
+autor – zmienić każdą swoją oczekującą (`ReviseOffer`, `POST …/offers/{id}/revise`).
+`Start` – tylko zaakceptowany pomocnik; `ReportDone` (InProgress, raz, `DoneReportedAt`) – pomocnik; `Complete` (z Accepted lub
+InProgress) i `Cancel` – właściciel; Start / ReportDone / Complete / Abandon / Interrupt → powiadomienia `Job*`. Ocena tylko po `Completed`, przez
+uczestnika. Publiczny profil (statystyki Pomagam / Zlecam, przerwane z obiema wersjami): `GET api/users/{id}/profile`.
 
 ## Gdzie co leży
+`docs/`: `ARCHITEKTURA.md` (szczegóły obszarów), `PLAN-NEGOCJACJE.md` (Kroki 9–12), `PLAN-POWIADOMIENIA.md` (Kroki 13–17),
+`PLAN-FRONTEND.md` (F1–F10 + wspólna kolejność), `HISTORIA-KROKOW.md` (pełny stan prac).
 ```
-Core            Entities, ValueObjects, Enums, Exceptions, Repositories (interfejsy + IUnitOfWork)
-Application     Abstractions (ICommand/IQuery + handlery), DTO, Queries, Commands (+ Commands/Handlers), Exceptions,
-                Security (IPasswordManager, IAuthenticator, ITokenStorage), Time (IClock), Extensions.AddApplication()
-Infrastructure  DAL/ICanHelpDbContext, DAL/Converters, DAL/Configurations, DAL/Repositories,
-                DAL/Handlers (query handlery + mapowanie AsDto), SqlUnitOfWork, DbInitializer, Security (JWT, hasła), Time,
-                Extensions.AddInfrastructure()
-Api             Program.cs, Controllers (Announcements, Categories, Users), ErrorHandling/DomainExceptionHandler,
-                appsettings*.json, Properties/launchSettings.json, ICanHelp.Api.http (przykładowe żądania)
-Api.Tests       Infrastructure/ApiFactory (kontener + ApiCollection), Infrastructure/TestApi (CreateUserAsync, ShouldBeProblemAsync…),
-                testy per obszar: ApiBasics, Users, AnnouncementFlow, DistanceSearch
-.github/workflows/ci.yml   build + testy jednostkowe + integracyjne (ubuntu-latest, Docker)
+Core            Entities, ValueObjects, Enums, Events, Exceptions, Repositories (interfejsy + IUnitOfWork)
+Application     Abstractions, DTO, Queries, Commands (+ Handlers), Exceptions, Events, Notifications (handlery zdarzeń,
+                NotificationPublisher, kanały, NotificationTextFormatter, IPushSender), Alerts, Security, Time, Extensions
+Infrastructure  DAL (DbContext, Converters, Configurations, Repositories, Handlers = query handlery, Migrations), SqlUnitOfWork,
+                DbInitializer, Security (JWT, hasła), Outbox, Push (FCM / log), Notifications (e-mail – log), Time, Extensions
+Api             Program.cs, Controllers, ErrorHandling/DomainExceptionHandler, Notifications (hub SignalR), ICanHelp.Api.http
+Api.Tests       Infrastructure/ApiFactory (kontener, RecordingPushSender), Infrastructure/TestApi (helpery), testy per obszar
+.github/workflows/ci.yml   backend: build + testy (z Dockerem); frontend: npm ci, lint, test, build
 ```
-Testy integracyjne: jeden kontener i baza `ICanHelpTests` na cały przebieg, środowisko `Testing`, config przez `UseSetting`.
-Bazy nie czyścimy – każdy test tworzy własnych użytkowników (unikalny e-mail) i filtruje po swoich danych (`ownerId`).
-Zapytania (`GetX`) definiuje Application, a ich handlery są w Infrastructure, bo czytają prosto z DbContext.
-Handlery komend są w Application (`Commands/Handlers`), używają repozytoriów + `IUnitOfWork`. Rejestracja handlerów: Scrutor.
-Wspólne: `RepositoryExtensions` (`GetOrThrowAsync` → `AnnouncementNotFound`, `GetActiveOrThrowAsync` → `UserNotFound`/`UserLocked`),
-`Time/DateTimeExtensions.AsUtc()` (daty z JSON bez strefy = UTC).
+- Zapytania (`GetX`) definiuje Application, handlery są w Infrastructure (czytają z DbContext, `AsNoTracking`). Handlery komend –
+  Application (`Commands/Handlers`, repozytoria + `IUnitOfWork`). Rejestracja: Scrutor. Wspólne: `RepositoryExtensions`
+  (`GetOrThrowAsync`, `GetActiveOrThrowAsync`, `GetOwnedOrThrowAsync` – cudze = 404, `EnsureCategoryAsync`), `CommandMapping`
+  (DTO / tekst z komendy → VO: `ToPrice`, `ToLocation`, `ToOptionalDescription`, `ToTerms`), `AsUtc()`. Zapytania: mapowania
+  `AnnouncementMapping` / `ConversationMapping` / `DtoMapping`, lista ogłoszeń `ToListRows()`, strona `TakePage(page, pageSize)`.
+- Testy integracyjne: jeden kontener i baza na przebieg, środowisko `Testing`, config przez `UseSetting`, outbox ręcznie
+  (`ProcessOutboxAsync()`). Bazy nie czyścimy – każdy test ma własnych użytkowników i filtruje po swoich danych.
 
-## Infrastructure (jak jest zbudowane)
-- `ICanHelpDbContext.ConfigureConventions` – globalne konwertery VO (`DAL/Converters`) i enumy jako string.
-- `Price`, `Location` → `ComplexProperty`; `ContactData` → `OwnsOne` (indeks na Email).
-- Relacje między agregatami tylko przez FK (`HasOne<User>().WithMany()`), bez nawigacji. Cascade tylko wewnątrz agregatu.
-- Repozytoria per agregat (`DAL/Repositories`) – ładują cały agregat (`Include` Offers/Images).
-- Strona odczytu: handlery zapytań w `DAL/Handlers` czytają z DbContext (`AsNoTracking`) i mapują do DTO (`Handlers/Extensions.cs`).
-- `DbInitializer` (IHostedService) – przy starcie: migracje + seed kategorii (nic nie robi, dopóki nie ma żadnej migracji).
-- Connection string: `ConnectionStrings:DefaultConnection` (w appsettings projektu Api).
-- Migracje w `ICanHelp.Infrastructure/DAL/Migrations`. `dotnet-ef` jako lokalne narzędzie (`.config/dotnet-tools.json`, 9.0.11).
-- Odległość (Krok 7): Core zostaje przy `Location` (lat/lon). W bazie kolumna `GeoPoint` (`geography`, computed PERSISTED
-  `geography::Point([Latitude],[Longitude],4326)`) jako shadow property + indeks przestrzenny `IX_Announcements_GeoPoint`
-  (ręczny SQL w migracji `AnnouncementGeoPoint` – EF go nie modeluje, nie ma go w snapshocie). `UseSqlServer(..., x => x.UseNetTopologySuite())`,
-  pomocnik `DAL/Spatial.cs` (SRID, `CreatePoint(lat, lon)` – w NTS X = długość!). `GetAnnouncements`: `Latitude`+`Longitude`
-  (+ `RadiusKm`, domyślnie 10, max 100) → `IsWithinDistance`, sortowanie od najbliższych, `AnnouncementDto.DistanceKm`.
-  Walidacja w `GetAnnouncements.GetDistanceFilter()` → `InvalidDistanceFilterException` (400).
-
-## Uwierzytelnianie (Krok 5)
-- `POST api/users/sign-up` (komenda `SignUp`, 201 + Location; rola zawsze `User`), `POST api/users/sign-in` (`SignIn` e-mail+hasło
-  → `JwtDto`), `GET api/users/me` (`[Authorize]`). Komendy nic nie zwracają: `SignInHandler` odkłada token do `ITokenStorage` (scoped),
-  kontroler go odczytuje.
-- Hasła: `PasswordManager` = `PasswordHasher<User>` z ASP.NET Core Identity (PBKDF2). Plain hasło tylko w VO `Password` (walidacja).
-- JWT: `Authenticator` (`JsonWebTokenHandler`, HS256), claimy `sub`/`unique_name`/`role`/`jti` – nazwy w `Security/AuthClaims`,
-  `MapInboundClaims = false`. Konfiguracja `Auth` (Issuer, Audience, Expiry, SigningKey ≥ 32 bajty, `ValidateOnStart`).
-  Dev-klucz w `appsettings.Development.json`; poza Development **trzeba** ustawić `Auth__SigningKey`, inaczej API nie wstanie.
-- Błędy: `UserNameAlreadyInUse`/`EmailAlreadyInUse` → 409, `InvalidCredentials` → 401 (bez zdradzania, czy konto istnieje),
-  `UserLocked` → 403 (dopiero po poprawnym haśle). Infrastructure ma `FrameworkReference Microsoft.AspNetCore.App` + pakiet JwtBearer.
-- Swagger: przycisk Authorize (Bearer). Przykłady w `ICanHelp.Api.http`.
-- Prywatność: `GET api/users/{id}` zwraca `UserPublicDto` (bez kontaktu, roli, blokady; query `GetUserPublicById`).
-  Pełny `UserDto` tylko w `/me` i w `GET api/users` (`[Authorize(Roles = "Admin")]`). `liked-*` – tylko właściciel lub admin
-  (`IsSelfOrAdmin` w kontrolerze, inaczej 403). Oceny, ogłoszenia, kategorie – publiczne.
-  Kontakt drugiej strony: `GET api/announcements/{id}/contact` (query `GetAnnouncementContact`) – tylko uczestnik, status
-  Accepted/InProgress/Completed, inaczej 404. Id aktora w komendach zawsze z tokenu (`User.TryGetUserId`, `Api/Security`), pola `[JsonIgnore]`.
-
-## Api (jak jest zbudowane)
-- Kontrolery `[ApiController]`, trasy `api/<zasób>`. Handler wstrzykiwany do akcji przez `[FromServices] IQueryHandler<TQuery, TResult>`
-  (bez mediatora). Zapytanie z filtrami bindowane `[FromQuery]` prosto do klasy z Application (`GetAnnouncements`, `GetUsers`).
-  `null` z handlera → `NotFound()`. Komendy: `[FromBody]` + `[FromServices] ICommandHandler<T>`. Dostęp do GET-ów – sekcja „Uwierzytelnianie”.
-- Komendy ogłoszeń (wszystkie `[Authorize]`, `api/announcements`): `POST` (201 + `CreatedDto`), `POST {id}/offers` (201),
-  `POST {id}/offers/{offerId}/counter|accept|reject|withdraw`, `POST {id}/start|complete|cancel` (204), `POST {id}/ratings` (201).
-  Akcje bez body idą przez prywatne `Execute(userId => komenda, ...)` w kontrolerze. Przykłady całego przepływu w `ICanHelp.Api.http`.
-- Błędy zawsze jako ProblemDetails: `AddProblemDetails` + `UseExceptionHandler` + `UseStatusCodePages`.
-  `DomainExceptionHandler`: `OfferNotFound`/`AnnouncementNotFound`/`UserNotFound` → 404, `DomainRuleException`, `AlreadyRated` → 409,
-  wyjątki auth (wyżej), inne `CustomExceptions` (np. `InvalidCategory`) → 400
-  (pole `errorCode` = nazwa wyjątku bez „Exception”), reszta → 500 bez szczegółów. Każda odpowiedź ma `traceId`.
-- Enumy w JSON jako string (`JsonStringEnumConverter`). Swagger (Swashbuckle) tylko w Development, z komentarzy `///`.
-- `GET /health` – health check (bez sprawdzania bazy). Porty: http 5080, https 7080. W Development `/` → `/swagger`,
-  `UseHttpsRedirection` tylko poza Development.
-- Connection string (`appsettings.json`) wskazuje SQL Server z `docker-compose.yml` (localhost,1433, sa / hasło dev).
-  Na produkcji nadpisać zmienną `ConnectionStrings__DefaultConnection`.
-- `public partial class Program` – pod `WebApplicationFactory` w testach integracyjnych.
+## Api w skrócie (szczegóły: `docs/ARCHITEKTURA.md`)
+- Kontrolery dziedziczą po `ApiController`: handler wstrzykiwany do akcji (`[FromServices] IQueryHandler<,>` / `ICommandHandler<>`,
+  bez mediatora), `null` z query → 404 (`OkOrNotFound`), komenda bez odpowiedzi → 204 (`Send`). Id aktora zawsze z tokenu
+  (`CurrentUserId`; token bez poprawnego `sub` odrzuca uwierzytelnianie → 401), pola komend ustawiane przez kontroler mają `[JsonIgnore]`.
+- Błędy jako ProblemDetails (`DomainExceptionHandler`, wg klasy bazowej wyjątku – nowego wyjątku nie trzeba nigdzie dopisywać):
+  `NotFoundException` → 404, `DomainRuleException`, `AlreadyExistsException`, `ConcurrencyConflict` → 409, inne `CustomExceptions`
+  → 400, `InvalidCredentials` → 401, `UserLocked` → 403; `errorCode` = nazwa wyjątku bez „Exception”, zawsze `traceId`.
+- Auth: JWT HS256 (`Auth:SigningKey` ≥ 32 bajty, poza Development z env) + refresh tokeny z rotacją. Prywatność: oferty widzi właściciel
+  (wszystkie) i pomocnik (swoje), kontakt po akceptacji, wątki tylko dla dwóch uczestników (obcy → 404), cudze zasoby `api/me/*` → 404.
+- Endpointy: `api/users` (+ refresh, sign-out), `api/categories`, `api/announcements` (+ offers, images, conversations, contact,
+  ratings, like), `api/conversations/{id}`, `api/me/` conversations | notifications (+ hub `/hubs/notifications`) | alerts | devices | ratings (+ `pending`).
+  Przykłady w `ICanHelp.Api.http`. Porty 5080/7080, `/health`, Swagger w Development.
+- Migracje w `Infrastructure/DAL/Migrations`: `dotnet ef migrations add` działa (Krok 15), ale sprawdź wynik – EF nie zna indeksu
+  przestrzennego `IX_Announcements_GeoPoint` (kolumna `GeoPoint`); linie, które go dotykają, usuń.
+- Sekrety poza repo (env / user-secrets projektu Api): `Auth:SigningKey`, `Push:Fcm:CredentialsPath` (plik JSON konta serwisowego).
 
 ## Komendy
 ```bash
+verify.cmd                                    # wszystko po kroku (Windows) → .verify/report.md; -Quick = bez Dockera
+serve-local.cmd                               # build frontu → Api/wwwroot → https://localhost:7080 (PWA, push); -NoBuild
 dotnet build
 dotnet test                                   # integracyjne wymagają działającego Dockera
 dotnet test --filter "Category!=Integration"  # tylko jednostkowe
-docker compose up -d                # SQL Server w Dockerze
-dotnet tool restore                 # instaluje dotnet-ef z manifestu
-dotnet run --project ICanHelp.Api   # Swagger: http://localhost:5080/swagger; przy starcie DbInitializer robi migracje + seed
+docker compose up -d                          # SQL Server w Dockerze
+dotnet tool restore                           # dotnet-ef z manifestu
+dotnet run --project ICanHelp.Api             # http://localhost:5080/swagger; przy starcie migracje + seed
 dotnet ef migrations add <Name> -p ICanHelp.Infrastructure -s ICanHelp.Api -o DAL/Migrations
-dotnet ef database update      -p ICanHelp.Infrastructure -s ICanHelp.Api
+cd ICanHelp.Web && npm ci && npm start        # http://localhost:4200 (proxy /api, /hubs → :5080)
 ```
 
-## Stan prac (aktualizuj!)
-- [x] Szkielet: Core, Application (DTO, Queries), Infrastructure
-- [x] Przebudowa domeny (Core) – model powyżej
-- [x] Krok 1 – Infrastructure + Application dopasowane do nowego Core (konfiguracje EF, repozytoria, query handlery)
-- [x] Krok 1b – build zielony, usunięty przestarzały `LocationConfiguration.cs`
-- [x] Krok 2 – `ICanHelp.Core.Tests` (xUnit + Shouldly): `Entities/Announcement*Tests.cs`, dane w `AnnouncementTestData.cs` (`Now`, `InStatus(...)`).
-- [x] Krok 3 – projekt `ICanHelp.Api`: kontrolery GET dla wszystkich zapytań, Swagger, ProblemDetails (`DomainExceptionHandler`),
-  appsettings, launchSettings, `/health`. `dotnet build` zielony u autora (3.11.2026).
-- [x] Krok 4 – `docker-compose.yml` (SQL Server 2022), manifest `dotnet-ef`, migracja `Init` (20261105141305), seed kategorii.
-- [x] Krok 5 – rejestracja/logowanie (JWT, hash hasła): opis w sekcji „Uwierzytelnianie”, projekt `ICanHelp.Application.Tests`
-  (14 testów `SignUpHandler`/`SignInHandler`). Bez nowej migracji (schemat Users bez zmian).
-- [x] Krok 6 – komendy ogłoszeń/ofert/oceny (`Commands/AnnouncementCommands.cs`, `OfferCommands.cs`) + endpointy + kontakt po akceptacji.
-  Testy: `Core.Tests/.../AnnouncementParticipantsTests.cs`, `Application.Tests/Commands/AnnouncementHandlersTests.cs`. Bez migracji.
-- [x] Krok 7 – wyszukiwanie po odległości (opis w sekcji „Infrastructure”), migracja `AnnouncementGeoPoint` (20261105190000,
-  pisana ręcznie), testy `Application.Tests/Queries/GetAnnouncementsDistanceFilterTests.cs`.
-- [x] Krok 8 – `ICanHelp.Api.Tests` (Testcontainers.MsSql 4.4.0, Mvc.Testing 9.0.11; ~30 testów: auth, prywatność, cały przepływ
-  negocjacji, wyszukiwanie po odległości, ProblemDetails), CI `.github/workflows/ci.yml`, README z diagramami Mermaid.
-  Zweryfikowane u autora 5.11.2026: `dotnet test` – 172/172 zielone (potwierdza też Kroki 5–7). **Zostało: push + zielony build w Actions.**
+## Stan prac (aktualizuj!) – pełna historia: `docs/HISTORIA-KROKOW.md`
+- [x] Backend, Kroki 1–15: domena, Api + ProblemDetails, JWT + refresh, ogłoszenia/oferty/oceny, odległość, edycja z rewizjami,
+  zdjęcia, wątki negocjacji, powiadomienia (outbox, SignalR), alerty obszar/trasa, push FCM + `api/me/devices`.
+  Ostatnia weryfikacja 10.11.2026 (`verify.cmd`): dotnet 468/468 (Core 198, Application 179, integracyjne 91).
+- [x] Frontend, F1–F6: szkielet, logowanie, przeglądanie (lista ↔ mapa), dodawanie/edycja, oferty i rozmowy, powiadomienia
+  w aplikacji. Ostatnia weryfikacja 10.11.2026: lint + Vitest 182/182 + build zielone.
+- [x] F7 – PWA + push (10.11.2026, `verify.cmd`: Vitest 209/209): manifest, ikony, jeden SW `app-sw.js` (FCM + ngsw), instalacja,
+  `PushService` → `api/me/devices`. Zostało ręcznie: `firebase` + `vapidKey` w `environment*.ts`, test Android / iPhone przez HTTPS.
+- [x] F8 – alerty (12.11.2026, `verify.cmd`: dotnet 468/468, Vitest 250/250): `/profile/alerts` (lista, włącz/wyłącz, usuń),
+  obszar / trasa (OpenRouteService), podgląd `/preview`. Zostało ręcznie: `openRouteServiceKey` w `environment*.ts`.
+- [ ] **W toku: F10 wdrożenie** = MVP (Augustów / Suwałki). 12.11.2026: API serwuje frontend (`wwwroot`, `serve-local.cmd`),
+  PWA + push sprawdzone lokalnie przez HTTPS w Chrome (`verify.cmd`: dotnet 479/479, Vitest 250/250). Android OK (tunel cloudflared). Dalej: iPhone, hosting.
+- [ ] F11 – poprawki po teście autora (`docs/PLAN-FRONTEND.md`) – przed testem z ludźmi. **A (błędy, czytelność) zrobione
+  12.11.2026** (kolumna 720 px, logo, zakładki → korzeń, odświeżanie listy, karta i akcje w wątku, Brave; `verify.cmd`: dotnet 479/479, Vitest 259/259).
+  **B nawigacja zrobiona 12.11.2026** (zakładki Szukaj · Ulubione · Dodaj · Zlecenia · Konto, dzwonek, „Zapytaj”, fraza
+  `phrase` w `GET api/announcements`; `verify.cmd`: dotnet 489/489, Vitest 275/275). **C zrobione 13.11.2026**: autor
+  aktualizuje nieaktualną ofertę (`ReviseOffer`, status `Revised`, powiadomienie `OfferRevised`, „Zaktualizuj ofertę”;
+  `verify.cmd`: dotnet 507/507, Vitest 281/281; test ręczny Chrome ↔ Brave OK). **D zrobione 13.11.2026** (`activity$`
+  hub + push, zmiana każdej oczekującej oferty, Start tylko pomocnik, `ReportDone` + potwierdzenie, powiadomienia `Job*`,
+  „Zakończone” zwinięte; `verify.cmd`: dotnet 532/532, Vitest 295/295). **F zrobione 13.11.2026** (bez „nieaktualna”: podgląd zmian +
+  „Podtrzymuję ofertę”, ekran „Oceny” + `api/me/ratings`, filtry i układ „Szukaj”, dzwonek w `/conversations/all`;
+  `verify.cmd`: dotnet 536/536, Vitest 322/322). **E zrobione 13.11.2026** (Zrezygnuj → Open / Przerwij → `Interrupted`
+  z powodem, `JobExits`, oceny po przerwaniu, „Wystaw ponownie”, liczniki `api/users/{id}/reliability`; `verify.cmd`:
+  dotnet 574/574, Vitest 342/342). **G zrobione 13.11.2026** (bez ocen po przerwaniu, stanowisko drugiej strony,
+  publiczny profil `/users/:id` – Pomagam / Zlecam, `api/users/{id}/profile`; `verify.cmd`: dotnet 581/581, Vitest 352/352). **H zrobione 13.11.2026** (oceny odporne na zmowę: jeden głos na osobę = średnia jej ocen,
+  bez zleceń < 30 min i powtórek z tą samą osobą w 7 dni – `Core/Services/ReputationPolicy`, „12 ocen od 9 osób”;
+  `verify.cmd`: dotnet 594/594, Vitest 356/356).
+  Zostało: test ręczny E + G + H, potem test z ludźmi; hosting (F10) na koniec.
+- [x] Refaktoryzacja (bez zmian zachowania i kontraktu API). **R1 backend 14.11.2026**: wspólne kroki handlerów i kontrolerów,
+  `OfferTerms`, `Announcement` w 4 plikach, wyjątki wg klasy bazowej (−900 linii; dotnet 610/610). **R2 frontend 15.11.2026**:
+  szczegóły i wątek = store + sekcje + czyste funkcje, wspólne listy / okna / komendy API (`verify.cmd -SkipBackend`: Vitest 425/425).
+- [x] Przed testem z ludźmi 16.11.2026: kategorie po polsku, dane testowe `DemoDataSeeder` (Development, pusta baza), nowe logo
+  (uścisk dłoni) i pomarańczowy kolor główny, motyw jasny / ciemny / systemowy w Konto → Aplikacja, większe Lista / Mapa (dotnet 610/610, Vitest 425/425).
+- [ ] Krok 16 – „jestem w okolicy” na żądanie → F9 (ekran) → Krok 17 (Capacitor, sklepy; opcjonalnie lokalizacja w tle)
 
 ## Jak pracować z AI (oszczędnie)
-- Jedna sesja = jeden krok z listy. Na start: „Przeczytaj CLAUDE.md, zrób Krok N”.
+- Jedna sesja = jeden krok. Na start: „Przeczytaj CLAUDE.md i docs/PLAN-…md, zrób Krok N” (frontend: Krok FN).
 - Podawaj konkretne pliki, zamiast prosić o przeszukanie repo.
-- Po kroku: zaktualizuj „Stan prac”, commit.
+- Po kroku: jedna linia w „Stan prac”, szczegóły w `docs/HISTORIA-KROKOW.md` (i `docs/ARCHITEKTURA.md`, jeśli doszedł obszar).
+- Sesja lokalna (Windows): AI samo uruchamia `verify.cmd`, czyta `.verify/report.md` i poprawia aż do „WSZYSTKO OK”.
+- Sesja w chmurze (bez .NET/Dockera/npm): autor uruchamia `verify.cmd` i pisze „sprawdź raport”; AI czyta raport (logi:
+  `.verify/*.log`), poprawia i wpisuje wynik do „Stan prac” i historii. Commit robi autor.

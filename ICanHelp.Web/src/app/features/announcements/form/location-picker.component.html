@@ -1,0 +1,17 @@
+<app-place-search (picked)="choose($event)"></app-place-search>
+
+<app-map
+  class="picker-map"
+  [markers]="markers()"
+  [circle]="circle()"
+  [center]="center()"
+  [zoom]="15"
+  (mapClick)="choose($event)"
+></app-map>
+<ion-note class="hint">
+  @if (point()) {
+    {{ hint() ?? 'Pokazujemy okolicę (~100 m), nie dokładny adres – ten podasz pomocnikowi po przyjęciu oferty.' }}
+  } @else {
+    Dotknij mapy, żeby wskazać miejsce.
+  }
+</ion-note>

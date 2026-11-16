@@ -2,7 +2,7 @@ using ICanHelp.Core.Exceptions;
 
 namespace ICanHelp.Application.Exceptions;
 
-public class AlreadyRatedException : CustomExceptions
+public class AlreadyRatedException : AlreadyExistsException
 {
     public Guid AnnouncementId { get; }
 

@@ -1,0 +1,141 @@
+import type {
+  AnnouncementFieldChangeDto,
+  ConversationDto,
+  JobExitDto,
+  MessageDto,
+  OfferDto,
+} from '../../core/api/api-client';
+import type { JobExitView } from '../offers/job-exit';
+import { jobExitView } from '../offers/job-exit';
+import { changedFieldsLabel, partyLabel, pendingOffer } from '../offers/offer-labels';
+import type { OfferView } from '../offers/offer-view';
+import { offerView } from '../offers/offer-view';
+
+/** Wpis osi czasu wątku gotowy do wyświetlenia (typy wpisów jak `ConversationEntryDto.type` w API). */
+export type TimelineItem =
+  | { kind: 'message'; key: string; at: string; message: MessageDto; mine: boolean }
+  /** Oferta / kontroferta – rysuje ją `app-offer-card` (`OfferView`). */
+  | ({ kind: 'offer'; key: string; at: string } & OfferView)
+  | {
+      kind: 'change';
+      key: string;
+      at: string;
+      fields: string;
+      revision: number;
+      /** Pola „było → jest” tej edycji (podgląd zmian). */
+      changes: AnnouncementFieldChangeDto[];
+      /** Edytował czytający (zleceniodawca) – „Edytowałeś ogłoszenie”, inaczej „Zleceniodawca zmienił ogłoszenie”. */
+      mine: boolean;
+    }
+  /** F11 E: rezygnacja / przerwanie zlecenia tego pomocnika (`JobExitView`). */
+  | ({ kind: 'exit'; key: string; at: string } & JobExitView);
+
+/**
+ * Oś czasu od najstarszych (kolejność z API). Wpisy z nieznanym `type` pomijamy – nowsza wersja backendu
+ * może dodać inne rodzaje, stara aplikacja ich po prostu nie pokaże.
+ */
+export function toTimelineItems(conversation: ConversationDto, myId: string | undefined): TimelineItem[] {
+  const items: TimelineItem[] = [];
+  const offers = offersOf(conversation);
+  for (const entry of conversation.timeline) {
+    if (entry.type === 'Message' && entry.message) {
+      items.push({
+        kind: 'message',
+        key: `m-${entry.message.id}`,
+        at: entry.at,
+        message: entry.message,
+        mine: entry.message.senderId === myId,
+      });
+    } else if (entry.type === 'Offer' && entry.offer) {
+      items.push({
+        kind: 'offer',
+        key: `o-${entry.offer.id}`,
+        at: entry.at,
+        ...offerView(entry.offer, offers, conversation.myRole, conversation.announcementStatus),
+      });
+    } else if (entry.type === 'AnnouncementChanged' && entry.change) {
+      items.push({
+        kind: 'change',
+        key: `c-${entry.change.revision}`,
+        at: entry.at,
+        fields: changedFieldsLabel(entry.change.fields),
+        revision: entry.change.revision,
+        changes: entry.change.fields,
+        mine: conversation.myRole === 'Client',
+      });
+    } else if (entry.type === 'JobExit' && entry.jobExit) {
+      items.push({
+        kind: 'exit',
+        key: `x-${entry.jobExit.number}`,
+        at: entry.at,
+        ...jobExitView(entry.jobExit, myId, conversation.clientId),
+      });
+    }
+  }
+  return items;
+}
+
+/** F11 E: wyjście ze zlecenia w tym wątku (rezygnacja albo przerwanie), ostatnie – albo `undefined`. */
+export function jobExitOf(conversation: ConversationDto): JobExitDto | undefined {
+  return conversation.timeline.filter((entry) => entry.type === 'JobExit' && entry.jobExit).at(-1)?.jobExit;
+}
+
+/** Oferty wątku (do „czy mam oczekującą ofertę”, podpowiedzi ceny). */
+export function offersOf(conversation: ConversationDto): OfferDto[] {
+  return conversation.timeline.filter((entry) => entry.type === 'Offer' && entry.offer).map((entry) => entry.offer);
+}
+
+/** Wyróżniona informacja nad polem wiadomości: co czeka na czytającego (F11 F). */
+export interface ThreadNotice {
+  /** `changes` – podgląd zmian ogłoszenia i decyzja o ofercie; `revised` – przewiń do aktualnej oferty. */
+  kind: 'changes' | 'revised';
+  text: string;
+  offer: OfferDto;
+}
+
+/**
+ * Jedna informacja dla czytającego na podstawie oczekującej oferty (najwyżej jedna w wątku):
+ * - jestem autorem, a ogłoszenie zmieniono po ofercie → „Zleceniodawca zmienił ogłoszenie – zobacz zmiany”
+ *   (u właściciela z własną kontrofertą – „Zmieniłeś ogłoszenie po swojej kontrofercie – zobacz zmiany”);
+ * - druga strona zmieniła swoją ofertę (poprzednia `Revised`) → „Pomocnik zmienił ofertę – zobacz aktualną”.
+ */
+export function threadNotice(conversation: ConversationDto): ThreadNotice | null {
+  if (conversation.announcementStatus !== 'Open') {
+    return null;
+  }
+  const offers = offersOf(conversation);
+  const offer = pendingOffer(offers);
+  if (!offer) {
+    return null;
+  }
+  const mine = offer.proposedBy === conversation.myRole;
+  if (mine && offer.isOutdated) {
+    return {
+      kind: 'changes',
+      text:
+        conversation.myRole === 'Helper'
+          ? 'Zleceniodawca zmienił ogłoszenie – zobacz zmiany'
+          : 'Zmieniłeś ogłoszenie po swojej kontrofercie – zobacz zmiany',
+      offer,
+    };
+  }
+  const previous = offers.find((other) => other.id === offer.parentOfferId);
+  if (!mine && !offer.isOutdated && previous?.status === 'Revised') {
+    const party = partyLabel(offer.proposedBy);
+    // „Podtrzymuję ofertę” = te same warunki do nowej wersji ogłoszenia – nie „zmienił”, tylko „podtrzymał”.
+    const text = sameTerms(offer, previous)
+      ? `${party} podtrzymał ofertę po zmianach – zobacz aktualną`
+      : `${party} zmienił ofertę – zobacz aktualną`;
+    return { kind: 'revised', text, offer };
+  }
+  return null;
+}
+
+function sameTerms(a: OfferDto, b: OfferDto): boolean {
+  return (
+    a.price.amount === b.price.amount &&
+    a.proposedStart === b.proposedStart &&
+    a.proposedEnd === b.proposedEnd &&
+    (a.message ?? '') === (b.message ?? '')
+  );
+}

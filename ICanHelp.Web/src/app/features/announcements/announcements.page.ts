@@ -1,0 +1,265 @@
+import type { OnInit } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
+import {
+  IonButton,
+  IonButtons,
+  IonChip,
+  IonContent,
+  IonHeader,
+  IonIcon,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
+  IonLabel,
+  IonList,
+  IonRefresher,
+  IonRefresherContent,
+  IonSearchbar,
+  IonSegment,
+  IonSegmentButton,
+  IonSelect,
+  IonSelectOption,
+  IonSkeletonText,
+  IonSpinner,
+  IonTitle,
+  IonToolbar,
+} from '@ionic/angular';
+import type { ViewWillEnter } from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import {
+  appsOutline,
+  close,
+  closeCircle,
+  listOutline,
+  locateOutline,
+  mapOutline,
+  megaphoneOutline,
+  searchOutline,
+} from 'ionicons/icons';
+
+import { CategoriesService } from '../../core/categories/categories.service';
+import { categoryIcon, registerCategoryIcons } from '../../core/categories/category-icons';
+import { GeolocationError, GeolocationService } from '../../core/geo/geolocation.service';
+import { ToastService } from '../../core/ui/toast.service';
+import { BrandComponent } from '../../shared/components/brand/brand.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { LoadFailedComponent } from '../../shared/components/load-state/load-failed.component';
+import type { MapCircle, MapMarker } from '../../shared/components/map/map.component';
+import { MapComponent } from '../../shared/components/map/map.component';
+import { NotificationsBellComponent } from '../../shared/components/notifications-bell/notifications-bell.component';
+import { completeIonEvent } from '../../shared/data/ion-events';
+import { formatPrice } from '../../shared/pipes/price.pipe';
+import { pluralPl } from '../../shared/text/plural';
+
+import { LikesService } from './likes/likes.service';
+import { AnnouncementCardComponent } from './list/announcement-card.component';
+import { NO_RADIUS_LIMIT, RADIUS_OPTIONS_KM, activeFilterCount, normalizePhrase } from './list/announcement-filters';
+import { AnnouncementListStore } from './list/announcement-list.store';
+
+export type AnnouncementsView = 'list' | 'map';
+
+/** Id z pola wyboru (`$event.detail.value` ma typ nieznany): pusty tekst albo coś innego = „bez filtra”. */
+function optionalId(value: unknown): string | undefined {
+  return typeof value === 'string' && value !== '' ? value : undefined;
+}
+
+/**
+ * Zakładka „Szukaj” (bez logowania): wyszukiwarka tekstowa, kafelki kategorii, lista z przewijaniem bez końca albo
+ * mapa, „blisko mnie”. Pokazujemy tylko ogłoszenia czekające na oferty – zlecenia po akceptacji są w „Zleceniach”.
+ */
+@Component({
+  selector: 'app-announcements',
+  templateUrl: './announcements.page.html',
+  styleUrls: ['./announcements.page.scss'],
+  providers: [AnnouncementListStore],
+  imports: [
+    BrandComponent,
+    NotificationsBellComponent,
+    IonSearchbar,
+    IonHeader,
+    IonToolbar,
+    IonTitle,
+    IonButtons,
+    IonContent,
+    IonSegment,
+    IonSegmentButton,
+    IonLabel,
+    IonIcon,
+    IonSpinner,
+    IonSelect,
+    IonSelectOption,
+    IonList,
+    IonRefresher,
+    IonRefresherContent,
+    IonInfiniteScroll,
+    IonInfiniteScrollContent,
+    IonSkeletonText,
+    IonButton,
+    IonChip,
+    EmptyStateComponent,
+    LoadFailedComponent,
+    AnnouncementCardComponent,
+    MapComponent,
+  ],
+})
+export class AnnouncementsPage implements OnInit, ViewWillEnter {
+  private readonly geolocation = inject(GeolocationService);
+  private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
+  protected readonly store = inject(AnnouncementListStore);
+  protected readonly categories = inject(CategoriesService);
+  protected readonly likes = inject(LikesService);
+
+  protected readonly radiusOptions = RADIUS_OPTIONS_KM;
+  /** Opcja promienia „Bez limitu” – wyłącza „Blisko mnie”. */
+  protected readonly noRadiusLimit = NO_RADIUS_LIMIT;
+  protected readonly categoryIcon = categoryIcon;
+  protected readonly skeletons = [1, 2, 3, 4, 5];
+  protected readonly view = signal<AnnouncementsView>('list');
+  protected readonly locating = signal(false);
+  /** Pinezka wybrana na mapie – jej ogłoszenie pokazujemy w karcie na dole mapy. */
+  protected readonly selectedId = signal<string | null>(null);
+  /** Pierwsze wejście wczytuje `ngOnInit` – odświeżamy dopiero przy kolejnych. */
+  private entered = false;
+
+  protected readonly filters = this.store.filters;
+  protected readonly hasFilters = computed(() => activeFilterCount(this.filters()) > 0);
+  protected readonly subcategories = computed(() => this.categories.subcategoriesOf(this.filters().categoryId));
+  protected readonly selected = computed(() => this.store.items().find((item) => item.id === this.selectedId()));
+  protected readonly markers = computed<MapMarker[]>(() =>
+    this.store.items().map((item) => ({
+      id: item.id,
+      latitude: item.location.latitude,
+      longitude: item.location.longitude,
+      title: `${item.title} · ${formatPrice(item.budget.amount)}`,
+    })),
+  );
+  protected readonly searchCircle = computed<MapCircle | undefined>(() => {
+    const { near, radiusKm } = this.filters();
+    return near ? { ...near, radiusKm } : undefined;
+  });
+  protected readonly mapSummary = computed(() => {
+    const count = this.store.items().length;
+    return `${count} ${pluralPl(count, 'ogłoszenie', 'ogłoszenia', 'ogłoszeń')} na mapie`;
+  });
+
+  constructor() {
+    addIcons({
+      appsOutline,
+      close,
+      closeCircle,
+      listOutline,
+      locateOutline,
+      mapOutline,
+      megaphoneOutline,
+      searchOutline,
+    });
+    registerCategoryIcons();
+  }
+
+  ngOnInit(): void {
+    // Błąd pokazał już interceptor; bez kategorii lista działa dalej (filtr kategorii jest wtedy pusty).
+    this.categories.load().subscribe({ error: () => undefined });
+    void this.store.reload();
+  }
+
+  /**
+   * Przy każdym wejściu na zakładkę (np. po zalogowaniu): serduszka na kartach – wczytane raz na sesję. Przy powrocie
+   * (ze szczegółów, z innej zakładki) – pierwsza strona od nowa: ogłoszenie mogło w międzyczasie przestać czekać na
+   * oferty (akceptacja, anulowanie) albo dojść nowe. Dotychczasowe karty zostają do przyjścia wyników.
+   */
+  ionViewWillEnter(): void {
+    this.likes.load().subscribe({ error: () => undefined });
+    if (this.entered && !this.store.loading()) {
+      void this.store.reload();
+    }
+    this.entered = true;
+  }
+
+  setView(value: unknown): void {
+    if (value === 'list' || value === 'map') {
+      this.view.set(value);
+      this.selectedId.set(null);
+    }
+  }
+
+  setCategory(value: unknown): void {
+    const categoryId = optionalId(value);
+    if (categoryId !== this.filters().categoryId) {
+      void this.store.setFilters({ categoryId, subcategoryId: undefined });
+    }
+  }
+
+  /**
+   * Kafelek kategorii: stuknięcie wybiera kategorię, ponowne stuknięcie wybranej – wyłącza filtr (tak samo jak
+   * pierwszy kafelek „Wszystkie”).
+   */
+  toggleCategory(categoryId: string): void {
+    this.setCategory(this.filters().categoryId === categoryId ? undefined : categoryId);
+  }
+
+  /** Wyszukiwarka (`ion-searchbar` z opóźnieniem 400 ms): nowa fraza = lista od pierwszej strony. */
+  setPhrase(value: unknown): void {
+    const phrase = normalizePhrase(value);
+    if (phrase !== normalizePhrase(this.filters().phrase)) {
+      void this.store.setFilters({ phrase });
+    }
+  }
+
+  setSubcategory(value: unknown): void {
+    const subcategoryId = optionalId(value);
+    if (subcategoryId !== this.filters().subcategoryId) {
+      void this.store.setFilters({ subcategoryId });
+    }
+  }
+
+  /** Promień „blisko mnie”; „Bez limitu” (`NO_RADIUS_LIMIT`) = wyłączenie filtra odległości. */
+  setRadius(value: unknown): void {
+    const radiusKm = Number(value);
+    if (radiusKm === NO_RADIUS_LIMIT) {
+      void this.store.setFilters({ near: undefined });
+      return;
+    }
+    if (this.radiusOptions.includes(radiusKm) && radiusKm !== this.filters().radiusKm) {
+      void this.store.setFilters({ radiusKm });
+    }
+  }
+
+  /** „Blisko mnie”: pozycję pobieramy dopiero teraz, po kliknięciu. Drugie kliknięcie wyłącza filtr. */
+  async toggleNearMe(): Promise<void> {
+    if (this.filters().near) {
+      await this.store.setFilters({ near: undefined });
+      return;
+    }
+    this.locating.set(true);
+    try {
+      const near = await this.geolocation.getCurrentPosition();
+      void this.store.setFilters({ near });
+    } catch (error) {
+      await this.toast.error(error instanceof GeolocationError ? error.message : 'Nie udało się ustalić pozycji.');
+    } finally {
+      this.locating.set(false);
+    }
+  }
+
+  /** „Wyczyść filtry” (chip przy aktywnych filtrach i pusty stan): fraza, kategoria, podkategoria, „blisko mnie”. */
+  clearFilters(): void {
+    void this.store.setFilters({ phrase: undefined, categoryId: undefined, subcategoryId: undefined, near: undefined });
+  }
+
+  refresh(event: Event): void {
+    void this.store.reload().then(() => completeIonEvent(event));
+  }
+
+  loadMore(event: Event): void {
+    void this.store.loadMore().then(() => completeIonEvent(event));
+  }
+
+  selectMarker(id: string): void {
+    this.selectedId.set(id);
+  }
+
+  openAnnouncement(id: string): void {
+    void this.router.navigate(['/announcements', id]);
+  }
+}

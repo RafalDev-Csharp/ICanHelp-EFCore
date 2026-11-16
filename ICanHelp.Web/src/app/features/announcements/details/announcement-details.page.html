@@ -1,0 +1,216 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/announcements"></ion-back-button>
+      <app-brand></app-brand>
+    </ion-buttons>
+    <ion-title>Ogłoszenie</ion-title>
+    @if (store.state() === 'ready' && !store.isOwner()) {
+    <ion-buttons slot="end">
+      <ion-button
+        (click)="toggleLike()"
+        [disabled]="liking()"
+        [attr.aria-label]="isLiked() ? 'Usuń z polubionych' : 'Polub'"
+        [attr.aria-pressed]="isLiked()"
+      >
+        <ion-icon
+          slot="icon-only"
+          [name]="isLiked() ? 'heart' : 'heart-outline'"
+          [color]="isLiked() ? 'danger' : undefined"
+        ></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    }
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="page-column">
+  @switch (store.state()) { @case ('loading') {
+  <div class="ion-padding" aria-busy="true" aria-label="Wczytywanie ogłoszenia">
+    <ion-skeleton-text [animated]="true" class="skeleton-gallery"></ion-skeleton-text>
+    <ion-skeleton-text [animated]="true" style="width: 80%; height: 24px"></ion-skeleton-text>
+    <ion-skeleton-text [animated]="true" style="width: 40%"></ion-skeleton-text>
+    <ion-skeleton-text [animated]="true" style="width: 100%"></ion-skeleton-text>
+    <ion-skeleton-text [animated]="true" style="width: 90%"></ion-skeleton-text>
+  </div>
+  } @case ('not-found') {
+  <app-empty-state
+    icon="alert-circle-outline"
+    heading="Nie ma takiego ogłoszenia"
+    message="Mogło zostać usunięte albo link jest niepoprawny."
+  >
+    <ion-button routerLink="/announcements" fill="outline">Wróć do ogłoszeń</ion-button>
+  </app-empty-state>
+  } @case ('failed') {
+  <app-load-failed heading="Nie udało się wczytać ogłoszenia" (retry)="load()"></app-load-failed>
+  } @case ('ready') { @if (store.announcement(); as item) {
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <app-announcement-content [announcement]="item"></app-announcement-content>
+
+  <app-announcement-owner
+    [owner]="store.owner()"
+    [ratings]="store.ownerRatings()"
+    [reliability]="store.ownerReliability()"
+  ></app-announcement-owner>
+
+  @if (store.contact(); as person) {
+  <ion-list inset="true" class="contact">
+    <ion-list-header>
+      <ion-label>{{ store.isOwner() ? 'Kontakt do pomocnika' : 'Kontakt do zleceniodawcy' }}</ion-label>
+    </ion-list-header>
+    <ion-item>
+      <ion-icon name="person-circle-outline" slot="start" aria-hidden="true"></ion-icon>
+      <ion-label>
+        <h3>{{ person.fullName }}</h3>
+        <p>{{ person.contactData.city }} {{ person.contactData.postalCode }}</p>
+      </ion-label>
+    </ion-item>
+    <ion-item [href]="'tel:' + person.contactData.phoneNumber">
+      <ion-icon name="call-outline" slot="start" aria-hidden="true"></ion-icon>
+      <ion-label>{{ person.contactData.phoneNumber }}</ion-label>
+    </ion-item>
+    <ion-item [href]="'mailto:' + person.contactData.email" lines="none">
+      <ion-icon name="mail-outline" slot="start" aria-hidden="true"></ion-icon>
+      <ion-label>{{ person.contactData.email }}</ion-label>
+    </ion-item>
+  </ion-list>
+  }
+
+  <app-announcement-negotiations
+    [negotiations]="store.negotiations()"
+    [history]="store.history()"
+    [ownerView]="store.isOwner()"
+    [helperReliability]="store.helperReliability()"
+    (conversationOpened)="openConversation($event)"
+  ></app-announcement-negotiations>
+  } } }
+</ion-content>
+
+@if (store.state() === 'ready') {
+<ion-footer>
+  <ion-toolbar>
+    @switch (footer()) { @case ('interrupted') { @if (store.interruption(); as entry) {
+    <p class="job-note page-column interrupted-note">
+      <ion-icon name="stop-circle-outline" aria-hidden="true"></ion-icon>
+      {{ interruptionNote() }} @if (entry.exit.response) {<br />
+      <span class="exit-response">{{ entry.responseAuthor }}: {{ entry.exit.response }}</span>
+      }
+    </p>
+    <div class="actions page-column">
+      @if (store.isOwner()) {
+      <ion-button fill="outline" class="republish-action" (click)="republish()">
+        <ion-icon name="copy-outline" slot="start" aria-hidden="true"></ion-icon>
+        Wystaw ponownie
+      </ion-button>
+      } @if (entry.canRespond) {
+      <ion-button class="primary-action respond-action" (click)="respondToExit()" [disabled]="busy()">
+        <ion-icon name="chatbubble-ellipses-outline" slot="start" aria-hidden="true"></ion-icon>
+        Dodaj swoje stanowisko
+      </ion-button>
+      } @else if (!store.isOwner()) {
+      <p class="footer-note primary-action">Zlecenie przerwane · bez ocen.</p>
+      }
+    </div>
+    } } @case ('completed') { @if (store.rated()) {
+    <p class="footer-note">
+      <ion-icon name="checkmark-done-outline" aria-hidden="true"></ion-icon>
+      Zlecenie zakończone · dziękujemy za ocenę.
+    </p>
+    } @else {
+    <div class="actions page-column">
+      <ion-button class="primary-action" (click)="rate()" [disabled]="busy()">
+        <ion-icon name="star-outline" slot="start" aria-hidden="true"></ion-icon>
+        {{ store.isOwner() ? 'Oceń pomocnika' : 'Oceń zleceniodawcę' }}
+      </ion-button>
+    </div>
+    } } @case ('job') { @let step = job(); @if (step.note; as note) {
+    <p class="job-note page-column" [class.highlight]="note.highlight">
+      <ion-icon [name]="note.icon" aria-hidden="true"></ion-icon>
+      {{ note.text }}
+    </p>
+    }
+    <div class="actions page-column">
+      @if (store.isOwner() && store.status() === 'Accepted') {
+      <ion-button fill="outline" color="danger" (click)="cancel()" [disabled]="cancelling() || busy()">
+        <ion-icon name="close-circle-outline" slot="start" aria-hidden="true"></ion-icon>
+        Anuluj
+      </ion-button>
+      } @else {
+      <ion-button fill="outline" (click)="openConversation(store.acceptedConversationId())">
+        <ion-icon name="chatbubble-outline" slot="start" aria-hidden="true"></ion-icon>
+        Rozmowa
+      </ion-button>
+      } @if (step.action; as action) {
+      <ion-button
+        class="primary-action job-action"
+        [color]="action.color"
+        [fill]="action.fill"
+        (click)="runJobAction()"
+        [disabled]="busy()"
+      >
+        <ion-icon [name]="action.icon" slot="start" aria-hidden="true"></ion-icon>
+        {{ action.label }}
+      </ion-button>
+      }
+    </div>
+    @if (step.exit; as exit) {
+    <div class="actions page-column">
+      <ion-button fill="clear" color="danger" size="small" class="job-exit" (click)="exitJob()" [disabled]="busy()">
+        <ion-icon [name]="exit.icon" slot="start" aria-hidden="true"></ion-icon>
+        {{ exit.label }}
+      </ion-button>
+    </div>
+    } } @case ('owner') { @if (store.isOpen()) {
+    <div class="actions page-column">
+      <ion-button fill="outline" color="danger" (click)="cancel()" [disabled]="cancelling()">
+        <ion-icon name="close-circle-outline" slot="start" aria-hidden="true"></ion-icon>
+        Anuluj
+      </ion-button>
+      <ion-button class="primary-action" (click)="edit()">
+        <ion-icon name="create-outline" slot="start" aria-hidden="true"></ion-icon>
+        Edytuj
+      </ion-button>
+    </div>
+    } @else {
+    <p class="footer-note">{{ statusLabel(store.status()) }} · to Twoje ogłoszenie.</p>
+    } } @case ('abandoned') {
+    <div class="actions page-column">
+      <p class="footer-note primary-action abandoned-note">
+        <ion-icon name="exit-outline" aria-hidden="true"></ion-icon>
+        Zlecenie zerwane – nie złożysz już oferty do tego ogłoszenia.
+      </p>
+      @if (store.myConversationId()) {
+      <ion-button fill="clear" (click)="writeMessage()">Rozmowa</ion-button>
+      }
+    </div>
+    } @case ('open') {
+    <div class="actions page-column">
+      <ion-button fill="outline" class="ask-action" (click)="writeMessage()" [disabled]="busy()">
+        <ion-icon
+          [name]="store.myConversationId() ? 'chatbubble-outline' : 'help-circle-outline'"
+          slot="start"
+          aria-hidden="true"
+        ></ion-icon>
+        {{ store.myConversationId() ? 'Rozmowa' : 'Zapytaj' }}
+      </ion-button>
+      <ion-button class="primary-action" (click)="makeOffer()" [disabled]="busy()">
+        @if (store.myOutdatedOffer()) {
+        <ion-icon name="eye-outline" slot="start" aria-hidden="true"></ion-icon>
+        Zobacz zmiany } @else if (store.myPendingOffer(); as offer) { Twoja oferta: {{ offer.price.amount | price }} }
+        @else { Złóż ofertę }
+      </ion-button>
+    </div>
+    } @case ('closed') {
+    <div class="actions page-column">
+      <p class="footer-note primary-action">To ogłoszenie nie przyjmuje już ofert.</p>
+      @if (store.myConversationId()) {
+      <ion-button fill="clear" (click)="writeMessage()">Rozmowa</ion-button>
+      }
+    </div>
+    } }
+  </ion-toolbar>
+</ion-footer>
+}

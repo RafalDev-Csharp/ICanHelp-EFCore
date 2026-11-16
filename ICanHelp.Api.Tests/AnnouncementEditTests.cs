@@ -1,0 +1,266 @@
+using ICanHelp.Api.Tests.Infrastructure;
+using ICanHelp.Application.DTO;
+using ICanHelp.Application.Notifications;
+
+namespace ICanHelp.Api.Tests;
+
+/// <summary>Krok 9: PATCH ogłoszenia, rewizje i ostrzeżenie „ogłoszenie zmieniło się po tej ofercie”.</summary>
+[Collection(ApiCollection.Name)]
+[Trait("Category", "Integration")]
+public sealed class AnnouncementEditTests
+{
+    private readonly ApiFactory _factory;
+
+    public AnnouncementEditTests(ApiFactory factory)
+    {
+        _factory = factory;
+    }
+
+    [Fact]
+    public async Task Edit_MakesPendingOfferOutdated_CounterOfferCanBeAccepted()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var helper = await _factory.CreateUserAsync();
+        var announcementId = await owner.CreateAnnouncementAsync();
+        var url = $"/api/announcements/{announcementId}";
+        var offerId = await helper.MakeOfferAsync(announcementId, 120m);
+
+        // Właściciel dopisuje coś do opisu – wysyła tylko to pole.
+        var patch = await owner.Client.PatchAsJsonAsync(url,
+            new { description = "Kran cieknie od tygodnia. Syfon pod zlewem też do wymiany." });
+        patch.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var details = await helper.Client.GetFromJsonAsync<AnnouncementDetailsDto>(url);
+        details.ShouldNotBeNull();
+        details.Description.ShouldBe("Kran cieknie od tygodnia. Syfon pod zlewem też do wymiany.");
+        details.Title.ShouldBe("Cieknący kran w kuchni");
+        details.Revision.ShouldBe(1);
+        details.UpdatedAt.ShouldNotBeNull();
+        var change = details.Changes.ShouldHaveSingleItem();
+        change.Revision.ShouldBe(1);
+        var changedField = change.Fields.ShouldHaveSingleItem();
+        changedField.Field.ShouldBe("Description");
+        changedField.OldValue.ShouldBe("Kran cieknie od tygodnia, mam nową uszczelkę.");
+        changedField.NewValue.ShouldBe("Kran cieknie od tygodnia. Syfon pod zlewem też do wymiany.");
+
+        // Pomocnik widzi przy swojej ofercie, co zmieniło się od chwili jej złożenia: „było” → „jest”.
+        var offer = details.Offers.ShouldHaveSingleItem();
+        offer.AnnouncementRevision.ShouldBe(0);
+        offer.IsOutdated.ShouldBeTrue();
+        var sinceOffer = offer.ChangesSinceOffer.ShouldHaveSingleItem();
+        sinceOffer.Field.ShouldBe("Description");
+        sinceOffer.OldValue.ShouldBe("Kran cieknie od tygodnia, mam nową uszczelkę.");
+        sinceOffer.NewValue.ShouldBe("Kran cieknie od tygodnia. Syfon pod zlewem też do wymiany.");
+
+        // Starej oferty nie da się już przyjąć…
+        await (await owner.Client.PostEmptyAsync($"{url}/offers/{offerId}/accept"))
+            .ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
+
+        // …ale kontroferta powstaje na nowej rewizji i pomocnik może ją zaakceptować.
+        var counter = await owner.Client.PostAsJsonAsync($"{url}/offers/{offerId}/counter", TestApi.OfferBody(160m));
+        counter.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var counterId = (await counter.ReadAsync<CreatedDto>()).Id;
+        (await helper.Client.PostEmptyAsync($"{url}/offers/{counterId}/accept")).StatusCode
+            .ShouldBe(HttpStatusCode.NoContent);
+
+        var accepted = await owner.Client.GetFromJsonAsync<AnnouncementDetailsDto>(url);
+        var acceptedOffer = accepted!.Offers.Single(o => o.Id == counterId);
+        acceptedOffer.Status.ShouldBe("Accepted");
+        acceptedOffer.AnnouncementRevision.ShouldBe(1);
+        acceptedOffer.IsOutdated.ShouldBeFalse();
+        acceptedOffer.ChangesSinceOffer.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Edit_HelperRevisesOutdatedOffer_OwnerIsNotifiedAndCanAcceptIt()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var helper = await _factory.CreateUserAsync();
+        var announcementId = await owner.CreateAnnouncementAsync();
+        var url = $"/api/announcements/{announcementId}";
+        var firstOfferId = await helper.MakeOfferAsync(announcementId, 120m);
+
+        // F11 D: aktualną ofertę autor też może zmienić, dopóki druga strona nie odpowie.
+        var changed = await helper.Client.PostAsJsonAsync($"{url}/offers/{firstOfferId}/revise", TestApi.OfferBody(150m));
+        changed.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var offerId = (await changed.ReadAsync<CreatedDto>()).Id;
+
+        (await owner.Client.PatchAsJsonAsync(url, new { description = "Kran i syfon pod zlewem do wymiany." }))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        await _factory.ProcessOutboxAsync();
+        var before = (await owner.GetNotificationsAsync()).Count;
+
+        // Właściciel nie zaktualizuje cudzej oferty (może ją tylko kontrować).
+        await (await owner.Client.PostAsJsonAsync($"{url}/offers/{offerId}/revise", TestApi.OfferBody(150m)))
+            .ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
+
+        var revise = await helper.Client.PostAsJsonAsync($"{url}/offers/{offerId}/revise", TestApi.OfferBody(170m));
+        revise.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var revisedId = (await revise.ReadAsync<CreatedDto>()).Id;
+
+        var details = await helper.Client.GetFromJsonAsync<AnnouncementDetailsDto>(url);
+        details!.Offers.Single(o => o.Id == offerId).Status.ShouldBe("Revised");
+        var revised = details.Offers.Single(o => o.Id == revisedId);
+        revised.Status.ShouldBe("Pending");
+        revised.ProposedBy.ShouldBe("Helper");
+        revised.ParentOfferId.ShouldBe(offerId);
+        revised.Price.Amount.ShouldBe(170m);
+        revised.AnnouncementRevision.ShouldBe(1);
+        revised.IsOutdated.ShouldBeFalse();
+
+        await _factory.ProcessOutboxAsync();
+        var notifications = await owner.GetNotificationsAsync();
+        notifications.Count.ShouldBe(before + 1);
+        // Dwie zmiany oferty (aktualnej i nieaktualnej) = dwa powiadomienia; nowsze – ze 170 zł.
+        var notification = notifications.Single(n =>
+            n.Type == "OfferRevised" && n.Parameters[NotificationPayload.Price] == "170.00 PLN");
+        notification.Title.ShouldBe("Oferta zaktualizowana: 170 zł");
+
+        (await owner.Client.PostEmptyAsync($"{url}/offers/{revisedId}/accept")).StatusCode
+            .ShouldBe(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task TwoEditsAfterOffer_OfferShowsValueFromOfferTimeAndCurrentValue()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var helper = await _factory.CreateUserAsync();
+        var announcementId = await owner.CreateAnnouncementAsync();
+        var url = $"/api/announcements/{announcementId}";
+        await helper.MakeOfferAsync(announcementId, 120m);
+
+        (await owner.Client.PatchAsJsonAsync(url, new { budget = new { amount = 180m, currency = "PLN" } }))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await owner.Client.PatchAsJsonAsync(url, new { budget = new { amount = 200m, currency = "PLN" } }))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var details = await helper.Client.GetFromJsonAsync<AnnouncementDetailsDto>(url);
+        details!.Revision.ShouldBe(2);
+        details.Changes.Count.ShouldBe(2);
+        var budget = details.Offers.ShouldHaveSingleItem().ChangesSinceOffer.ShouldHaveSingleItem();
+        budget.Field.ShouldBe("Budget");
+        budget.OldValue.ShouldBe("150.00 PLN");
+        budget.NewValue.ShouldBe("200.00 PLN");
+    }
+
+    [Fact]
+    public async Task LaterEdit_CannotHideEarlierPriceChange()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var helper = await _factory.CreateUserAsync();
+        var announcementId = await owner.CreateAnnouncementAsync();
+        var url = $"/api/announcements/{announcementId}";
+        await helper.MakeOfferAsync(announcementId, 120m);
+        const string original = "Kran cieknie od tygodnia, mam nową uszczelkę.";
+
+        (await owner.Client.PatchAsJsonAsync(url, new
+        {
+            description = original + " Syfon też do wymiany.",
+            budget = new { amount = 500m, currency = "PLN" }
+        })).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await owner.Client.PatchAsJsonAsync(url, new { description = original }))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var details = await helper.Client.GetFromJsonAsync<AnnouncementDetailsDto>(url);
+        var offer = details!.Offers.ShouldHaveSingleItem();
+        offer.IsOutdated.ShouldBeTrue();
+        offer.EditsSinceOffer.ShouldBe(2);
+        var budget = offer.ChangesSinceOffer.ShouldHaveSingleItem();
+        budget.Field.ShouldBe("Budget");
+        budget.OldValue.ShouldBe("150.00 PLN");
+        budget.NewValue.ShouldBe("500.00 PLN");
+        // Pełna historia nadal pokazuje obie edycje, także cofnięcie opisu.
+        details.Changes.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Edit_WithSameValues_DoesNotCreateRevision()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var announcementId = await owner.CreateAnnouncementAsync();
+        var url = $"/api/announcements/{announcementId}";
+
+        var patch = await owner.Client.PatchAsJsonAsync(url, new { title = "Cieknący kran w kuchni" });
+        patch.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var details = await owner.Client.GetFromJsonAsync<AnnouncementDetailsDto>(url);
+        details!.Revision.ShouldBe(0);
+        details.Changes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Edit_ByNotOwner_Returns409()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var stranger = await _factory.CreateUserAsync();
+        var announcementId = await owner.CreateAnnouncementAsync();
+
+        var response = await stranger.Client.PatchAsJsonAsync($"/api/announcements/{announcementId}",
+            new { title = "Moje ogłoszenie" });
+
+        await response.ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
+    }
+
+    [Fact]
+    public async Task Edit_WithoutToken_Returns401()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var announcementId = await owner.CreateAnnouncementAsync();
+
+        var response = await _factory.CreateClient().PatchAsJsonAsync($"/api/announcements/{announcementId}",
+            new { title = "Bez logowania" });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Edit_AfterAcceptance_Returns409()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var helper = await _factory.CreateUserAsync();
+        var announcementId = await owner.CreateAnnouncementAsync();
+        var url = $"/api/announcements/{announcementId}";
+        var offerId = await helper.MakeOfferAsync(announcementId, 120m);
+        (await owner.Client.PostEmptyAsync($"{url}/offers/{offerId}/accept")).StatusCode
+            .ShouldBe(HttpStatusCode.NoContent);
+
+        var response = await owner.Client.PatchAsJsonAsync(url, new { description = "Zmiana po akceptacji." });
+
+        await response.ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
+    }
+
+    [Fact]
+    public async Task Edit_ZeroBudget_Returns409AndKeepsData()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var announcementId = await owner.CreateAnnouncementAsync();
+        var url = $"/api/announcements/{announcementId}";
+
+        var response = await owner.Client.PatchAsJsonAsync(url, new { budget = new { amount = 0m, currency = "PLN" } });
+
+        await response.ShouldBeProblemAsync(HttpStatusCode.Conflict, "DomainRule");
+        var details = await owner.Client.GetFromJsonAsync<AnnouncementDetailsDto>(url);
+        details!.Budget.Amount.ShouldBe(150m);
+        details.Revision.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Edit_WithStaleExpectedRevision_Returns409ConcurrencyConflict()
+    {
+        var owner = await _factory.CreateUserAsync();
+        var announcementId = await owner.CreateAnnouncementAsync();
+        var url = $"/api/announcements/{announcementId}";
+
+        // Pierwsza karta zapisuje zmianę na rewizji 0 → rewizja 1.
+        (await owner.Client.PatchAsJsonAsync(url, new { title = "Kran w kuchni", expectedRevision = 0 })).StatusCode
+            .ShouldBe(HttpStatusCode.NoContent);
+
+        // Druga karta wciąż ma rewizję 0 – nie nadpisuje pierwszej zmiany.
+        var stale = await owner.Client.PatchAsJsonAsync(url, new { title = "Kran w łazience", expectedRevision = 0 });
+        await stale.ShouldBeProblemAsync(HttpStatusCode.Conflict, "ConcurrencyConflict");
+
+        var details = await owner.Client.GetFromJsonAsync<AnnouncementDetailsDto>(url);
+        details!.Title.ShouldBe("Kran w kuchni");
+        details.Revision.ShouldBe(1);
+    }
+}
