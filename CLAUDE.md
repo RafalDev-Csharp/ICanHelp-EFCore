@@ -97,6 +97,9 @@ Api.Tests       Infrastructure/ApiFactory (kontener, RecordingPushSender), Infra
 ```bash
 verify.cmd                                    # wszystko po kroku (Windows) → .verify/report.md; -Quick = bez Dockera
 serve-local.cmd                               # build frontu → Api/wwwroot → https://localhost:7080 (PWA, push); -NoBuild
+start-all.cmd                                 # to samo + tunel cloudflared (adres dla telefonu); -NoBuild; Ctrl+C = stop
+marketing\spot\render-spot.cmd                # spot reklamowy (icanhelp-spot.html) → marketing\spot\out\icanhelp-spot.mp4 (ffmpeg)
+node marketing/spot/montage.mjs E:/reklama     # reklama z klipów AI + out/app → out/reklama-16x9.mp4, -pion.mp4 (muzyka.mp3 w folderze = własna)
 dotnet build
 dotnet test                                   # integracyjne wymagają działającego Dockera
 dotnet test --filter "Category!=Integration"  # tylko jednostkowe

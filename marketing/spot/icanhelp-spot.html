@@ -1,0 +1,953 @@
+<title>I can help U – spot reklamowy</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bangers&family=Patrick+Hand&family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Figtree:wght@400;600;700&display=swap">
+<style>
+/* Układ: kadr filmu 16:9 (styl prostego webkomiksu: ludziki z kresek, płaskie kolory) + sterowanie + scenariusz. */
+:root {
+  --bg: #f3f4f1;
+  --surface: #ffffff;
+  --ink: #1d2420;
+  --muted: #5d6862;
+  --line: #d9ded8;
+  --accent: #c9500b;
+  --helper: #1f7a58;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Figtree", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #131715; --surface: #1b211e; --ink: #e8ede9; --muted: #a0aaa4; --line: #2e3632; --accent: #ff7a1a; --helper: #4cc895; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #131715; --surface: #1b211e; --ink: #e8ede9; --muted: #a0aaa4; --line: #2e3632; --accent: #ff7a1a; --helper: #4cc895; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1100px; margin: 0 auto; padding-block: 24px 48px; display: grid; gap: 22px; }
+h1, h2 { font-family: var(--display); margin: 0; line-height: 1.1; text-wrap: balance; }
+h1 { font-size: clamp(1.6rem, 3.6vw, 2.4rem); font-weight: 800; }
+h2 { font-size: 1.35rem; font-weight: 800; }
+p { margin: 0; }
+.sub { color: var(--muted); max-width: 70ch; }
+
+/* ---------- kadr ---------- */
+.film { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 14px; overflow: hidden;
+  background: #fffdf6; container-type: inline-size; border: 3px solid #111; }
+.film:fullscreen { border-radius: 0; border: 0; }
+#layer, #layer svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.caption { position: absolute; left: 4cqw; right: 4cqw; bottom: 3.2cqw; display: flex; justify-content: center; pointer-events: none; }
+.caption span { font-family: "Patrick Hand", "Comic Sans MS", var(--body); font-weight: 700; font-size: 2.9cqw; line-height: 1.15; color: #111;
+  background: #fff; border: .35cqw solid #111; padding: .6cqw 1.6cqw; border-radius: .6cqw; text-align: center; text-wrap: balance;
+  box-shadow: .5cqw .5cqw 0 #111; }
+.caption.show span { animation: capIn .3s ease both; }
+@keyframes capIn { from { opacity: 0; transform: translateY(1cqw) rotate(-1deg); } to { opacity: 1; transform: rotate(-.6deg); } }
+.progress { position: absolute; left: 0; bottom: 0; height: .5cqw; min-height: 3px; background: #ff7a1a; width: 0; }
+.poster { position: absolute; inset: 0; display: grid; place-items: center; background: rgb(255 253 246 / 40%); }
+.poster button { font-family: Bangers, var(--display); letter-spacing: .04em; font-size: clamp(1.1rem, 3cqw, 2rem); border: .35cqw solid #111; cursor: pointer;
+  background: #ff7a1a; color: #111; padding: 1cqw 3cqw; border-radius: 999px; box-shadow: .5cqw .5cqw 0 #111; }
+.poster small { display: block; font-family: var(--body); font-weight: 600; font-size: .55em; letter-spacing: 0; }
+.poster button:focus-visible, .ctrl:focus-visible, .shot:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* animacje w scenach; --d = opóźnienie od początku sceny */
+/* punkt obrotu tylko dla animowanych klas – reszta zachowuje transformacje z atrybutów SVG */
+:where(#layer) :is(.pop, .fade, .out, .up, .press, .drip, .dripLong, .ripple, .blink, .zzz, .flicker) { transform-box: fill-box; transform-origin: center; }
+.film.paused #layer * { animation-play-state: paused !important; }
+#layer .cam { transform-box: view-box; transform-origin: 50% 45%; animation: cam linear both; }
+@keyframes cam { from { transform: scale(1); } to { transform: scale(1.05); } }
+.pop { animation: pop .4s cubic-bezier(.2,1.6,.4,1) both; animation-delay: var(--d, 0s); }
+@keyframes pop { from { opacity: 0; transform: scale(.3) rotate(-8deg); } to { opacity: 1; transform: none; } }
+.fade { animation: fade .4s ease both; animation-delay: var(--d, 0s); }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.out { animation: out .2s ease both; animation-delay: var(--d, 0s); }
+@keyframes out { from { opacity: 1; } to { opacity: 0; } }
+.up { animation: up .45s cubic-bezier(.2,1.3,.4,1) both; animation-delay: var(--d, 0s); }
+@keyframes up { from { opacity: 0; transform: translateY(60px); } to { opacity: 1; transform: none; } }
+.press { animation: press .35s ease both; animation-delay: var(--d, 0s); }
+@keyframes press { 0% { transform: none; } 45% { transform: scale(.88); } 100% { transform: none; filter: brightness(1.15); } }
+.drip { animation: drip .6s ease-in infinite; animation-delay: var(--d, 0s); }
+@keyframes drip { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(90px); opacity: .2; } }
+.dripLong { animation: dripLong .9s ease-in infinite; animation-delay: var(--d, 0s); }
+@keyframes dripLong { 0% { transform: translateY(0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(460px); opacity: .3; } }
+.ripple { animation: ripple .6s ease-out infinite; animation-delay: var(--d, 0s); }
+@keyframes ripple { from { transform: scale(.2); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
+#layer .swing2 { transform-box: view-box; transform-origin: 481px 335px; animation: swing2 2.4s linear both; }
+@keyframes swing2 {
+  0% { transform: rotate(-40deg); } 20% { transform: rotate(-46deg); animation-timing-function: cubic-bezier(.7,0,1,.6); }
+  27% { transform: rotate(0); } 40% { transform: rotate(-12deg); } 78% { transform: rotate(-50deg); animation-timing-function: cubic-bezier(.7,0,1,.6); }
+  92% { transform: rotate(0); } 100% { transform: rotate(0); }
+}
+.shake { animation: shake .14s linear infinite; }
+@keyframes shake { 0%,100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+.pour { animation: pour .35s linear infinite; }
+@keyframes pour { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -42; } }
+#layer .rock { transform-box: view-box; transform-origin: 700px 730px; animation: rock .5s ease-in-out infinite alternate; }
+@keyframes rock { from { transform: rotate(-1.5deg); } to { transform: rotate(1.5deg) translateX(10px); } }
+.rain { animation: rain .45s linear infinite; }
+@keyframes rain { from { transform: translateY(-60px); } to { transform: translateY(0); } }
+.flicker { animation: flicker 1.1s steps(1) infinite; }
+@keyframes flicker { 0%,22%,48%,70% { opacity: 1; } 12%,34%,58%,86% { opacity: .06; } }
+.drive { animation: drive 4.6s linear both; animation-delay: var(--d, 0s); }
+@keyframes drive { from { transform: translateX(0); } to { transform: translateX(-2300px); } }
+.blink { animation: blink 1.2s ease-in-out infinite; animation-delay: var(--d, 0s); }
+@keyframes blink { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(1.6); } }
+.zzz { animation: zzz 2s ease-out infinite; animation-delay: var(--d, 0s); }
+@keyframes zzz { 0% { opacity: 0; transform: translate(0,0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(40px,-80px); } }
+@media (prefers-reduced-motion: reduce) { .drip, .dripLong, .rain, .flicker, .rock, .blink, .zzz, .ripple { animation-iteration-count: 1 !important; } #layer .cam { animation: none; } }
+
+/* Eksport do wideo: sam kadr na cały ekran, bez interfejsu. */
+html.export body { margin: 0; padding: 0; background: #000; }
+html.export .wrap { max-width: none; padding: 0; gap: 0; }
+html.export .wrap > :not(.film), html.export .poster, html.export .progress { display: none !important; }
+html.export .film { position: fixed; inset: 0; width: 100vw; height: 100vh; aspect-ratio: auto; border: 0; border-radius: 0; }
+
+/* ---------- sterowanie i scenariusz ---------- */
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ctrl { font: inherit; font-weight: 600; font-size: .9rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  border-radius: 999px; padding: 8px 16px; cursor: pointer; }
+.ctrl:hover { border-color: var(--ink); }
+.ctrl.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.time { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; font-size: .9rem; }
+.script { display: grid; gap: 6px; }
+.shot { display: grid; grid-template-columns: 92px minmax(0, 1fr) minmax(0, 240px); gap: 14px; align-items: start; text-align: left;
+  font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; cursor: pointer; }
+.shot:hover { border-color: var(--muted); }
+.shot[aria-current="true"] { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); }
+.shot .tc { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--muted); }
+.shot b { display: block; }
+.shot .what { color: var(--muted); font-size: .92rem; }
+.shot .snd { color: var(--muted); font-size: .85rem; font-style: italic; }
+.tag { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
+.tag.z { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.tag.p { background: color-mix(in srgb, var(--helper) 18%, transparent); color: var(--helper); }
+.note { color: var(--muted); font-size: .88rem; }
+.guide { display: grid; gap: 14px; }
+.roles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.role { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; display: grid; gap: 10px; align-content: start; }
+.role h3 { margin: 0; font-family: var(--display); font-size: 1.2rem; }
+.role.z h3 { color: var(--accent); }
+.role.p h3 { color: var(--helper); }
+.role ol { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 12px; }
+.role li { counter-increment: s; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 2px 10px; }
+.role li::before { content: counter(s); grid-row: span 3; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: .85rem; color: #fff; background: var(--accent); }
+.role.p li::before { background: var(--helper); }
+.role li b, .role li span, .role li .see { grid-column: 2; }
+.role li span { color: var(--muted); font-size: .95rem; }
+.see { justify-self: start; font: inherit; font-size: .85rem; font-weight: 600; border: 0; background: none; color: var(--accent); padding: 2px 0; cursor: pointer; }
+.role.p .see { color: var(--helper); }
+.see:hover { text-decoration: underline; }
+.see:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.rules { display: grid; gap: 6px; color: var(--muted); font-size: .92rem; }
+.shot .what i { color: var(--ink); font-style: normal; font-weight: 600; }
+@media (max-width: 700px) {
+  .roles { grid-template-columns: minmax(0, 1fr); }
+  .shot { grid-template-columns: 70px minmax(0, 1fr); }
+  .shot .snd { grid-column: 2; }
+  .time { margin-left: 0; width: 100%; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>I can help U – spot reklamowy</h1>
+    <p class="sub">Reklama i instrukcja w jednym: ok. 60 s filmu o drobnych usterkach i ludziach, którzy umieją je naprawić po drodze,
+      a pod nim krótka instrukcja korzystania z aplikacji. Najlepiej oglądać ze słuchawkami, na pełnym ekranie.</p>
+  </header>
+
+  <div class="film" id="film">
+    <div id="layer"></div>
+    <div class="caption" id="caption"><span hidden></span></div>
+    <div class="progress" id="progress"></div>
+    <div class="poster" id="poster">
+      <button type="button" id="bigPlay">▶ Odtwórz <small>ok. 1 min · z dźwiękiem</small></button>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl primary" id="play" type="button">Odtwórz</button>
+    <button class="ctrl" id="restart" type="button">Od początku</button>
+    <button class="ctrl" id="mute" type="button" aria-pressed="false">Dźwięk: wł.</button>
+    <button class="ctrl" id="full" type="button">Pełny ekran</button>
+    <span class="time" id="time">0:00 / 1:00</span>
+  </div>
+
+
+  <section class="guide" aria-labelledby="h-guide">
+    <h2 id="h-guide">Jak to działa – instrukcja</h2>
+    <p class="note">Aplikacja ma dwie role. Jedno konto wystarczy do obu: raz zlecasz, raz pomagasz.</p>
+    <div class="roles">
+      <article class="role z">
+        <h3>Zlecam – potrzebuję pomocy</h3>
+        <ol>
+          <li><b>Załóż konto</b><span>Konto → Załóż konto. Imię, e-mail, telefon i miejscowość.</span></li>
+          <li><b>Dodaj zlecenie</b><span>Zakładka „Dodaj”: kategoria, tytuł, opis, do 5 zdjęć usterki, Twoja kwota i miejsce. Inni widzą tylko okolicę (ok. 100 m), nie dokładny adres.</span><button type="button" class="see" data-scene="Zlecam: dodaj zlecenie">▶ zobacz w filmie</button></li>
+          <li><b>Odbierz oferty</b><span>Pomocnicy proponują cenę i termin. Dostajesz powiadomienie, a rozmowa jest w zakładce „Zlecenia”. Możesz przyjąć ofertę, odrzucić ją albo zaproponować inną cenę.</span><button type="button" class="see" data-scene="Wspólny interes: cena i termin">▶ zobacz w filmie</button></li>
+          <li><b>Umowa</b><span>Po przyjęciu oferty kontakt i dokładny adres widzi tylko wybrany pomocnik. Pozostałe oferty zostają odrzucone.</span></li>
+          <li><b>Realizacja</b><span>Pomocnik naciska „Rozpocznij” na miejscu i „Zgłoś wykonanie” po pracy. Ty potwierdzasz wykonanie.</span><button type="button" class="see" data-scene="Naprawione">▶ zobacz w filmie</button></li>
+          <li><b>Ocena</b><span>Po zakończeniu oceniacie się nawzajem. Oceny widać w publicznym profilu.</span></li>
+        </ol>
+      </article>
+      <article class="role p">
+        <h3>Pomagam – chcę zarobić</h3>
+        <ol>
+          <li><b>Ustaw alert</b><span>Konto → Alerty: „w okolicy” (punkt i promień), „po drodze” (np. praca → dom) albo „cała Polska”. Wybierasz kategorie, dni i godziny – powiadomienie przyjdzie samo.</span><button type="button" class="see" data-scene="Pomagam: zlecenie po drodze">▶ zobacz w filmie</button></li>
+          <li><b>Albo szukaj sam</b><span>Zakładka „Szukaj”: kategorie, lista albo mapa, „Blisko mnie” z promieniem do 200 km.</span></li>
+          <li><b>Złóż ofertę</b><span>Cena, termin od–do i krótka wiadomość, np. dlaczego trochę drożej. Ofertę możesz zmienić albo odpowiedzieć na kontrofertę.</span><button type="button" class="see" data-scene="Wspólny interes: cena i termin">▶ zobacz w filmie</button></li>
+          <li><b>Po akceptacji</b><span>Dostajesz kontakt i dokładny adres. Na miejscu „Rozpocznij”, po pracy „Zgłoś wykonanie”.</span><button type="button" class="see" data-scene="Naprawione">▶ zobacz w filmie</button></li>
+          <li><b>Buduj reputację</b><span>Każda ocena i ukończone zlecenie są w Twoim profilu. Liczy się jeden głos na osobę, więc oceny trudno naciągnąć.</span></li>
+        </ol>
+      </article>
+    </div>
+    <div class="rules">
+      <p><b>Uczciwie dla obu stron.</b> Rezygnacja albo przerwanie zlecenia wymaga podania powodu, a druga strona może dopisać swoje stanowisko.</p>
+      <p><b>Bezpiecznie.</b> Prace przy instalacji elektrycznej i na wysokości zlecaj osobom z odpowiednimi uprawnieniami i sprzętem.</p>
+    </div>
+  </section>
+
+  <section class="script" aria-labelledby="h-script">
+    <h2 id="h-script">Scenariusz filmu</h2>
+    <p class="note">Kliknij scenę, żeby do niej przeskoczyć. Ten sam plan nada się do nagrania prawdziwego filmu.</p>
+    <div id="shots" class="script"></div>
+    <p class="note">Wszystkie dźwięki i muzyka powstają w przeglądarce, bez nagrań. Do nagrania na YouTube: pełny ekran i nagrywanie ekranu
+      z dźwiękiem systemu (Windows: Win + Alt + R).</p>
+  </section>
+</div>
+
+<script>
+(() => {
+  /* ============ rysunki: styl prostego webkomiksu ============ */
+  const K = '#111';
+  const AD = new URLSearchParams(location.search).has('reklama'); // wersja scen do montażu reklamy (montage.mjs)
+  const LINE = (d, w = 7, c = K) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const d = (sec) => `style="--d:${sec}s"`;
+  const EYES = {
+    dot: `<circle cx="-16" cy="-6" r="5" fill="${K}"/><circle cx="16" cy="-6" r="5" fill="${K}"/>`,
+    stare: `<circle cx="-17" cy="-8" r="12" fill="#fff" stroke="${K}" stroke-width="3"/><circle cx="17" cy="-8" r="12" fill="#fff" stroke="${K}" stroke-width="3"/><circle cx="-17" cy="-8" r="3.5" fill="${K}"/><circle cx="17" cy="-8" r="3.5" fill="${K}"/>`,
+    closed: LINE('M-24 -6 Q-16 0 -8 -6', 4) + LINE('M8 -6 Q16 0 24 -6', 4),
+    happy: LINE('M-24 -4 Q-16 -14 -8 -4', 4) + LINE('M8 -4 Q16 -14 24 -4', 4),
+    squeeze: LINE('M-26 -14 L-10 -6 L-26 2', 4) + LINE('M26 -14 L10 -6 L26 2', 4),
+    squint: LINE('M-26 -6 H-8', 5) + LINE('M8 -6 H26', 5),
+  };
+  const FACE = {
+    neutral: EYES.dot + LINE('M-10 20 H10', 4),
+    annoyed: EYES.dot + LINE('M-28 -24 L-8 -16', 4) + LINE('M8 -16 L28 -24', 4) + LINE('M-12 22 Q0 16 12 22', 4),
+    stare: EYES.stare + LINE('M-8 24 H8', 4),
+    sad: EYES.dot + LINE('M-28 -16 L-8 -24', 4) + LINE('M8 -24 L28 -16', 4) + LINE('M-12 26 Q0 16 12 26', 4),
+    pain: EYES.squeeze + LINE('M-30 -22 L-10 -14', 4) + LINE('M10 -14 L30 -22', 4) + `<rect x="-18" y="14" width="36" height="20" rx="6" fill="#fff" stroke="${K}" stroke-width="4"/><path d="M-18 24 H18 M-6 14 V34 M6 14 V34" stroke="${K}" stroke-width="2.5"/><path d="M-30 4 q-4 12 0 16 q4 -4 0 -16Z" fill="#6fb2ff" stroke="${K}" stroke-width="2"/>`,
+    shock: EYES.stare + `<ellipse cx="0" cy="26" rx="8" ry="11" fill="${K}"/>`,
+    squint: EYES.squint + LINE('M-28 -22 L-8 -14', 4) + LINE('M8 -14 L28 -22', 4) + LINE('M-10 22 H10', 4),
+    happy: EYES.happy + `<path d="M-18 12 Q0 38 18 12 Z" fill="${K}"/>`,
+    sleep: EYES.closed + LINE('M-6 22 Q0 26 6 22', 4),
+    smirk: EYES.dot + LINE('M-12 20 Q4 28 14 16', 4),
+  };
+  const HAIRS = {
+    none: () => '',
+    short: (c) => `<path d="M-50 -14 Q-50 -56 0 -56 Q50 -56 50 -14 Q30 -36 0 -36 Q-30 -36 -50 -14Z" fill="${c}" stroke="${K}" stroke-width="4"/>`,
+    spiky: (c) => `<path d="M-48 -18 L-40 -50 L-24 -38 L-12 -64 L2 -40 L18 -64 L28 -38 L44 -52 L48 -18 Q24 -34 0 -34 Q-24 -34 -48 -18Z" fill="${c}" stroke="${K}" stroke-width="4"/>`,
+    long: (c) => `<path d="M-54 44 Q-62 -58 0 -58 Q62 -58 54 44 L40 44 Q44 -20 0 -30 Q-44 -20 -40 44Z" fill="${c}" stroke="${K}" stroke-width="4"/>`,
+    bun: (c) => `<circle cx="0" cy="-64" r="18" fill="${c}" stroke="${K}" stroke-width="4"/><path d="M-50 -10 Q-50 -56 0 -56 Q50 -56 50 -10 Q28 -32 0 -32 Q-28 -32 -50 -10Z" fill="${c}" stroke="${K}" stroke-width="4"/>`,
+    cap: (c) => `<path d="M-50 -18 Q-48 -62 0 -62 Q48 -62 50 -18Z" fill="${c}" stroke="${K}" stroke-width="4"/><path d="M40 -22 H88" stroke="${K}" stroke-width="14" stroke-linecap="round"/><path d="M40 -22 H86" stroke="${c}" stroke-width="8" stroke-linecap="round"/>`,
+  };
+  function headC(o) {
+    const glasses = o.glasses ? `<g fill="#fff" fill-opacity=".3" stroke="${K}" stroke-width="3.5"><circle cx="-17" cy="-7" r="13"/><circle cx="17" cy="-7" r="13"/><path d="M-4 -7 H4"/></g>` : '';
+    const mustache = o.mustache ? `<path d="M-18 12 Q-8 4 0 10 Q8 4 18 12 Q8 18 0 14 Q-8 18 -18 12Z" fill="${o.hc ?? K}" stroke="${K}" stroke-width="2"/>` : '';
+    const sweat = o.sweat ? `<path d="M44 -30 q-8 14 0 18 q8 -4 0 -18Z" fill="#6fb2ff" stroke="${K}" stroke-width="3"/>` : '';
+    return `<circle r="52" fill="#fffdf8" stroke="${K}" stroke-width="5"/>${HAIRS[o.hair ?? 'none'](o.hc ?? '#222')}${FACE[o.expr ?? 'neutral']}${mustache}${glasses}${sweat}`;
+  }
+  const headAt = (x, y, s, o = {}) => `<g transform="translate(${x} ${y}) scale(${s}) rotate(${o.tilt ?? 0})">${headC(o)}</g>`;
+  /* ludzik: (x, y) = środek głowy; arms/legs = końce kończyn w układzie postaci; elbows opcjonalnie */
+  function guy(x, y, o = {}) {
+    const s = o.s ?? 1;
+    const arms = o.arms ?? [[-62, 168], [62, 168]];
+    const legs = o.legs ?? [[-30, 330], [30, 330]];
+    const armsSvg = arms.map(([ax, ay], i) => {
+      if (ax === null) return '';
+      const sx = i ? 34 : -34, el = o.elbows?.[i];
+      return LINE(el ? `M${sx} 70 L${el[0]} ${el[1]} L${ax} ${ay}` : `M${sx} 70 L${ax} ${ay}`, 8);
+    }).join('');
+    const legsSvg = legs.map(([lx, ly], i) => LINE(`M${i ? 18 : -18} 196 L${lx} ${ly}`, 8)).join('');
+    const shadow = o.noShadow ? '' : `<ellipse cx="0" cy="${Math.max(...legs.map((l) => l[1])) + 6}" rx="70" ry="10" fill="${K}" opacity=".12"/>`;
+    const headSvg = o.noHead ? '' : `<g transform="rotate(${o.tilt ?? 0})">${headC(o)}</g>`;
+    return `<g transform="translate(${x} ${y}) scale(${s})">${shadow}${legsSvg}<path d="M-36 52 L36 52 L46 200 L-46 200 Z" fill="${o.shirt ?? '#e74c3c'}" stroke="${K}" stroke-width="5" stroke-linejoin="round"/>${armsSvg}${headSvg}</g>`;
+  }
+  /* napisy komiksowe */
+  const sfx = (x, y, txt, size, fill, o = {}) =>
+    `<g class="${o.cls ?? 'pop'}" ${d(o.d ?? 0)}><text x="${x}" y="${y}" font-family="Bangers, Impact, sans-serif" font-size="${size}" letter-spacing="2" fill="${fill}" stroke="${K}" stroke-width="${Math.max(4, size / 11)}" stroke-linejoin="round" paint-order="stroke" text-anchor="${o.a ?? 'start'}" transform="rotate(${o.rot ?? 0} ${x} ${y})">${txt}</text></g>`;
+  const T = (x, y, txt, size, fill, o = {}) =>
+    `<text x="${x}" y="${y}" font-family="${o.font ?? 'Bricolage Grotesque, Segoe UI, sans-serif'}" font-size="${size}" font-weight="${o.w ?? 800}" fill="${fill}" text-anchor="${o.a ?? 'start'}"${o.cls ? ` class="${o.cls}"` : ''}${o.d ? ` style="--d:${o.d}s"` : ''}>${txt}</text>`;
+  const F = (x, y, txt, size, fill, o = {}) => T(x, y, txt, size, fill, { font: 'Figtree, Segoe UI, sans-serif', w: 600, ...o });
+  const C = (x, y, txt, size, fill, o = {}) => T(x, y, txt, size, fill, { font: 'Patrick Hand, Comic Sans MS, sans-serif', w: 700, ...o });
+  /* kartka „fachowiec zrobi to w kilka minut” */
+  const hint = (l1, l2, dl = 1.7, x = 1050, y = 36) =>
+    `<g class="up" style="--d:${dl}s"><rect x="${x + 8}" y="${y + 8}" width="520" height="132" rx="20" fill="${K}"/><rect x="${x}" y="${y}" width="520" height="132" rx="20" fill="#fff" stroke="${K}" stroke-width="5"/><circle cx="${x + 64}" cy="${y + 66}" r="38" fill="#1f7a58" stroke="${K}" stroke-width="4"/><path d="M${x + 48} ${y + 84} L${x + 70} ${y + 62} M${x + 66} ${y + 52} a15 15 0 1 0 14 14" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round"/>${C(x + 118, y + 58, l1, 30, K)}${C(x + 118, y + 100, l2, 27, '#1f7a58')}</g>`;
+  const drop = (x, y, s = 1, cls = 'drip', dl = 0) =>
+    `<g transform="translate(${x} ${y}) scale(${s})"><path class="${cls}" style="--d:${dl}s" d="M0 -20 Q14 0 0 13 Q-14 0 0 -20Z" fill="#6fb2ff" stroke="${K}" stroke-width="3"/></g>`;
+  const star = (x, y, r, fill) => {
+    const pts = [];
+    for (let i = 0; i < 16; i++) { const a = (Math.PI * i) / 8, rr = i % 2 ? r * 0.45 : r; pts.push(`${(x + Math.cos(a) * rr).toFixed(0)},${(y + Math.sin(a) * rr).toFixed(0)}`); }
+    return `<polygon points="${pts.join(' ')}" fill="${fill}" stroke="${K}" stroke-width="5" stroke-linejoin="round"/>`;
+  };
+  function phone(x, y, w, h, content) {
+    return `<g transform="translate(${x} ${y})"><rect x="10" y="10" width="${w}" height="${h}" rx="46" fill="${K}"/><rect width="${w}" height="${h}" rx="46" fill="#1d2420" stroke="${K}" stroke-width="5"/><rect x="14" y="14" width="${w - 28}" height="${h - 28}" rx="34" fill="#fbfcfa"/><g transform="translate(14 14)">${content}</g></g>`;
+  }
+  /* klasa animacji na zewnętrznej grupie – animowany transform CSS nadpisałby translate z atrybutu */
+  const field = (x, y, w, label, value, o = {}) =>
+    `<g${o.cls ? ` class="${o.cls}" ${d(o.d ?? 0)}` : ''}><g transform="translate(${x} ${y})"><rect width="${w}" height="64" rx="14" fill="#fff" stroke="#c9d0c8" stroke-width="2"/>${F(16, 24, label, 15, '#6b756f')}${F(16, 50, value, 21, '#1d2420', { w: 700 })}</g></g>`;
+  const btn = (x, y, w, label, color, o = {}) =>
+    `<g${o.cls ? ` class="${o.cls}" ${d(o.d ?? 0)}` : ''}><g transform="translate(${x} ${y})"><rect width="${w}" height="58" rx="29" fill="${color}"/>${F(w / 2, 37, label, 21, '#fff', { a: 'middle', w: 700 })}</g></g>`;
+  const LOGO = (x, y, s, bg, fg) =>
+    `<g transform="translate(${x} ${y}) scale(${s})"><rect x="-60" y="-60" width="120" height="120" rx="30" fill="${bg}" stroke="${K}" stroke-width="5"/><g fill="none" stroke="${fg}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"><path d="M-44 -2 L-22 -24 L0 -8 L16 -18 L44 4"/><path d="M-22 10 L-6 26 L6 20 L18 30 L32 20"/><path d="M-44 -2 V12 L-24 26"/><path d="M44 4 V14 L26 28"/></g></g>`;
+  function car(x, label, color) {
+    return `<g transform="translate(${x} 735)"><path d="M0 0 V-60 Q0 -78 20 -80 L60 -82 L90 -132 H200 L236 -82 L262 -80 Q280 -78 280 -60 V0 Z" fill="${color}" stroke="${K}" stroke-width="5" stroke-linejoin="round"/><path d="M104 -122 H146 V-86 H80 Z M154 -122 H192 L214 -86 H154 Z" fill="#dff1fb" stroke="${K}" stroke-width="4" stroke-linejoin="round"/><circle cx="64" cy="0" r="26" fill="#333" stroke="${K}" stroke-width="5"/><circle cx="216" cy="0" r="26" fill="#333" stroke="${K}" stroke-width="5"/>${C(140, -28, label, 26, '#fff', { a: 'middle' })}</g>`;
+  }
+
+  /* ============ sceny ============ */
+  const scenes = [];
+  let total = 0;
+  function add(dur, def) { def.start = total; def.dur = dur; total += dur; scenes.push(def); }
+
+  /* dymek komiksowy: (x, y) = środek, ogonek do (tx, ty) */
+  function bubble(x, y, txt, dl, tx, ty, size = 40) {
+    const w = Math.round(txt.length * size * 0.5 + 70), h = size + 46;
+    const bx = x - w / 2, by = y - h / 2, base = Math.max(bx + 40, Math.min(bx + w - 40, tx));
+    return `<g class="pop" ${d(dl)}><polygon points="${base - 22},${by + h - 4} ${base + 22},${by + h - 4} ${tx},${ty}" fill="#fff" stroke="${K}" stroke-width="5" stroke-linejoin="round"/>`
+      + `<rect x="${bx}" y="${by}" width="${w}" height="${h}" rx="${h / 2}" fill="#fff" stroke="${K}" stroke-width="5"/>`
+      + `<polygon points="${base - 17},${by + h - 7} ${base + 17},${by + h - 7} ${base + (tx - base) * 0.25},${by + h + 8}" fill="#fff"/>`
+      + `${C(x, y + size * 0.35, txt, size, K, { a: 'middle' })}</g>`;
+  }
+  const sink = (x, y, dripping = true) => `<rect x="${x - 180}" y="${y}" width="360" height="40" fill="#b9c1d3" stroke="${K}" stroke-width="5"/><path d="M${x - 120} ${y + 40} h240 l-20 60 h-200 z" fill="#8c95ad" stroke="${K}" stroke-width="5"/>
+    ${LINE(`M${x + 60} ${y} V${y - 90} H${x} V${y - 66}`, 22)}${LINE(`M${x + 60} ${y} V${y - 90} H${x} V${y - 66}`, 12, '#d8dee8')}
+    ${dripping ? `${drop(x, y - 40, 1.3, 'drip', 0)}${drop(x, y - 40, 1.3, 'drip', 0.3)}<ellipse class="ripple" cx="${x}" cy="${y + 42}" rx="34" ry="8" fill="none" stroke="#9fd0ff" stroke-width="4"/>` : ''}`;
+  const PAWEL = { hair: 'cap', hc: '#c9500b', shirt: '#f1c40f' };
+  const MAREK = { hair: 'short', hc: '#5a3b22', shirt: '#4a78c2' };
+
+  add(4, {
+    title: 'Cieknący kran', what: 'Noc, 03:12. Marek leży w łóżku z szeroko otwartymi oczami. Przez drzwi widać kuchnię: z kranu kapie do zlewu.', snd: 'cisza nocy, krople z pogłosem łazienki, ciężki wydech',
+    say: '„No nie… znowu?!”',
+    caption: '',
+    events: [[0, 'underscore'], [0.15, 'drip'], [0.75, 'drip'], [1.35, 'drip'], [1.95, 'drip'], [2.4, 'sigh'], [2.55, 'drip'], [3.15, 'drip']],
+    svg: () => `<rect width="1600" height="900" fill="#26325a"/>
+      <rect x="560" y="90" width="260" height="230" fill="#1a2348" stroke="${K}" stroke-width="6"/>${LINE('M690 90 V320 M560 205 H820', 6)}<circle cx="760" cy="150" r="30" fill="#f4e7b0" stroke="${K}" stroke-width="4"/>
+      <rect x="1180" y="150" width="380" height="620" fill="#34427a" stroke="${K}" stroke-width="8"/>
+      ${sink(1380, 470)}
+      <rect x="140" y="560" width="1000" height="70" fill="#7a5236" stroke="${K}" stroke-width="6"/><rect x="140" y="470" width="44" height="300" fill="#7a5236" stroke="${K}" stroke-width="6"/>
+      <ellipse cx="320" cy="540" rx="130" ry="46" fill="#fff" stroke="${K}" stroke-width="5"/>
+      ${headAt(320, 478, 1.15, { expr: 'stare', ...MAREK })}
+      <rect x="420" y="505" width="720" height="90" rx="40" fill="#4a78c2" stroke="${K}" stroke-width="6"/>
+      <rect x="900" y="660" width="210" height="96" rx="12" fill="#111" stroke="${K}" stroke-width="5"/>${T(1005, 726, '03:12', 60, '#ff4b3e', { a: 'middle', font: 'Consolas, monospace', w: 700 })}
+      ${sfx(1250, 300, 'KAP', 64, '#cfe8ff', { rot: -8, d: 0.15 })}${sfx(1320, 360, 'KAP', 64, '#cfe8ff', { rot: 6, d: 0.75 })}${sfx(1235, 420, 'KAP', 64, '#cfe8ff', { rot: -4, d: 1.35 })}
+      ${bubble(470, 300, 'No nie… znowu?!', 2.2, 360, 420, 52)}`,
+  });
+
+  add(3.6, {
+    title: 'Młotek i palec', what: 'Ktoś bez wiertarki wbija gwóźdź w ceglaną ścianę. Gwóźdź się wygina, a drugi cios trafia w palec.', snd: 'metaliczne dzwonienie gwoździa, sypanie tynku, głuche uderzenie',
+    say: '„Aaaa! No ja nie mogę!”',
+    caption: '',
+    events: [[0.65, 'tink'], [0.7, 'crumble'], [2.2, 'thud']],
+    svg: () => {
+      let bricks = '';
+      for (let r = 0; r < 15; r++) for (let c = 0; c < 7; c++) bricks += `<rect x="${1000 + c * 110 - (r % 2) * 55}" y="${r * 60}" width="106" height="56" fill="#c8684a" stroke="${K}" stroke-width="3"/>`;
+      return `<rect width="1600" height="900" fill="#f4ead9"/><rect y="725" width="1600" height="175" fill="#d8c3a2" stroke="${K}" stroke-width="5"/>
+      <svg x="1000" y="0" width="600" height="900" overflow="hidden"><g transform="translate(-1000 0)">${bricks}</g></svg><path d="M1000 0 V900" stroke="${K}" stroke-width="6"/>
+      ${guy(430, 230, { s: 1.5, shirt: '#3d7cc9', noHead: true, arms: [[353, 127], [null, 0]] })}
+      <circle cx="958" cy="420" r="16" fill="#fffdf8" stroke="${K}" stroke-width="5"/>
+      <g class="out" ${d(0.65)}>${LINE('M975 420 H1000', 9, '#8d939a')}<rect x="966" y="404" width="10" height="32" rx="3" fill="#6d7379" stroke="${K}" stroke-width="2"/></g>
+      <g class="fade" ${d(0.65)}>${LINE('M972 420 H990 Q1000 420 1004 394', 9, '#8d939a')}<rect x="966" y="404" width="10" height="32" rx="3" fill="#6d7379" stroke="${K}" stroke-width="2"/></g>
+      <g class="pop" ${d(0.65)}><rect x="1010" y="440" width="12" height="12" fill="#e9c3a6" stroke="${K}" stroke-width="2"/><rect x="1030" y="466" width="10" height="10" fill="#e9c3a6" stroke="${K}" stroke-width="2"/><rect x="1016" y="492" width="14" height="10" fill="#e9c3a6" stroke="${K}" stroke-width="2"/></g>
+      <g class="out" ${d(0.65)}>${headAt(430, 230, 1.5, { expr: 'annoyed', hair: 'spiky', hc: '#333' })}</g>
+      <g class="fade" ${d(0.65)}><g class="out" ${d(2.2)}>${headAt(430, 230, 1.5, { expr: 'shock', hair: 'spiky', hc: '#333' })}</g></g>
+      <g class="fade" ${d(2.2)}>${headAt(430, 230, 1.5, { expr: 'pain', hair: 'spiky', hc: '#333' })}</g>
+      <g class="swing2">${LINE('M481 335 L840 320', 12)}${LINE('M840 320 L925 392', 22)}${LINE('M840 320 L925 392', 14, '#a9713f')}<rect x="890" y="375" width="84" height="48" rx="8" fill="#6b7076" stroke="${K}" stroke-width="5" transform="rotate(40 932 399)"/></g>
+      ${sfx(1060, 380, '?!', 120, '#fff', { rot: 8, d: 0.9 })}
+      <g class="pop" ${d(2.2)}>${star(958, 420, 95, '#ffd23f')}</g>
+      ${bubble(640, 70, 'Aaaa! No ja nie mogę!', 2.35, 520, 150, 50)}`;
+    },
+  });
+
+  add(3, {
+    title: 'Skrzypiące drzwi', what: 'Drzwi szorują po podłodze i skrzypią. W powiększeniu róg drzwi rysuje panele. Druga próba jest jeszcze głośniejsza.', snd: 'drewniane skrzypienie zawiasów, szuranie o podłogę, westchnienie',
+    say: '„Eeech…”',
+    caption: '',
+    events: [[0.2, 'creak'], [0.9, 'scrape'], [1.9, 'sigh']],
+    svg: () => `<defs><clipPath id="zoomClip"><circle cx="1290" cy="600" r="160"/></clipPath></defs>
+      <rect width="1600" height="900" fill="#efe6d8"/><rect y="730" width="1600" height="170" fill="#c9a27a" stroke="${K}" stroke-width="5"/>
+      ${LINE('M0 790 H1600 M0 850 H1600', 3)}
+      ${LINE('M700 760 Q850 800 1000 760', 5, '#fff3e0')}${LINE('M700 790 Q860 835 1020 790', 5, '#fff3e0')}
+      <rect x="680" y="170" width="340" height="570" fill="#6b4428" stroke="${K}" stroke-width="6"/>
+      <g class="rock"><rect x="700" y="190" width="300" height="545" fill="#b07a45" stroke="${K}" stroke-width="6"/><rect x="740" y="240" width="220" height="190" fill="none" stroke="${K}" stroke-width="4"/><rect x="740" y="470" width="220" height="210" fill="none" stroke="${K}" stroke-width="4"/><circle cx="960" cy="470" r="14" fill="#e2c36a" stroke="${K}" stroke-width="4"/></g>
+      ${guy(420, 300, { s: 1.35, shirt: '#4f9a5a', hair: 'long', hc: '#8b4a2b', expr: 'annoyed', arms: [[207, 160], [207, 205]], elbows: [[110, 140], [110, 190]], legs: [[-60, 320], [30, 320]] })}
+      <g class="pop" ${d(0.5)}><circle cx="1298" cy="608" r="166" fill="${K}"/><circle cx="1290" cy="600" r="166" fill="#fff" stroke="${K}" stroke-width="6"/><g clip-path="url(#zoomClip)"><rect x="1120" y="420" width="340" height="360" fill="#efe6d8"/><rect x="1120" y="650" width="340" height="130" fill="#c9a27a"/><rect x="1130" y="430" width="230" height="240" fill="#b07a45" stroke="${K}" stroke-width="5" transform="rotate(4 1360 660)"/>${LINE('M1200 690 Q1300 700 1420 680 M1190 715 Q1310 728 1440 705', 6, '#fff3e0')}${LINE('M1370 640 l40 -20 M1380 662 l46 0 M1372 684 l38 22', 5)}</g></g>
+      ${sfx(1100, 330, 'SKRZYYYP!', 84, '#fff', { rot: -6, d: 0.25 })}
+      ${bubble(330, 110, 'Eeech…', 1.8, 400, 210, 50)}`,
+  });
+
+  add(4, {
+    title: 'Zatkana rynna', what: 'Ulewa. Rynna pełna liści, woda leje się górą tuż obok właściciela domu. Patrzy w górę, potem na swoje puste ręce: nie ma drabiny ani sprzętu.', snd: 'deszcz z pojedynczymi kroplami, woda przelewająca się z rynny',
+    say: '„No pięknie…”',
+    caption: '',
+    events: [[0, 'rain:4'], [0.3, 'gush:3.6']],
+    svg: () => {
+      let rain = '';
+      for (let i = 0; i < 70; i++) { const x = (i * 97) % 1640, y = (i * 53) % 900; rain += `<path d="M${x} ${y} l-14 50" stroke="#dbe5ee" stroke-width="3" opacity=".8"/>`; }
+      let leaves = '';
+      for (let i = 0; i < 26; i++) leaves += `<ellipse cx="${330 + i * 45 + (i % 3) * 7}" cy="${204 - (i % 4) * 6}" rx="22" ry="11" fill="${['#c0702a', '#8a6d1f', '#5f8a2f', '#b5482a'][i % 4]}" stroke="${K}" stroke-width="3" transform="rotate(${(i * 37) % 60 - 30} ${330 + i * 45} ${204 - (i % 4) * 6})"/>`;
+      const streams = [880, 925, 975].map((x, i) => `<path class="pour" style="animation-delay:${i * 0.1}s" d="M${x} 236 Q${x + 18} 400 ${x + 8} 730" fill="none" stroke="#6fb2ff" stroke-width="${16 - i * 3}" stroke-linecap="round" stroke-dasharray="26 16"/>`).join('');
+      return `<rect width="1600" height="900" fill="#7d8a96"/><g class="rain">${rain}</g>
+        <rect x="260" y="230" width="1340" height="560" fill="#efe2c8" stroke="${K}" stroke-width="6"/>
+        <polygon points="230,232 1600,232 1600,120 420,120" fill="#8f3a2a" stroke="${K}" stroke-width="6" stroke-linejoin="round"/>
+        <rect x="300" y="200" width="1300" height="40" rx="6" fill="#9aa3ad" stroke="${K}" stroke-width="5"/>${leaves}
+        <rect x="1420" y="240" width="34" height="550" fill="#9aa3ad" stroke="${K}" stroke-width="5"/>
+        <rect x="420" y="360" width="220" height="200" fill="#dff1fb" stroke="${K}" stroke-width="6"/>${LINE('M530 360 V560 M420 460 H640', 5)}
+        <rect x="1080" y="450" width="160" height="340" fill="#8a5a34" stroke="${K}" stroke-width="6"/>
+        <rect y="790" width="1600" height="110" fill="#6f7a5a" stroke="${K}" stroke-width="5"/>
+        ${streams}<ellipse class="ripple" cx="905" cy="790" rx="70" ry="14" fill="none" stroke="#bfe0ff" stroke-width="5"/><ellipse cx="905" cy="800" rx="110" ry="16" fill="#6fb2ff" opacity=".6"/>
+        ${guy(1160, 470, { s: 0.95, shirt: '#c0392b', hair: 'short', hc: '#222', expr: 'sad', tilt: -14, arms: [[-110, 120], [110, 120]], elbows: [[-80, 110], [80, 110]] })}
+        ${sfx(700, 330, 'CHLUP!', 80, '#cfe8ff', { rot: -8, d: 0.5 })}
+        ${bubble(1250, 330, 'No pięknie…', 2.0, 1180, 400, 52)}`;
+    },
+  });
+
+  add(3.4, {
+    title: 'Drukarka', what: 'Ania klika „Drukuj”. Drukarka zgrzyta, miga czerwona kontrolka, papier się zacina, na ekranie błąd. Ania łapie się za głowę.', snd: 'kliknięcie, zgrzyt drukarki, dźwięk błędu, narastający szum przejścia',
+    say: '„No przecież zaraz oszaleję!”',
+    caption: '',
+    events: [[0.2, 'tap'], [0.4, 'printer'], [1.4, 'uierr'], [1.8, 'printer'], [2.4, 'riser']],
+    svg: () => `<rect width="1600" height="900" fill="#e3eaf2"/><rect y="680" width="1600" height="220" fill="#b08d6a" stroke="${K}" stroke-width="5"/>
+      ${guy(330, 330, { s: 1.15, shirt: '#16a085', hair: 'long', hc: '#7b3f00', expr: 'annoyed', noHead: false, arms: [[-48, -40], [48, -40]], elbows: [[-100, 60], [100, 60]] })}
+      <rect x="560" y="330" width="520" height="330" rx="14" fill="#333" stroke="${K}" stroke-width="6"/><rect x="578" y="348" width="484" height="294" fill="#f4f6f8"/><path d="M520 660 H1120 L1090 690 H550 Z" fill="#9aa0a8" stroke="${K}" stroke-width="5"/>
+      ${F(600, 400, 'Umowa_najem.pdf', 26, '#1d2420', { w: 700 })}${LINE('M600 430 H1000 M600 460 H960 M600 490 H1010', 6, '#c9d0d8')}
+      <g class="pop" ${d(1.4)}><rect x="640" y="440" width="360" height="150" rx="10" fill="#fff" stroke="${K}" stroke-width="5"/><circle cx="690" cy="490" r="22" fill="#e74c3c" stroke="${K}" stroke-width="3"/>${C(690, 500, '!', 30, '#fff', { a: 'middle' })}${C(730, 500, 'Błąd drukarki', 30, K)}${C(670, 560, 'Zacięcie papieru', 26, '#5d6862')}</g>
+      <g class="shake"><rect x="1180" y="480" width="330" height="200" rx="18" fill="#dfe3e8" stroke="${K}" stroke-width="6"/><rect x="1220" y="440" width="250" height="50" fill="#fff" stroke="${K}" stroke-width="4"/><path d="M1230 600 l40 -14 l30 18 l40 -16 l40 14 l40 -18 l40 16 v40 h-230 z" fill="#fff" stroke="${K}" stroke-width="4"/><circle cx="1470" cy="530" r="12" fill="#e74c3c" stroke="${K}" stroke-width="3" class="blink"/></g>
+      ${sfx(1250, 400, 'ZGRZYT!', 64, '#fff', { rot: 6, d: 0.45 })}
+      ${bubble(560, 200, 'No przecież zaraz oszaleję!', 2.0, 400, 260, 44)}`,
+  });
+
+  add(4.5, {
+    title: 'Nie musisz radzić sobie sam', music: true, what: 'Obraz zatrzymuje się. Na ciemnym tle: „Małe problemy potrafią zepsuć cały dzień. Ale nie musisz radzić sobie z nimi sam.” Pojawia się logo.', snd: 'filmowe „uderzenie”, startuje pogodna muzyka lo-fi',
+    say: 'napis zamiast lektora',
+    caption: '',
+    events: [[0, 'impact'], [0, 'music'], [2.6, 'swoosh']],
+    svg: () => `<rect width="1600" height="900" fill="#1d2420"/>
+      ${C(800, 300, 'Małe problemy potrafią zepsuć cały dzień.', 58, '#fff', { a: 'middle', cls: 'fade', d: 0.3 })}
+      ${C(800, 390, 'Ale nie musisz radzić sobie z nimi sam.', 58, '#ff9a4d', { a: 'middle', cls: 'fade', d: 1.3 })}
+      <g class="pop" ${d(2.6)}>${LOGO(560, 580, 1.1, '#ff7a1a', '#fff')}</g>
+      ${sfx(660, 625, 'I CAN HELP U', 120, '#fff', { d: 2.7 })}`,
+  });
+
+  add(7, {
+    title: 'Zlecam: dodaj zlecenie', tag: 'z', what: 'Marek w telefonie: kategoria Hydraulika, zdjęcie kapiącego kranu, krótki opis, kwota 30 zł, miejsce na mapie, „Opublikuj”.', snd: 'miękkie stuknięcia ekranu, migawka aparatu, dźwięk powodzenia',
+    say: 'napis: „Dodaj zlecenie: zdjęcie, opis i Twoja cena.”',
+    caption: '',
+    events: [[0.8, 'tap'], [2.2, 'shutter'], [2.8, 'tap'], [3.6, 'tap'], [4.2, 'tap'], [5.0, 'tap'], [5.4, 'success']],
+    svg: () => {
+      const cats = ['Hydraulika', 'Elektryka', 'Drobne naprawy', 'Ogród', 'Komputery', 'Korepetycje'];
+      const tiles = cats.map((c, i) => { const x = 22 + (i % 2) * 170, y = 120 + Math.floor(i / 2) * 140; return `<rect x="${x}" y="${y}" width="155" height="122" rx="20" fill="#f1f3ef"/>${F(x + 77, y + 72, c, 19, '#1d2420', { a: 'middle', w: 700 })}`; }).join('');
+      const thumb = `<rect width="150" height="100" rx="14" fill="#cfd9e6"/><rect x="30" y="24" width="90" height="14" rx="7" fill="#7d8796"/><rect x="30" y="24" width="14" height="42" rx="5" fill="#7d8796"/><circle cx="37" cy="80" r="7" fill="#3b8fd6"/>`;
+      const screen = `
+        <g class="out" ${d(1.8)}>${T(22, 76, 'Czego potrzebujesz?', 32, '#1d2420')}${tiles}<rect x="22" y="120" width="155" height="122" rx="20" fill="none" stroke="#c9500b" stroke-width="7" class="pop" ${d(0.8)}/></g>
+        <g class="fade" ${d(1.8)}>${T(22, 70, 'Nowe zlecenie', 30, '#1d2420')}
+          ${field(22, 90, 328, 'Kategoria', 'Hydraulika · Cieknący kran')}
+          ${F(22, 182, 'Zdjęcia usterki', 16, '#6b756f')}<g transform="translate(22 192)"><g class="pop" ${d(2.2)}>${thumb}</g></g>
+          ${field(22, 306, 328, 'Opis', '', {})}${F(38, 356, 'Kapie całą noc, chyba uszczelka.', 18, '#1d2420', { cls: 'fade', d: 2.8, w: 700 })}
+          ${field(22, 386, 328, 'Twoja kwota', '')}${T(40, 436, '30 zł', 30, '#c9500b', { cls: 'pop', d: 3.6 })}
+          <g transform="translate(22 466)"><rect width="328" height="150" rx="14" fill="#e7eee4" stroke="#c9d0c8" stroke-width="2"/>${LINE('M0 60 H328 M120 0 V150 M250 0 V150', 8, '#fff')}${F(14, 26, 'Miejsce (inni widzą tylko okolicę)', 14, '#5d6862')}<g class="pop" ${d(4.2)}><circle cx="186" cy="92" r="40" fill="#c9500b" fill-opacity=".15" stroke="#c9500b" stroke-width="2"/><circle cx="186" cy="92" r="11" fill="#c9500b" stroke="#fff" stroke-width="4"/></g></g>
+          ${btn(22, 660, 328, 'Opublikuj', '#c9500b', { cls: 'press', d: 5.0 })}
+          <g class="up" ${d(5.4)}><rect x="22" y="10" width="328" height="96" rx="18" fill="#1d2420"/>${F(40, 50, 'Opublikowane!', 24, '#fff', { w: 700 })}${F(40, 84, 'Pomocnicy w okolicy już wiedzą.', 18, '#d7e0da')}</g>
+        </g>`;
+      const step = (y, n, txt, dl) => `<g class="pop" ${d(dl)}><circle cx="170" cy="${y - 12}" r="26" fill="#ff7a1a" stroke="${K}" stroke-width="4"/>${C(170, y - 1, n, 30, K, { a: 'middle' })}${C(214, y, txt, 38, K)}</g>`;
+      return `<rect width="1600" height="900" fill="#fff4ea"/>
+        ${sfx(130, 160, 'ZLECAM', 60, '#ff7a1a')}${C(130, 240, 'Dodaj zlecenie:', 64, K)}${C(130, 310, 'zdjęcie, opis i Twoja cena.', 52, '#c9500b')}
+        ${step(430, '1', 'Kategoria', 0.4)}${step(505, '2', 'Zdjęcie i opis', 2.0)}${step(580, '3', 'Twoja kwota', 3.5)}${step(655, '4', 'Miejsce i gotowe', 4.1)}
+        ${guy(820, 560, { s: 0.6, expr: 'smirk', ...MAREK, arms: [[90, 70], [90, 80]], elbows: [[-20, 140], [20, 150]] })}
+        ${phone(1000, 50, 400, 800, screen)}`;
+    },
+  });
+
+  /*
+   * Wersja do reklamy (montage.mjs otwiera stronę z ?reklama): pomocnik jedzie i po drodze zgarnia trzy zlecenia,
+   * licznik zarobku rośnie. W samym spocie zostaje scena z jednym zleceniem (niżej).
+   */
+  if (AD) add(7.5, {
+    title: 'Pomagam: zlecenia po drodze', tag: 'p', what: 'Pomocnik jedzie z pracy do domu i po drodze zgarnia trzy zlecenia, licznik zarobku rośnie.', snd: 'szum jazdy, dźwięki kasy',
+    say: '', caption: '',
+    events: [[0, 'drive:7']],
+    svg: () => {
+      const path = 'M-60 700 C 280 560, 520 800, 820 660 S 1320 520, 1680 600';
+      // punkty na trasie i chwile, w których auto do nich dojeżdża (ruch po długości ścieżki, 6,5 s)
+      const jobs = [
+        { x: 395, y: 680, t: 1.75, label: 'Kran · +35 zł', above: true },
+        { x: 820, y: 660, t: 3.4, label: 'Półka · +50 zł', above: false },
+        { x: 1149, y: 555, t: 4.55, label: 'Rower · +40 zł', above: true },
+      ];
+      const sums = ['+35 zł', '+85 zł', '+125 zł'];
+      const pin = (j) => {
+        const ly = j.above ? j.y - 120 : j.y + 110;
+        return `<g class="pop" ${d(j.t - 0.9)}><circle cx="${j.x}" cy="${j.y}" r="22" fill="#ff7a1a" stroke="${K}" stroke-width="5"/></g>
+          <g class="pop" ${d(j.t)}><rect x="${j.x - 150}" y="${ly - 40}" width="300" height="64" rx="32" fill="#2ecc71" stroke="${K}" stroke-width="5"/>${C(j.x, ly + 4, j.label, 32, '#fff', { a: 'middle' })}</g>`;
+      };
+      const counter = sums.map((s, i) => {
+        const shown = `<g class="pop" ${d(jobs[i].t)}>${C(1440, 168, s, 64, '#1f7a58', { a: 'middle' })}</g>`;
+        return i < sums.length - 1 ? `<g class="out" ${d(jobs[i + 1].t)}>${shown}</g>` : shown;
+      }).join('');
+      return `<rect width="1600" height="900" fill="#e8f3ec"/>
+        ${sfx(80, 120, 'POMAGAM', 66, '#2ecc71', { d: 0.1 })}
+        ${C(80, 190, 'Masz po drodze? Potrafisz? Masz narzędzia?', 44, K, { cls: 'fade', d: 0.4 })}
+        ${sfx(80, 268, 'ZARABIAJ NA SZYBKICH ZLECENIACH', 52, '#ff7a1a', { cls: 'fade', d: 2.2 })}
+        ${sfx(80, 336, 'I ZRÓB KOMUŚ DZIEŃ!', 52, '#ff7a1a', { cls: 'fade', d: 5.2 })}
+        <g class="up" ${d(1.4)}><rect x="1248" y="58" width="300" height="140" rx="26" fill="${K}"/><rect x="1240" y="50" width="300" height="140" rx="26" fill="#fff" stroke="${K}" stroke-width="5"/>${C(1390, 94, 'Dziś zarobione', 26, '#5d6862', { a: 'middle' })}</g>
+        <g transform="translate(-50 0)">${counter}</g>
+        ${C(80, 870, 'Praca', 34, '#1f7a58')}${C(1440, 560, 'Dom', 34, '#1f7a58')}
+        <path d="${path}" fill="none" stroke="#2ecc71" stroke-opacity=".18" stroke-width="210" stroke-linecap="round"/>
+        <path d="${path}" fill="none" stroke="${K}" stroke-width="80" stroke-linecap="round"/>
+        <path d="${path}" fill="none" stroke="#8a9a90" stroke-width="70" stroke-linecap="round"/>
+        <path d="${path}" fill="none" stroke="#fff" stroke-width="6" stroke-dasharray="40 30"/>
+        ${jobs.map(pin).join('')}
+        <g><animateMotion dur="6.5s" fill="freeze" rotate="auto" path="${path}"/><rect x="-60" y="-30" width="120" height="60" rx="16" fill="#f1c40f" stroke="${K}" stroke-width="5"/><rect x="-24" y="-22" width="40" height="44" rx="8" fill="#dff1fb" stroke="${K}" stroke-width="3"/></g>`;
+    },
+  });
+
+  if (!AD) add(6, {
+    title: 'Pomagam: zlecenie po drodze', tag: 'p', what: 'Paweł, który zna się na hydraulice, wraca autem z pracy. Ma ustawiony alert „po drodze”, więc telefon od razu pokazuje zlecenie Marka 0,8 km od trasy.', snd: 'szum jazdy, powiadomienie w telefonie',
+    say: 'napis: „Znasz się na czymś? Masz narzędzia? Zarabiaj po drodze.”',
+    caption: '',
+    events: [[0, 'drive:5.6'], [1.6, 'notify']],
+    svg: () => {
+      const path = 'M-60 700 C 280 560, 520 800, 820 660 S 1320 520, 1680 600';
+      return `<rect width="1600" height="900" fill="#e8f3ec"/>
+        ${sfx(100, 140, 'POMAGAM', 76, '#2ecc71', { d: 0.1 })}${C(100, 215, 'Znasz się na czymś? Masz narzędzia?', 48, K, { cls: 'fade', d: 0.4 })}${sfx(100, 300, 'ZARABIAJ PO DRODZE.', 70, '#ff7a1a', { cls: 'fade', d: 2.8 })}
+        ${C(80, 870, 'Praca', 34, '#1f7a58')}${C(1440, 560, 'Dom', 34, '#1f7a58')}
+        <path d="${path}" fill="none" stroke="#2ecc71" stroke-opacity=".18" stroke-width="210" stroke-linecap="round"/>
+        <path d="${path}" fill="none" stroke="${K}" stroke-width="80" stroke-linecap="round"/>
+        <path d="${path}" fill="none" stroke="#8a9a90" stroke-width="70" stroke-linecap="round"/>
+        <path d="${path}" fill="none" stroke="#fff" stroke-width="6" stroke-dasharray="40 30"/>
+        <g class="pop" ${d(1.6)}><circle cx="760" cy="540" r="24" fill="#ff7a1a" stroke="${K}" stroke-width="5"/>${C(800, 520, 'Marek · kran · 30 zł', 30, K)}</g>
+        <g><animateMotion dur="5.4s" fill="freeze" rotate="auto" keyPoints="0;0.42;0.5;1" keyTimes="0;0.3;0.7;1" calcMode="linear" path="${path}"/><rect x="-60" y="-30" width="120" height="60" rx="16" fill="#f1c40f" stroke="${K}" stroke-width="5"/><rect x="-24" y="-22" width="40" height="44" rx="8" fill="#dff1fb" stroke="${K}" stroke-width="3"/></g>
+        <g class="up" ${d(1.6)}><rect x="1048" y="88" width="480" height="170" rx="26" fill="${K}"/><rect x="1040" y="80" width="480" height="170" rx="26" fill="#1d2420" stroke="${K}" stroke-width="5"/>${LOGO(1100, 140, 0.4, '#ff7a1a', '#fff')}${F(1140, 130, 'Nowe ogłoszenie po drodze', 24, '#fff', { w: 700 })}${F(1140, 166, 'Cieknący kran w kuchni – 0,8 km', 20, '#d7e0da')}${F(1140, 198, 'Hydraulika · 30 zł', 20, '#ff9a4d', { w: 700 })}${F(1140, 230, 'Złóż ofertę →', 20, '#2ecc71', { w: 700 })}</g>`;
+    },
+  });
+
+  add(7, {
+    title: 'Wspólny interes: cena i termin', tag: 'p', what: 'Ekran podzielony na pół. ZLECAM (Marek): kran, 30 zł. POMAGAM (Paweł): „Proponuję 35 zł, dziś 17:30. Trochę więcej pracy, niż się wydaje”. Marek przyjmuje ofertę, oboje się uśmiechają, uścisk dłoni.', snd: 'dźwięki wiadomości, stuknięcie, dźwięk powodzenia',
+    say: 'napis: „Ustalcie cenę i termin.”',
+    caption: '',
+    events: [[0.3, 'msg'], [1.3, 'msg'], [2.3, 'msg'], [3.6, 'tap'], [4.2, 'success']],
+    svg: () => {
+      const bub = (x, y, w, h, fill, lines, dl) => `<g class="up" ${d(dl)}><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="22" fill="${fill}"/>${lines.map((l, i) => F(x + 20, y + 38 + i * 30, l[0], l[1] ?? 20, '#1d2420', { w: l[2] ?? 600 })).join('')}</g>`;
+      const left = `${T(20, 62, 'Cieknący kran', 26, '#1d2420')}${F(20, 92, 'Twoje zlecenie · Hydraulika', 17, '#5d6862')}
+        ${bub(20, 120, 290, 100, '#fde6d4', [['Moja kwota', 17], ['30 zł', 36, 800]], 0.3)}
+        ${bub(20, 244, 290, 196, '#d7efe4', [['Oferta Pawła · ★ 4,9', 17], ['35 zł', 36, 800], ['dziś 17:30–18:00', 19, 700], ['„Trochę więcej pracy,', 17], ['niż się wydaje.”', 17]], 2.3)}
+        ${btn(20, 520, 290, 'Przyjmij ofertę', '#1f7a58', { cls: 'press', d: 3.6 })}`;
+      const right = `${T(20, 62, 'Cieknący kran', 26, '#1d2420')}${F(20, 92, '30 zł · 0,8 km od trasy', 17, '#5d6862')}
+        ${bub(20, 120, 290, 220, '#d7efe4', [['Twoja oferta', 17], ['35 zł', 36, 800], ['dziś 17:30–18:00', 19, 700], ['Trochę więcej pracy, niż', 17], ['się wydaje – wymienię', 17], ['uszczelkę.', 17]], 1.3)}
+        <g class="pop" ${d(4.0)}><rect x="20" y="520" width="290" height="58" rx="29" fill="#e8f6ee" stroke="#1f7a58" stroke-width="3"/>${F(165, 557, '✓ Oferta przyjęta', 21, '#1f7a58', { a: 'middle', w: 700 })}</g>`;
+      return `<rect width="800" height="900" fill="#ffe2cc"/><rect x="800" width="800" height="900" fill="#d7efe4"/><path d="M800 0 V900" stroke="${K}" stroke-width="8"/>
+        ${sfx(400, 100, 'ZLECAM', 64, '#ff7a1a', { a: 'middle' })}${sfx(1200, 100, 'POMAGAM', 64, '#2ecc71', { a: 'middle' })}
+        ${C(400, 140, 'potrzebuję pomocy', 28, K, { a: 'middle' })}${C(1200, 140, 'chcę zarobić', 28, K, { a: 'middle' })}
+        ${phone(225, 170, 350, 640, left)}${phone(1025, 170, 350, 640, right)}
+        <g class="out" ${d(4.2)}>${headAt(110, 770, 0.8, { expr: 'neutral', ...MAREK })}${headAt(1490, 770, 0.8, { expr: 'smirk', ...PAWEL })}</g>
+        <g class="fade" ${d(4.2)}>${headAt(110, 770, 0.8, { expr: 'happy', ...MAREK })}${headAt(1490, 770, 0.8, { expr: 'happy', ...PAWEL })}</g>
+        <g class="pop" ${d(4.2)}><circle cx="808" cy="478" r="150" fill="${K}"/><circle cx="800" cy="470" r="150" fill="#ff7a1a" stroke="${K}" stroke-width="8"/>${LOGO(800, 420, 0.75, '#fff', '#c9500b')}${sfx(800, 520, 'UMOWA!', 52, '#fff', { a: 'middle', d: 4.2 })}${C(800, 566, '35 zł · dziś 17:30', 28, K, { a: 'middle' })}</g>
+        <g class="fade" ${d(4.6)}><rect x="548" y="818" width="520" height="72" rx="36" fill="${K}"/><rect x="540" y="810" width="520" height="72" rx="36" fill="#fff" stroke="${K}" stroke-width="5"/>${C(800, 860, 'Ustalcie cenę i termin.', 40, K, { a: 'middle' })}</g>`;
+    },
+  });
+
+  add(5.5, {
+    title: 'Naprawione', what: 'Paweł u Marka wymienia uszczelkę. Kran przestaje kapać, cisza. Marek odetchnął z ulgą, Paweł ma 35 zł. W aplikacji: zgłoszono wykonanie, potwierdzono, oceny 5★.', snd: 'zgrzyt klucza, zakręcany kran, cisza, dzwonek zarobku',
+    say: '„Ufff…”',
+    caption: '',
+    events: [[0.3, 'ratchet'], [1.1, 'ratchet'], [1.9, 'tapclose'], [3.4, 'cash'], [4.3, 'success']],
+    svg: () => `<rect width="1600" height="900" fill="#eef1f6"/><rect y="700" width="1600" height="200" fill="#c9b293" stroke="${K}" stroke-width="5"/>
+      <rect x="420" y="300" width="760" height="400" fill="#e3e8ef" stroke="${K}" stroke-width="5"/>
+      <g class="out" ${d(2.0)}>${sink(800, 470, true)}</g><g class="fade" ${d(2.0)}>${sink(800, 470, false)}</g>
+      ${guy(560, 330, { s: 1.0, expr: 'neutral', ...PAWEL, arms: [[-62, 168], [240, 70]], elbows: [null, [130, 130]] })}
+      <g class="shake">${LINE('M800 400 L845 380', 14, '#6b7076')}<circle cx="852" cy="377" r="12" fill="none" stroke="#6b7076" stroke-width="8"/></g>
+      ${sfx(820, 250, 'CISZA.', 90, '#fff', { rot: -4, d: 2.2 })}
+      <g class="fade" ${d(2.4)}>${guy(1300, 330, { s: 1.0, expr: 'happy', ...MAREK })}</g>
+      ${bubble(1330, 160, 'Ufff…', 2.7, 1300, 240, 50)}
+      <g class="pop" ${d(3.4)}><rect x="438" y="148" width="210" height="80" rx="40" fill="${K}"/><rect x="430" y="140" width="210" height="80" rx="40" fill="#ffd23f" stroke="${K}" stroke-width="5"/>${C(535, 194, '+35 zł', 44, K, { a: 'middle' })}</g>
+      <g class="up" ${d(3.9)}><rect x="438" y="768" width="1100" height="100" rx="20" fill="${K}"/><rect x="430" y="760" width="1100" height="100" rx="20" fill="#fff" stroke="${K}" stroke-width="5"/>${C(470, 822, '✓ Zgłoszono wykonanie', 32, '#1f7a58')}${C(870, 822, '✓ Potwierdzono', 32, '#1f7a58')}${C(1170, 822, '★★★★★', 40, '#e7a10f')}</g>`,
+  });
+
+  add(3.6, {
+    title: 'Wszystko działa', what: 'Szybkie przebitki: rynna czysta i woda płynie rurą, drukarka drukuje, drzwi zamykają się bez skrzypienia.', snd: 'muzyka, miękkie „pop”',
+    say: '—',
+    caption: '',
+    events: [[0.2, 'msg'], [0.6, 'msg'], [1.0, 'msg']],
+    svg: () => {
+      const panel = (x, bg, inner, label, dl) => `<g class="pop" ${d(dl)}><rect x="${x + 8}" y="168" width="470" height="560" rx="10" fill="${K}"/><rect x="${x}" y="160" width="470" height="560" rx="10" fill="${bg}" stroke="${K}" stroke-width="6"/>${inner}<g transform="translate(${x + 24} 650)"><rect width="${label.length * 15 + 76}" height="50" rx="25" fill="#fff" stroke="${K}" stroke-width="4"/><circle cx="26" cy="25" r="12" fill="#2ecc71" stroke="${K}" stroke-width="3"/>${C(48, 34, label, 26, K)}</g></g>`;
+      return `<rect width="1600" height="900" fill="#fffdf6"/>
+        ${sfx(800, 120, 'I PO KŁOPOCIE.', 84, '#ff7a1a', { a: 'middle', d: 0.1 })}
+        ${panel(60, '#d8e7f0', `<rect x="90" y="260" width="410" height="34" rx="6" fill="#9aa3ad" stroke="${K}" stroke-width="5"/><rect x="430" y="294" width="34" height="320" fill="#9aa3ad" stroke="${K}" stroke-width="5"/><path class="pour" d="M447 300 V610" stroke="#6fb2ff" stroke-width="10" stroke-dasharray="26 16" fill="none"/>${guy(240, 390, { s: 0.6, expr: 'happy', hair: 'short', hc: '#222', shirt: '#c0392b', noShadow: true })}`, 'Rynna czysta', 0.2)}
+        ${panel(565, '#e3eaf2', `<rect x="640" y="380" width="320" height="180" rx="16" fill="#dfe3e8" stroke="${K}" stroke-width="5"/><rect x="690" y="300" width="220" height="110" fill="#fff" stroke="${K}" stroke-width="4"/>${LINE('M710 330 H880 M710 355 H860 M710 380 H870', 5, '#c9d0d8')}<circle cx="930" cy="420" r="10" fill="#2ecc71" stroke="${K}" stroke-width="3"/>${guy(990, 430, { s: 0.45, expr: 'happy', hair: 'long', hc: '#7b3f00', shirt: '#16a085', noShadow: true })}`, 'Drukuje', 0.6)}
+        ${panel(1070, '#efe6d8', `<rect x="1180" y="240" width="250" height="400" fill="#b07a45" stroke="${K}" stroke-width="6"/><circle cx="1400" cy="450" r="12" fill="#e2c36a" stroke="${K}" stroke-width="4"/>${guy(1130, 400, { s: 0.55, expr: 'happy', hair: 'long', hc: '#8b4a2b', shirt: '#4f9a5a', noShadow: true })}${sfx(1300, 220, 'cisza', 44, '#fff', { a: 'middle', d: 1.0 })}`, 'Drzwi bez skrzypienia', 1.0)}`;
+    },
+  });
+
+  add(3.6, {
+    title: 'Zleć albo pomóż', what: 'Ekran na pół. Po lewej: „Masz coś do zrobienia? ZLEĆ.” Po prawej: „Masz chwilę? POMÓŻ I ZARÓB!”', snd: 'muzyka, dwa miękkie „swoosh”',
+    say: 'napis: „Masz coś do zrobienia? Zleć. Masz chwilę? Pomóż i zarób!”',
+    caption: '',
+    events: [[0.2, 'swoosh'], [1.2, 'swoosh']],
+    svg: () => `<rect width="800" height="900" fill="#ff7a1a"/><rect x="800" width="800" height="900" fill="#1f7a58"/><path d="M800 0 V900" stroke="${K}" stroke-width="8"/>
+      <g class="up" ${d(0.2)}>${C(400, 200, 'Masz coś do zrobienia?', 52, K, { a: 'middle' })}${sfx(400, 420, 'ZLEĆ.', 150, '#fff', { a: 'middle', d: 0.3 })}${guy(400, 520, { s: 0.75, expr: 'smirk', ...MAREK, arms: [[70, 60], [62, 168]], elbows: [[-20, 130], null] })}</g>
+      <g class="up" ${d(1.2)}>${C(1200, 200, 'Masz chwilę?', 52, '#fff', { a: 'middle' })}${sfx(1200, 400, 'POMÓŻ I ZARÓB!', 110, '#ffd23f', { a: 'middle', d: 1.3 })}${guy(1200, 520, { s: 0.75, expr: 'happy', ...PAWEL, arms: [[-62, 168], [90, -10]], elbows: [null, [90, 70]] })}</g>`,
+  });
+
+  add(4.4, {
+    title: 'I can help U', poster: true, what: 'Pomarańczowe logo z uściskiem dłoni, nazwa, hasło „Pomagaj. Zyskuj.” i „Małe problemy. Wielka ulga.” Na dole pole wyszukiwania z nazwą roboczą „IcanHelpU app”.', snd: 'końcowy akord',
+    say: '—',
+    caption: '',
+    events: [[0.3, 'success']],
+    svg: () => `<rect width="1600" height="900" fill="#ff7a1a"/>
+      <g class="pop">${LOGO(800, 240, 1.6, '#fff', '#c9500b')}</g>
+      ${sfx(800, 480, 'I CAN HELP U', 160, '#fff', { a: 'middle', d: 0.3 })}
+      ${C(800, 590, 'Pomagaj. Zyskuj.', 80, K, { a: 'middle', cls: 'fade', d: 0.8 })}
+      ${C(800, 670, 'Małe problemy. Wielka ulga.', 46, K, { a: 'middle', cls: 'fade', d: 1.3 })}
+      <g class="up" ${d(1.9)}><rect x="558" y="738" width="500" height="84" rx="42" fill="${K}"/><rect x="550" y="730" width="500" height="84" rx="42" fill="#fff" stroke="${K}" stroke-width="5"/><circle cx="604" cy="768" r="17" fill="none" stroke="${K}" stroke-width="6"/>${LINE('M616 781 L632 797', 7)}${C(820, 786, 'IcanHelpU app', 44, K, { a: 'middle' })}</g>`,
+  });
+
+  /* ============ dźwięk: realistyczny foley + nowoczesna muzyka (Web Audio) ============ */
+  let ctx = null, master = null, musicBus = null, revIn = null, noiseBuf = null, muted = false, musicNodes = [];
+  /* Eksport do pliku: dźwięk liczy OfflineAudioContext, a timeShift przesuwa „teraz” na czas zdarzenia w filmie. */
+  let timeShift = 0, exporting = false;
+  function audio() {
+    if (!ctx) buildGraph(new (window.AudioContext || window.webkitAudioContext)());
+    return ctx;
+  }
+  function buildGraph(c) {
+    {
+      ctx = c;
+      const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 3; comp.connect(ctx.destination);
+      master = ctx.createGain(); master.gain.value = muted ? 0 : 0.95; master.connect(comp);
+      musicBus = ctx.createGain(); musicBus.gain.value = 0.42; musicBus.connect(master);
+      // Pogłos: odpowiedź impulsowa pokoju (szum z wykładniczym zanikiem, stereo).
+      const len = Math.floor(ctx.sampleRate * 1.9), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (let ch = 0; ch < 2; ch++) { const data = ir.getChannelData(ch); for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3); }
+      const conv = ctx.createConvolver(); conv.buffer = ir;
+      revIn = ctx.createGain(); revIn.gain.value = 0.5; revIn.connect(conv); conv.connect(master);
+      const musicRev = ctx.createGain(); musicRev.gain.value = 0.18; musicBus.connect(musicRev); musicRev.connect(revIn);
+      noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+      const nd = noiseBuf.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    }
+  }
+  function route(g, o) {
+    g.connect(o.dest ?? master);
+    if (o.rev) { const r = ctx.createGain(); r.gain.value = o.rev; g.connect(r); r.connect(revIn); }
+  }
+  function env(g, t, o) {
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(o.vol, t + (o.attack ?? 0.005));
+    if (o.sustain) { g.gain.setValueAtTime(o.vol, t + Math.max((o.attack ?? 0.005) + 0.01, o.dur - 0.12)); g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur); }
+    else g.gain.exponentialRampToValueAtTime(0.0001, t + (o.attack ?? 0.005) + o.dur);
+  }
+  function tone(o) {
+    const c = audio(), t = o.t ?? now();
+    const osc = c.createOscillator(), g = c.createGain();
+    osc.type = o.type ?? 'sine'; osc.frequency.setValueAtTime(o.f0, t); if (o.f1) osc.frequency.exponentialRampToValueAtTime(o.f1, t + (o.glide ?? o.dur));
+    let src = osc;
+    if (o.lp) { const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.lp; osc.connect(f); src = f; }
+    env(g, t, o); src.connect(g); route(g, o); osc.start(t); osc.stop(t + (o.attack ?? 0.005) + o.dur + 0.05); return osc;
+  }
+  function noise(o) {
+    const c = audio(), t = o.t ?? now();
+    const s = c.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+    const f = c.createBiquadFilter(); f.type = o.ftype ?? 'bandpass'; f.Q.value = o.q ?? 0.8;
+    f.frequency.setValueAtTime(o.f0 ?? 1000, t); if (o.f1) f.frequency.exponentialRampToValueAtTime(o.f1, t + o.dur);
+    const g = c.createGain(); env(g, t, o);
+    let last = g;
+    if (o.pan !== undefined && c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.setValueAtTime(o.pan[0], t); p.pan.linearRampToValueAtTime(o.pan[1], t + o.dur); g.connect(p); last = p; }
+    s.connect(f).connect(g); route(last, o); s.start(t); s.stop(t + (o.attack ?? 0.005) + o.dur + 0.05); return s;
+  }
+  /* FM: elektryczne pianino (ratio 1) i dzwonek (ratio 3.5) */
+  function fm(o) {
+    const c = audio(), t = o.t ?? now();
+    const car = c.createOscillator(), mod = c.createOscillator(), mg = c.createGain(), g = c.createGain();
+    car.frequency.value = o.f; mod.frequency.value = o.f * (o.ratio ?? 1);
+    mg.gain.setValueAtTime(o.f * (o.index ?? 1.4), t); mg.gain.exponentialRampToValueAtTime(o.f * 0.08 + 0.01, t + o.dur * 0.5);
+    mod.connect(mg).connect(car.frequency);
+    env(g, t, { vol: o.vol, dur: o.dur, attack: o.attack ?? 0.004 });
+    car.connect(g); route(g, o); car.start(t); mod.start(t); car.stop(t + o.dur + 0.05); mod.stop(t + o.dur + 0.05);
+    return [car, mod];
+  }
+  let buffers = {};
+  function buffer(name, seconds, fill) {
+    const c = audio();
+    if (!buffers[name]) { const b = c.createBuffer(1, Math.floor(c.sampleRate * seconds), c.sampleRate); fill(c.sampleRate, b.getChannelData(0)); buffers[name] = b; }
+    return buffers[name];
+  }
+  function play(buf, vol, rev = 0) {
+    const c = audio(), s = c.createBufferSource(), g = c.createGain();
+    s.buffer = buf; g.gain.value = vol; s.connect(g); route(g, { rev }); s.start(now()); return s;
+  }
+  const now = () => audio().currentTime + timeShift;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
+  const SFX = {
+    sub: () => tone({ f0: 62, f1: 34, dur: 1.2, vol: 0.7 }),
+    // Kropla: trzask uderzenia + rezonans pęcherzyka (szybko rosnący ton), duży pogłos łazienki.
+    drip: () => {
+      const p = rnd(0.88, 1.15), t = now();
+      noise({ dur: 0.01, vol: 0.18, ftype: 'highpass', f0: 5000, t, rev: 0.4 });
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.setValueAtTime(600 * p, t); o.frequency.exponentialRampToValueAtTime(1850 * p, t + 0.045); o.frequency.exponentialRampToValueAtTime(2050 * p, t + 0.09);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.42, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+      o.connect(g); route(g, { rev: 0.9 }); o.start(t); o.stop(t + 0.15);
+    },
+    bucket: () => { const t = now(); tone({ f0: 520, f1: 900, dur: 0.06, vol: 0.3, t }); tone({ type: 'triangle', f0: 1850, dur: 0.5, vol: 0.05, t, rev: 0.3 }); tone({ f0: 2790, dur: 0.3, vol: 0.03, t }); },
+    // Gwóźdź: nieharmoniczne alikwoty metalu + krótki trzask.
+    tink: () => { const t = now(); [[2350, 0.4, 0.14], [5420, 0.2, 0.07], [8150, 0.1, 0.04]].forEach(([f, dur, vol]) => tone({ f0: f, dur, vol, t, rev: 0.25 })); noise({ dur: 0.012, vol: 0.3, ftype: 'highpass', f0: 4000, t }); },
+    crumble: () => { for (let i = 0; i < 10; i++) noise({ dur: rnd(0.01, 0.03), vol: rnd(0.05, 0.14), f0: rnd(1800, 4200), q: 2, t: now() + 0.05 + i * rnd(0.03, 0.06) }); },
+    thud: () => { const t = now(); tone({ f0: 115, f1: 55, dur: 0.25, vol: 0.9, t }); noise({ dur: 0.12, vol: 0.45, ftype: 'lowpass', f0: 500, t }); noise({ dur: 0.03, vol: 0.18, f0: 1300, t }); },
+    // Skrzypienie drewna: seria trzasków „stick-slip” wzbudzających rezonanse deski.
+    creak: () => play(buffer('creak', 1.2, (sr, data) => {
+      const modes = [[430, 0.014], [980, 0.009], [1720, 0.006]];
+      let next = 0;
+      for (let i = 0; i < data.length; i++) {
+        const tt0 = i / sr;
+        if (tt0 >= next) {
+          next = tt0 + 1 / (28 + 70 * Math.sin(Math.PI * Math.min(1, tt0 / 1.1)) + Math.random() * 12);
+          const amp = 0.6 + Math.random() * 0.4;
+          for (let k = 0; k < sr * 0.03 && i + k < data.length; k++) {
+            const tt = k / sr; let v = 0;
+            for (const [f, dec] of modes) v += Math.sin(2 * Math.PI * f * tt) * Math.exp(-tt / dec);
+            data[i + k] += amp * v * 0.3;
+          }
+        }
+      }
+    }), 0.3, 0.25),
+    // Szuranie: szum z nierównym „szarpaniem” (tarcie o panel).
+    scrape: () => play(buffer('scrape', 0.9, (sr, data) => {
+      let lp = 0;
+      for (let i = 0; i < data.length; i++) {
+        const tt = i / sr, grit = Math.pow(Math.abs(Math.sin(2 * Math.PI * 31 * tt + Math.sin(tt * 9))), 6);
+        lp += 0.12 * ((Math.random() * 2 - 1) - lp);
+        data[i] = lp * (0.25 + 0.75 * grit) * Math.sin(Math.PI * tt / 0.9) * 1.4;
+      }
+    }), 0.35, 0.15),
+    // Westchnienie: oddech przez dwa formanty, długie narastanie i wygaszenie.
+    sigh: () => { const t = now(); noise({ dur: 1.2, vol: 0.2, f0: 750, f1: 430, q: 1.4, attack: 0.4, t, rev: 0.15 }); noise({ dur: 1.1, vol: 0.08, f0: 1400, f1: 950, q: 2, attack: 0.4, t }); },
+    clock: (dur) => { for (let i = 0; i < Number(dur); i += 0.5) { const t = now() + i; noise({ dur: 0.006, vol: i % 1 ? 0.05 : 0.08, ftype: 'highpass', f0: 3200, t, rev: 0.3 }); tone({ f0: i % 1 ? 2300 : 2600, dur: 0.012, vol: 0.03, t }); } },
+    rain: (dur) => {
+      const D = Number(dur), t = now();
+      noise({ dur: D, vol: 0.09, f0: 1400, q: 0.5, attack: 0.3, sustain: true, t });
+      noise({ dur: D, vol: 0.04, ftype: 'highpass', f0: 5000, attack: 0.3, sustain: true, t });
+      for (let i = 0; i < D * 30; i++) noise({ dur: rnd(0.003, 0.009), vol: rnd(0.03, 0.12), ftype: 'highpass', f0: rnd(2500, 6000), t: t + Math.random() * D });
+    },
+    // Brzęczenie sieci 50 Hz z harmonicznymi.
+    hum: (dur) => { const t = now(), D = Number(dur); [[50, 0.07], [100, 0.06], [150, 0.03], [250, 0.015]].forEach(([f, vol]) => tone({ f0: f, dur: D, vol, attack: 0.05, sustain: true, t })); },
+    zap: () => { for (let i = 0; i < 6; i++) noise({ dur: rnd(0.005, 0.02), vol: rnd(0.1, 0.25), ftype: 'highpass', f0: 2500, t: now() + i * rnd(0.02, 0.05) }); },
+    fan: (dur) => noise({ dur: Number(dur), vol: 0.07, f0: 700, q: 0.6, attack: 0.4, sustain: true }),
+    // Błąd systemu: miękkie, nowoczesne dwa tony (bez piszczenia).
+    uierr: () => { const t = now(); tone({ type: 'triangle', f0: 660, dur: 0.1, vol: 0.14, t, lp: 2200 }); tone({ type: 'triangle', f0: 440, dur: 0.22, vol: 0.14, t: t + 0.11, lp: 2200 }); },
+    scribble: () => { for (let i = 0; i < 7; i++) noise({ dur: rnd(0.07, 0.14), vol: rnd(0.06, 0.1), f0: rnd(2800, 4200), q: 1.6, attack: 0.02, t: now() + i * 0.16 }); },
+    page: () => noise({ dur: 0.3, vol: 0.12, f0: 1200, f1: 3800, attack: 0.05 }),
+    riser: () => { noise({ dur: 1.0, vol: 0.28, f0: 250, f1: 5000, q: 2, attack: 0.9 }); tone({ f0: 180, f1: 720, dur: 1.0, vol: 0.05, attack: 0.9 }); },
+    impact: () => { const t = now(); tone({ f0: 70, f1: 30, dur: 1.3, vol: 0.9, t }); noise({ dur: 0.45, vol: 0.45, ftype: 'lowpass', f0: 1400, f1: 300, t, rev: 0.6 }); },
+    carpass: () => noise({ dur: 1.4, vol: 0.16, ftype: 'lowpass', f0: 380, f1: 900, attack: 0.6, pan: [-0.9, 0.9] }),
+    swoosh: () => noise({ dur: 0.35, vol: 0.14, f0: 700, f1: 3200, attack: 0.15 }),
+    tap: () => { const t = now(); tone({ f0: 1500, dur: 0.012, vol: 0.12, t }); noise({ dur: 0.005, vol: 0.05, ftype: 'highpass', f0: 6000, t }); },
+    blip: () => fm({ f: 1760, ratio: 3.5, index: 1.2, dur: 0.35, vol: 0.05, rev: 0.3 }),
+    msg: () => { const t = now(); tone({ f0: 620, f1: 1050, dur: 0.05, vol: 0.14, t }); tone({ f0: 1050, dur: 0.06, vol: 0.06, t: t + 0.05 }); },
+    shutter: () => { const t = now(); noise({ dur: 0.02, vol: 0.4, ftype: 'highpass', f0: 2500, t }); tone({ f0: 190, dur: 0.02, vol: 0.2, t }); noise({ dur: 0.03, vol: 0.28, ftype: 'highpass', f0: 2000, t: t + 0.07 }); },
+    success: () => { const t = now(); [1046.5, 1318.5, 1568].forEach((f, i) => fm({ f, ratio: 3.5, index: 1.2, dur: 1.1, vol: 0.09, t: t + i * 0.07, rev: 0.35 })); },
+    cash: () => { const t = now(); fm({ f: 1568, ratio: 3.5, index: 1, dur: 0.6, vol: 0.08, t, rev: 0.3 }); fm({ f: 2093, ratio: 3.5, index: 1, dur: 0.7, vol: 0.07, t: t + 0.08, rev: 0.3 }); noise({ dur: 0.08, vol: 0.05, ftype: 'highpass', f0: 7000, t }); },
+    // Woda przelewająca się z rynny: gęsty szum wody + pojedyncze chlupnięcia.
+    gush: (dur) => { const D = Number(dur), t = now(); noise({ dur: D, vol: 0.16, ftype: 'lowpass', f0: 900, attack: 0.3, sustain: true, t, rev: 0.2 }); noise({ dur: D, vol: 0.06, f0: 2500, q: 0.7, attack: 0.3, sustain: true, t }); for (let i = 0; i < D * 6; i++) tone({ f0: rnd(300, 600), f1: rnd(700, 1200), dur: 0.05, vol: rnd(0.05, 0.12), t: t + Math.random() * D }); },
+    // Drukarka: silnik + zgrzyt + stuknięcia mechanizmu.
+    printer: () => { const t = now(); tone({ type: 'sawtooth', f0: 95, dur: 0.9, vol: 0.07, lp: 700, attack: 0.05, sustain: true, t }); noise({ dur: 0.9, vol: 0.09, f0: 1700, q: 3, attack: 0.05, sustain: true, t }); [0.15, 0.4, 0.7].forEach((at) => noise({ dur: 0.04, vol: 0.3, ftype: 'lowpass', f0: 500, t: t + at })); },
+    // Jazda autem: niski szum silnika i opon.
+    drive: (dur) => { const D = Number(dur), t = now(); noise({ dur: D, vol: 0.1, ftype: 'lowpass', f0: 320, attack: 0.5, sustain: true, t }); tone({ type: 'sawtooth', f0: 62, dur: D, vol: 0.03, lp: 200, attack: 0.5, sustain: true, t }); },
+    // Powiadomienie w telefonie.
+    notify: () => { const t = now(); fm({ f: 1318.5, ratio: 3.5, index: 1, dur: 0.5, vol: 0.1, t, rev: 0.2 }); fm({ f: 1760, ratio: 3.5, index: 1, dur: 0.7, vol: 0.09, t: t + 0.12, rev: 0.2 }); },
+    // Klucz z grzechotką.
+    ratchet: () => { for (let i = 0; i < 7; i++) { const t = now() + i * 0.08; noise({ dur: 0.006, vol: 0.22, ftype: 'highpass', f0: 3000, t }); tone({ f0: 2100, dur: 0.01, vol: 0.05, t }); } },
+    tapclose: () => { tone({ type: 'triangle', f0: 900, f1: 640, dur: 0.22, vol: 0.06 }); noise({ dur: 0.05, vol: 0.12, ftype: 'lowpass', f0: 700 }); },
+    // Niepokojący podkład pod usterkami: niska plama z dudnieniem i oddechem powietrza.
+    underscore: () => { if (musicNodes.length === 0) startUnderscore(0); },
+    music: () => scheduleMusic(0),
+  };
+  const MUSIC_START = () => scenes.find((s) => s.music).start;
+  function stopMusic() { musicNodes.forEach((n) => { try { n.stop(); } catch { /* już zatrzymany */ } }); musicNodes = []; }
+  function startUnderscore(offset) {
+    if (!ctx) return;
+    const length = MUSIC_START() - offset;
+    if (length <= 0.3) return;
+    const t = now();
+    const fl = ctx.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 420;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.1, t + 1.5);
+    g.gain.setValueAtTime(0.1, t + length - 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t + length);
+    fl.connect(g).connect(musicBus);
+    [[110, 'sine'], [110.7, 'sine'], [130.8, 'triangle'], [164.8, 'sine']].forEach(([f, type]) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; o.connect(fl); o.start(t); o.stop(t + length + 0.1); musicNodes.push(o); });
+    musicNodes.push(noise({ dur: length, vol: 0.025, f0: 900, q: 0.4, attack: 1.2, sustain: true, t, dest: musicBus }));
+  }
+  /* Muzyka lo-fi, 88 BPM: elektryczne pianino Fmaj7–Em7–Dm7–Cmaj7, sub-bas, miękki bit, trzaski winylu, dzwonkowa melodia. */
+  function scheduleMusic(offset) {
+    if (!exporting) stopMusic();
+    if (!ctx) return;
+    const beat = 60 / 88, start = now() - offset, length = total - MUSIC_START();
+    const chords = [[174.6, 220, 261.6, 329.6], [164.8, 196, 246.9, 293.7], [146.8, 174.6, 220, 261.6], [130.8, 164.8, 196, 246.9]];
+    const roots = [87.3, 82.4, 73.4, 65.4];
+    const melody = [880, 0, 784, 659, 0, 659, 587, 0, 523, 587, 659, 0, 784, 0, 659, 0];
+    const crackle = buffer('crackle', 2, (sr, data) => { for (let i = 0; i < data.length; i++) data[i] = Math.random() < 0.0009 ? (Math.random() * 2 - 1) * 0.8 : (Math.random() * 2 - 1) * 0.01; });
+    const cs = ctx.createBufferSource(), cg = ctx.createGain(); cs.buffer = crackle; cs.loop = true; cg.gain.value = 0.18; cs.connect(cg).connect(musicBus);
+    cs.start(Math.max(now(), start)); cs.stop(start + length); musicNodes.push(cs);
+    for (let b = 0; b * beat < length - beat; b++) {
+      const t = start + b * beat;
+      if (t < now() - 0.02) continue;
+      const bar = Math.floor(b / 4) % 4, pos = b % 4, swing = beat * 0.56;
+      if (pos === 0 || pos === 2) {
+        const at = pos === 0 ? t : t + beat * 0.5;
+        chords[bar].forEach((f, i) => musicNodes.push(...fm({ f, ratio: 1, index: 1.3, dur: pos === 0 ? 1.9 : 1.1, vol: pos === 0 ? 0.075 : 0.05, t: at + i * 0.012, dest: musicBus })));
+        musicNodes.push(tone({ f0: roots[bar], dur: beat * 1.5, vol: 0.5, t: at, dest: musicBus, attack: 0.01 }));
+        musicNodes.push(tone({ f0: 115, f1: 45, dur: 0.26, vol: 0.75, t, dest: musicBus }));
+      }
+      if (pos === 1 || pos === 3) { musicNodes.push(noise({ dur: 0.14, vol: 0.2, f0: 1900, q: 0.7, t, dest: musicBus })); musicNodes.push(tone({ f0: 190, dur: 0.06, vol: 0.12, t, dest: musicBus })); }
+      musicNodes.push(noise({ dur: 0.025, vol: 0.05, ftype: 'highpass', f0: 8000, t, dest: musicBus }));
+      musicNodes.push(noise({ dur: 0.025, vol: 0.035, ftype: 'highpass', f0: 8000, t: t + swing, dest: musicBus }));
+      if (b >= 16) { const n = melody[b % 16]; if (n) musicNodes.push(...fm({ f: n, ratio: 3.5, index: 1.1, dur: 0.9, vol: 0.05, t, dest: musicBus })); }
+    }
+    const end = start + length - 1.2;
+    if (end > now()) chords[0].concat([523.2, 659.3]).forEach((f, i) => musicNodes.push(...fm({ f, ratio: i > 3 ? 3.5 : 1, index: 1.2, dur: 2.4, vol: 0.07, t: end + i * 0.04, dest: musicBus })));
+  }
+  function fire(event) {
+    if (muted || !ctx) return;
+    const [name, ...args] = event.split(':');
+    try { SFX[name]?.(...args); } catch { /* dźwięk nie jest krytyczny */ }
+  }
+
+  /* ============ odtwarzacz ============ */
+  const film = document.getElementById('film'), layer = document.getElementById('layer'), caption = document.getElementById('caption');
+  const progress = document.getElementById('progress'), timeEl = document.getElementById('time'), poster = document.getElementById('poster');
+  const playBtn = document.getElementById('play'), shotsEl = document.getElementById('shots');
+  let t = 0, playing = false, last = performance.now(), current = -1, fired = new Set();
+
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  scenes.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'shot';
+    const tag = s.tag === 'z' ? '<span class="tag z">Zlecam</span>' : s.tag === 'p' ? '<span class="tag p">Pomagam</span>' : '';
+    b.innerHTML = `<span class="tc">${fmt(s.start)}–${fmt(s.start + s.dur)}</span><span><b>${i + 1}. ${s.title}${tag}</b><span class="what">${s.what}${s.say && s.say !== '—' ? ` <i>${s.say}</i>` : ''}</span></span><span class="snd">${s.snd}</span>`;
+    b.addEventListener('click', () => { seek(i); if (!playing) start(); film.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+    shotsEl.appendChild(b);
+  });
+
+  function render(i) {
+    current = i;
+    const s = scenes[i];
+    layer.innerHTML = `<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice"><g class="cam" style="animation-duration:${s.dur}s">${s.svg()}</g></svg>`;
+    const span = caption.querySelector('span');
+    caption.classList.remove('show');
+    span.hidden = !s.caption; span.textContent = s.caption;
+    void caption.offsetWidth;
+    if (s.caption) caption.classList.add('show');
+    [...shotsEl.children].forEach((b, n) => b.setAttribute('aria-current', String(n === i)));
+    // Pauza zatrzymuje scenę; kadr spoczynkowy pod przyciskiem „Odtwórz” gra swoje animacje.
+    if (!playing && poster.hidden) layer.querySelector('svg')?.pauseAnimations?.();
+  }
+  const sceneAt = (time) => { for (let i = scenes.length - 1; i >= 0; i--) if (time >= scenes[i].start) return i; return 0; };
+
+  function seek(i) {
+    t = scenes[i].start;
+    fired = new Set();
+    if (ctx) {
+      stopMusic();
+      if (playing && t >= MUSIC_START()) scheduleMusic(t - MUSIC_START());
+      else if (playing && t > 0) startUnderscore(t); // od zera podkład włącza zdarzenie pierwszej sceny
+    }
+    render(i);
+  }
+  function start() {
+    audio();
+    if (ctx.state === 'suspended') ctx.resume();
+    if (t >= total) seek(0);
+    playing = true; poster.hidden = true; film.classList.remove('paused'); playBtn.textContent = 'Pauza';
+    layer.querySelector('svg')?.unpauseAnimations?.();
+    if (musicNodes.length === 0) {
+      if (t >= MUSIC_START()) scheduleMusic(t - MUSIC_START());
+      else if (t > 0) startUnderscore(t);
+    }
+    last = performance.now();
+  }
+  function pause() {
+    playing = false; film.classList.add('paused'); playBtn.textContent = 'Odtwórz';
+    layer.querySelector('svg')?.pauseAnimations?.();
+    if (ctx && ctx.state === 'running') ctx.suspend();
+  }
+  function frame(nowMs) {
+    const dt = Math.min(0.1, (nowMs - last) / 1000); last = nowMs;
+    if (playing) {
+      t += dt;
+      if (t >= total) { t = total; pause(); musicNodes = []; poster.hidden = false; document.getElementById('bigPlay').innerHTML = '↻ Jeszcze raz <small>ok. 1 min · z dźwiękiem</small>'; }
+      const i = sceneAt(Math.min(t, total - 0.001));
+      if (i !== current) render(i);
+      const s = scenes[i], local = t - s.start;
+      s.events.forEach(([at, ev], k) => { const key = `${i}:${k}`; if (local >= at && !fired.has(key)) { fired.add(key); fire(ev); } });
+    }
+    progress.style.width = `${(t / total) * 100}%`;
+    timeEl.textContent = `${fmt(t)} / ${fmt(total)}`;
+    requestAnimationFrame(frame);
+  }
+
+  document.querySelectorAll('.see').forEach((btn) => btn.addEventListener('click', () => {
+    const i = scenes.findIndex((s) => s.title === btn.dataset.scene);
+    if (i < 0) return;
+    seek(i); if (!playing) start(); film.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }));
+  document.getElementById('bigPlay').addEventListener('click', () => { if (t >= total) seek(0); start(); });
+  playBtn.addEventListener('click', () => (playing ? pause() : start()));
+  document.getElementById('restart').addEventListener('click', () => { seek(0); start(); });
+  const muteBtn = document.getElementById('mute');
+  muteBtn.addEventListener('click', () => {
+    muted = !muted; muteBtn.textContent = muted ? 'Dźwięk: wył.' : 'Dźwięk: wł.'; muteBtn.setAttribute('aria-pressed', String(muted));
+    if (master) master.gain.value = muted ? 0 : 0.95;
+  });
+  document.getElementById('full').addEventListener('click', () => { film.requestFullscreen?.().catch(() => { /* niedostępne w tym widoku */ }); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && playing) pause(); });
+
+  /* ===== Eksport do pliku wideo (marketing/spot/render-video.mjs): klatka po klatce + dźwięk offline ===== */
+  function wavBase64(buf) {
+    const ch = [buf.getChannelData(0), buf.getChannelData(buf.numberOfChannels > 1 ? 1 : 0)], n = buf.length;
+    const out = new DataView(new ArrayBuffer(44 + n * 4));
+    const str = (o, s) => [...s].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)));
+    str(0, 'RIFF'); out.setUint32(4, 36 + n * 4, true); str(8, 'WAVE'); str(12, 'fmt ');
+    out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 2, true); out.setUint32(24, buf.sampleRate, true);
+    out.setUint32(28, buf.sampleRate * 4, true); out.setUint16(32, 4, true); out.setUint16(34, 16, true); str(36, 'data'); out.setUint32(40, n * 4, true);
+    for (let i = 0, o = 44; i < n; i++) for (let c = 0; c < 2; c++, o += 2) out.setInt16(o, Math.max(-1, Math.min(1, ch[c][i])) * 0x7fff, true);
+    const bytes = new Uint8Array(out.buffer);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  window.__spot = {
+    total,
+    scenes: scenes.map((s) => ({ title: s.title, start: s.start, dur: s.dur })),
+    enterExport() { document.documentElement.classList.add('export'); poster.hidden = true; playing = false; current = -1; },
+    /* Klatka dla czasu `time` (s): scena + wszystkie animacje CSS i SVG ustawione dokładnie na ten moment. */
+    renderAt(time) {
+      const i = sceneAt(Math.min(time, total - 0.001));
+      if (i !== current) render(i);
+      const local = time - scenes[i].start;
+      film.classList.remove('paused');
+      document.getAnimations().forEach((a) => { a.pause(); a.currentTime = local * 1000; });
+      const svg = layer.querySelector('svg');
+      svg?.pauseAnimations?.(); svg?.setCurrentTime?.(local);
+    },
+    /* Cała ścieżka dźwiękowa (efekty + muzyka) policzona offline → WAV w base64. */
+    async renderAudio() {
+      exporting = true;
+      const sr = 48000, off = new OfflineAudioContext(2, Math.ceil(sr * (total + 0.5)), sr);
+      buffers = {}; musicNodes = [];
+      buildGraph(off);
+      scenes.forEach((s) => s.events.forEach(([at, ev]) => { timeShift = s.start + at; fire(ev); }));
+      timeShift = 0;
+      return wavBase64(await off.startRendering());
+    },
+  };
+
+  // Kadr spoczynkowy: logo i dwie role.
+  render(scenes.findIndex((s) => s.poster));
+  t = 0;
+  [...shotsEl.children].forEach((b) => b.setAttribute('aria-current', 'false'));
+  requestAnimationFrame(frame);
+})();
+</script>

@@ -41,6 +41,14 @@ export class AnnouncementContentComponent {
     const { categoryId, subcategoryId } = this.announcement();
     return this.categories.path(categoryId, subcategoryId);
   });
+  /**
+   * Cena z przyjętej oferty – po akceptacji liczy się ona, nie budżet z ogłoszenia (np. 30 zł → umówione 35 zł).
+   * Ofertę widzi właściciel i przyjęty pomocnik; obcy dostają budżet.
+   */
+  protected readonly agreedPrice = computed(() => {
+    const { acceptedOfferId, offers } = this.announcement();
+    return acceptedOfferId ? offers.find((offer) => offer.id === acceptedOfferId)?.price.amount : undefined;
+  });
   /** „Brak ofert” / „1 oferta” / „3 oferty” – etykieta pod tytułem. */
   protected readonly offersLabel = computed(() => {
     const count = this.announcement().helperCount;

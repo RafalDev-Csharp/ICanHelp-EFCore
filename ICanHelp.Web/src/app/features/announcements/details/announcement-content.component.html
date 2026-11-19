@@ -12,7 +12,13 @@
 <section class="ion-padding summary">
   <ion-badge [color]="statusColor(item.status)">{{ statusLabel(item.status) }}</ion-badge>
   <h1>{{ item.title }}</h1>
-  <p class="budget">{{ item.budget.amount | price }}</p>
+  @if (agreedPrice(); as agreed) {
+    <p class="budget" data-testid="agreed-price">
+      {{ agreed | price }} <span class="agreed">uzgodniona cena</span>
+    </p>
+  } @else {
+    <p class="budget">{{ item.budget.amount | price }}</p>
+  }
   <p class="meta">
     Dodane {{ item.createdAt | timeAgo }}
     @if (item.updatedAt) {

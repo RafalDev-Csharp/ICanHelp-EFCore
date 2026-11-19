@@ -506,5 +506,9 @@
   (`GeocodingService.suggest` – Photon, od 3 znaków, 400 ms, ramka Polski, `lang=default`; Enter / lupa – dalej Nominatim).
   Ciemniejszy okrąg promienia i pas trasy. `verify.cmd`: dotnet 615/615 (Core 271, Application 225, integracyjne 119),
   Vitest 442/442, lint + build zielone; ręcznie w przeglądarce: alert „cała Polska” + podgląd, podpowiedzi adresu, okrąg.
+  Start jednym poleceniem: `start-all.cmd` (= `serve-local.ps1 -Tunnel`: Docker, build frontu, API 7080/5080 i cloudflared
+  w tle na 5080 – adres `*.trycloudflare.com` wypisany na zielono, log `.verify\cloudflared.log`, Ctrl+C zamyka oba;
+  osobne `dotnet run` niepotrzebne). Sprawdzone: `/health` 200 lokalnie i przez tunel.
+  Uprawnienia: `.claude/settings.json` – reguły `PowerShell(…)` dla verify / dotnet / npm / git i odczytu przeglądarki.
 - [ ] Krok 16 – „jestem w okolicy” na żądanie
 - [ ] Krok 17 (później) – aplikacja w sklepach + tryb automatyczny

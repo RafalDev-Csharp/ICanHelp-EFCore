@@ -9,7 +9,8 @@
       fill="outline"
       interface="action-sheet"
       cancelText="Anuluj"
-      errorText="Wybierz kategorię."
+      [class.quiet-errors]="!submitted()"
+      [errorText]="submitted() ? 'Wybierz kategorię.' : ''"
     >
       @for (category of categories.categories(); track category.id) {
         <ion-select-option [value]="category.id">{{ category.name }}</ion-select-option>
@@ -22,7 +23,8 @@
       fill="outline"
       interface="action-sheet"
       cancelText="Anuluj"
-      errorText="Wybierz podkategorię."
+      [class.quiet-errors]="!submitted()"
+      [errorText]="submitted() ? 'Wybierz podkategorię.' : ''"
     >
       @for (subcategory of categories.subcategoriesOf(categoryId()); track subcategory.id) {
         <ion-select-option [value]="subcategory.id">{{ subcategory.name }}</ion-select-option>

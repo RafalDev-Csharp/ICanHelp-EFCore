@@ -370,3 +370,6 @@ App_Data/
 
 # Krok F10: kopia zbudowanego frontendu (serve-local.cmd)
 ICanHelp.Api/wwwroot/
+
+# Spot reklamowy – wygenerowane wideo i dźwięk (marketing\spot\render-spot.cmd)
+marketing/spot/out/

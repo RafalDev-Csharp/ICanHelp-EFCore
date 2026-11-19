@@ -1,0 +1,331 @@
+<title>Produkcja spotu I can help U</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Układ: jedna kolumna kroków produkcji (jak lista ujęć na planie), w każdym kroku karty z tekstem do skopiowania. */
+:root {
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --ink: #1d2420;
+  --muted: #5f6a64;
+  --line: #dfe3dc;
+  --accent: #c9500b;     /* pomarańcz marki */
+  --accent-soft: #fbe8da;
+  --helper: #1f7a58;
+  --code-bg: #f1f2ee;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #131715; --surface: #1b211e; --ink: #e8ede9; --muted: #a0aaa4; --line: #2e3632; --accent: #ff8a3d; --accent-soft: #3a2516; --helper: #4cc895; --code-bg: #222a26; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #131715; --surface: #1b211e; --ink: #e8ede9; --muted: #a0aaa4; --line: #2e3632; --accent: #ff8a3d; --accent-soft: #3a2516; --helper: #4cc895; --code-bg: #222a26; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 1rem; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 960px; margin: 0 auto; padding-block: 28px 64px; display: grid; gap: 40px; }
+h1, h2, h3 { font-family: var(--display); margin: 0; line-height: 1.15; text-wrap: balance; }
+h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800; }
+h2 { font-size: 1.45rem; font-weight: 800; display: flex; gap: 12px; align-items: baseline; }
+h2 .n { font-size: .85rem; font-weight: 700; color: #fff; background: var(--accent); border-radius: 999px; padding: 2px 10px; letter-spacing: .04em; flex: none; }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; }
+.lead { color: var(--muted); max-width: 68ch; font-size: 1.05rem; }
+.muted { color: var(--muted); }
+section { display: grid; gap: 16px; }
+a { color: var(--accent); }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+
+.needs { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.need { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 4px; }
+.need b { font-size: .95rem; }
+.need span { color: var(--muted); font-size: .9rem; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; display: grid; gap: 10px; min-width: 0; }
+.card header { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: baseline; justify-content: space-between; }
+.card .id { font-family: var(--mono); font-size: .8rem; font-weight: 500; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 2px 8px; }
+.card .meta { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.copybox { position: relative; background: var(--code-bg); border-radius: 10px; padding: 12px 14px; padding-right: 96px; font-family: var(--mono); font-size: .86rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
+.copybox.pl { font-family: var(--body); font-size: 1rem; }
+.copy { position: absolute; top: 8px; right: 8px; font: inherit; font-family: var(--body); font-size: .8rem; font-weight: 700; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+.copy:hover { border-color: var(--accent); color: var(--accent); }
+.copy.done { background: var(--helper); border-color: var(--helper); color: #fff; }
+.copy:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.tip { font-size: .9rem; color: var(--muted); }
+.tip b { color: var(--ink); }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+
+.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 10px; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: start; }
+.steps li::before { content: counter(s); width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-size: .8rem; font-weight: 700; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: .92rem; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; background: var(--code-bg); }
+tr:last-child td { border-bottom: 0; }
+td.t { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; }
+td .src { font-family: var(--mono); font-size: .8rem; color: var(--accent); }
+tr.app td { background: color-mix(in srgb, var(--helper) 7%, transparent); }
+
+.warn { border-left: 4px solid var(--accent); background: var(--surface); border-radius: 0 12px 12px 0; padding: 12px 16px; display: grid; gap: 6px; }
+@media (max-width: 640px) { .grid2 { grid-template-columns: minmax(0, 1fr); } .copybox { padding-right: 14px; padding-top: 42px; } }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:12px">
+    <h1>Produkcja spotu I can help U</h1>
+    <p class="lead">Wszystko, czego potrzeba, żeby z gotowego scenariusza zrobić realistyczną reklamę ok. 60 s. Kopiujesz teksty przyciskiem
+      <b>Kopiuj</b> i wklejasz w podane miejsca. Sceny z ludźmi robi generator wideo AI, ekrany aplikacji bierzemy z gotowego pliku
+      <code>icanhelp-spot.mp4</code>, a całość składasz w darmowym Clipchamp.</p>
+  </header>
+
+  <section>
+    <h2><span class="n">0</span>Co będzie potrzebne</h2>
+    <div class="needs">
+      <div class="need"><b>Generator wideo AI</b><span>Kling AI (klingai.com) albo Hailuo (hailuoai.video). Darmowe dzienne kredyty – zaloguj się kontem Google.</span></div>
+      <div class="need"><b>Clipchamp</b><span>Darmowy edytor w Windows 11 (Start → wpisz „Clipchamp”) albo w przeglądarce: clipchamp.com.</span></div>
+      <div class="need"><b>Telefon</b><span>Do nagrania 6 krótkich okrzyków bohaterów Twoim głosem (dyktafon). Brzmi naturalniej niż każdy lektor AI.</span></div>
+      <div class="need"><b>Plik icanhelp-spot.mp4</b><span>Masz go już: <code>marketing\spot\out\</code>. Z niego bierzemy ekrany aplikacji, logo i hasła.</span></div>
+      <div class="need"><b>Muzyka i efekty</b><span>YouTube Studio → Biblioteka audio albo pixabay.com/music. Darmowe, także do reklamy.</span></div>
+      <div class="need"><b>Ok. 2–3 wieczory</b><span>Darmowe kredyty starczają na kilka klipów dziennie, a część klipów trzeba wygenerować ponownie.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">1</span>Wygeneruj sceny z ludźmi (10 klipów)</h2>
+    <p class="muted">W generatorze wybierz <b>Tekst na wideo</b> (Text to Video), proporcje <b>16:9</b>, długość <b>5 s</b>. Wklej opis sceny,
+      a w polu <b>Negative prompt</b> (czego unikać) wklej tekst poniżej. Opisy są po angielsku, bo tak generatory działają najlepiej.
+      Z każdego klipu wykorzystasz 1–4 s – najlepszy fragment wybierzesz przy montażu.</p>
+    <div class="card">
+      <header><h3>Negative prompt – ten sam do każdego klipu</h3></header>
+      <div class="copybox" data-copy>text, subtitles, captions, watermark, logo, brand names, distorted hands, extra fingers, deformed face, blurry, low quality, cartoon, 3D render, oversaturated</div>
+    </div>
+    <div id="clips" style="display:grid;gap:12px"></div>
+    <div class="warn">
+      <b>Jak zachować tę samą twarz w kilku klipach</b>
+      <p class="muted">Bohater z kranem (klip P1b) wraca w klipach S2 i S3a. Po wygenerowaniu P1b zrób zrzut ekranu jego twarzy
+        i przy S2 oraz S3a wybierz <b>Obraz na wideo</b> (Image to Video) z tym zrzutem jako punktem startu. Tak samo pomocnik z S1 w klipie S2.
+        Jeśli twarz i tak się zmieni – nic nie szkodzi, widz rzadko to zauważa przy ujęciach po 1–3 s.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>Nagraj okrzyki bohaterów</h2>
+    <p class="muted">Dyktafon w telefonie, cichy pokój, telefon 20 cm od ust. Każdy tekst 3–4 razy, z przesadną emocją – wybierzesz najlepszy.
+      Możesz poprosić o pomoc kogoś z rodziny (kobiece głosy w P3 i P5). Jeśli nie chcesz nagrywać – w Clipchamp dodaj je jako napisy-dymki.</p>
+    <div class="grid2" id="shouts"></div>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Lektor po polsku (Clipchamp, zamiana tekstu na mowę)</h2>
+    <p class="muted">W Clipchamp: <b>Nagraj i utwórz</b> → <b>Zamiana tekstu na mowę</b> → język <b>polski</b> → wybierz głos (posłuchaj kilku,
+      wybierz spokojny i ciepły) → wklej tekst → <b>Zapisz do multimediów</b>. Każdy fragment osobno, wtedy łatwo go ustawić na osi czasu.
+      Szybkość mowy: normalna albo trochę wolniej.</p>
+    <div style="display:grid;gap:10px" id="voice"></div>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>Muzyka i efekty dźwiękowe</h2>
+    <div class="grid2">
+      <div class="card">
+        <h3>Muzyka (YouTube Studio → Biblioteka audio)</h3>
+        <ul class="plain">
+          <li><b>0:00–0:18</b> – cichy, niepokojący podkład. Filtr: nastrój <i>Mroczny</i> albo <i>Dramatyczny</i>, bez wokalu.</li>
+          <li><b>0:18–1:00</b> – pogodny utwór. Filtr: nastrój <i>Szczęśliwy</i> albo <i>Inspirujący</i>, gatunek <i>Pop</i>, bez wokalu.</li>
+          <li>Wybieraj utwory z oznaczeniem <b>„Atrybucja nie jest wymagana”</b>.</li>
+          <li>Pod lektorem ścisz muzykę do ok. <b>20–30%</b>.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Efekty (Biblioteka audio → Efekty dźwiękowe albo pixabay.com/sound-effects)</h3>
+        <p class="muted">Szukaj po angielsku:</p>
+        <div class="copybox" data-copy>water drip, hammer hit, door creak, heavy rain, gutter overflow, printer jam, car interior, phone notification, success chime</div>
+        <p class="tip">Generatory z dźwiękiem (np. Google Veo) dodają odgłosy same – wtedy ten krok możesz pominąć.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">5</span>Oś czasu – co, gdzie i kiedy</h2>
+    <p class="muted">Zielone wiersze to fragmenty z Twojego pliku <code>icanhelp-spot.mp4</code> – wycinasz z niego <b>dokładnie te same sekundy</b>,
+      w których mają się pojawić w filmie. Pozostałe to klipy z generatora.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Czas</th><th>Obraz</th><th>Dźwięk</th><th>Lektor / napis</th></tr></thead>
+        <tbody id="timeline"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">5b</span>Prawdziwe ekrany aplikacji (zamiast animowanych)</h2>
+    <p class="muted">Nagrałem prawdziwą aplikację na kontach demo: Marek zleca, Tomek pomaga. Pliki są w <code>marketing\spot\out\app\</code>,
+      każdy w dwóch wersjach: <b>-16x9.mp4</b> (telefon na pomarańczowym tle, do filmu na YouTube) i <b>-pion.mp4</b> (na TikToka i Reels).
+      Nagrania trwają dłużej niż miejsca w filmie, więc w Clipchamp zaznacz klip → <b>Prędkość</b> i przyspiesz go albo wytnij najciekawszy kawałek.
+      Możesz nimi zastąpić zielone wiersze z tabeli albo dołożyć je obok animacji.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Plik</th><th>Co widać</th><th>Długość</th><th>Gdzie w filmie</th><th>Prędkość</th></tr></thead>
+        <tbody>
+          <tr><td><span class="src">1-alert</span></td><td>Tomek ustawia alert „w okolicy”: hydraulika, Piotrkowska, 5 km</td><td class="t">ok. 14 s</td><td>0:32.5–0:35.5 (po klipie S1)</td><td>×4–5</td></tr>
+          <tr><td><span class="src">2-zlecam</span></td><td>Marek dodaje zlecenie: kategoria, opis, 30 zł, adres, zdjęcie, „Opublikuj”</td><td class="t">ok. 22 s</td><td>0:22.5–0:29.5</td><td>×3</td></tr>
+          <tr><td><span class="src">3-oferta</span></td><td>Tomek dostaje powiadomienie z alertu, otwiera ogłoszenie i składa ofertę: 35 zł, dziś 17:30–18:00, wiadomość</td><td class="t">ok. 19 s</td><td>0:35.5–0:39.5</td><td>×5</td></tr>
+          <tr><td><span class="src">4-przyjecie</span></td><td>Marek otwiera rozmowę i klika „Przyjmij”</td><td class="t">ok. 9 s</td><td>0:39.5–0:42.5</td><td>×3</td></tr>
+          <tr><td><span class="src">5-realizacja</span></td><td>Tomek: „Rozpocznij zlecenie”, potem „Zgłoś wykonanie”</td><td class="t">ok. 10 s</td><td>wstawka 1–2 s w trakcie S2</td><td>×5 albo wycinek</td></tr>
+          <tr><td><span class="src">6-potwierdzenie</span></td><td>Marek: „Potwierdź wykonanie” i ocena ★★★★★ z komentarzem</td><td class="t">ok. 13 s</td><td>wstawka 1–2 s po S2</td><td>×6 albo wycinek</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="tip"><b>Wskazówka:</b> przy przyspieszeniu napisy w aplikacji migają szybko – zatrzymaj obraz na 1 s na najważniejszym ekranie
+      (np. karta oferty „35 zł, dziś 17:30–18:00”): w Clipchamp ustaw suwak, <b>Podziel</b> i dla kawałka ustaw prędkość ×0,25 albo dodaj stopklatkę.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">6</span>Montaż w Clipchamp krok po kroku</h2>
+    <ol class="steps">
+      <li><span><b>Nowy projekt.</b> Otwórz Clipchamp, zaloguj się kontem Microsoft i kliknij <b>Utwórz nowy film</b>. Proporcje zostaw <b>16:9</b>.</span></li>
+      <li><span><b>Import.</b> Kliknij <b>Importuj multimedia</b> i dodaj wszystko: klipy z generatora, nagrania okrzyków, fragmenty lektora, muzykę, efekty i <code>icanhelp-spot.mp4</code>.</span></li>
+      <li><span><b>Klipy po kolei.</b> Przeciągaj klipy na oś czasu w kolejności z tabeli. Zaznacz klip i przeciągnij jego krawędź, żeby skrócić go do podanego czasu.</span></li>
+      <li><span><b>Ekrany aplikacji.</b> Przeciągnij <code>icanhelp-spot.mp4</code> na oś. Ustaw suwak na podanej sekundzie i użyj <b>Podziel</b> (nożyczki albo klawisz S). Niepotrzebne kawałki usuń klawiszem Delete. Wycisz dźwięk tego pliku (ikona głośnika na klipie) – muzykę dajemy własną.</span></li>
+      <li><span><b>Okrzyki i lektor.</b> Przeciągnij nagrania na ścieżkę pod obrazem, na podany czas. Okrzyk powinien zaczynać się razem z miną bohatera.</span></li>
+      <li><span><b>Muzyka.</b> Dodaj dwa utwory na osobnej ścieżce: niepokojący do 0:18, pogodny od 0:18. Na styku dodaj wyciszenie (<b>Zanikanie</b> w ustawieniach dźwięku). Ścisz pod lektorem.</span></li>
+      <li><span><b>Napisy.</b> Zakładka <b>Tekst</b> → wybierz prosty styl → wpisz tekst z tabeli → ustaw czas. Dla okrzyków możesz użyć stylu dymka.</span></li>
+      <li><span><b>Przejścia.</b> Między scenami problemów zwykłe cięcia (wyglądają najbardziej dynamicznie). Krótkie <b>Przenikanie</b> tylko przed 0:18, gdy zaczyna się rozwiązanie.</span></li>
+      <li><span><b>Sprawdzenie.</b> Obejrzyj całość dwa razy: raz z dźwiękiem, raz bez – napisy muszą wystarczyć, bo w mediach społecznościowych większość ludzi ogląda bez dźwięku.</span></li>
+      <li><span><b>Eksport.</b> Kliknij <b>Eksportuj</b> → <b>1080p</b>. Gotowe – plik możesz wrzucić na YouTube albo wysłać.</span></li>
+    </ol>
+    <p class="tip">Nazwy przycisków w Clipchamp mogą się trochę różnić w zależności od wersji – szukaj podobnie brzmiących.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">7</span>Zanim opublikujesz</h2>
+    <div class="warn">
+      <b>Licencje</b>
+      <p class="muted">Darmowe plany generatorów AI często dodają znak wodny i nie pozwalają na użycie komercyjne. Do pokazania znajomym i testów
+        wystarczą. Przed płatną kampanią wykup jeden miesiąc planu (zwykle 10–30 zł) i wygeneruj klipy jeszcze raz w nim. Ceny i limity
+        zmieniają się często – sprawdź przy zakładaniu konta.</p>
+    </div>
+    <div class="warn">
+      <b>Bezpieczeństwo w kadrze</b>
+      <p class="muted">Pomocnik przy rynnie stoi na wysokiej, stabilnej drabinie. Kierowca patrzy na telefon tylko na czerwonym świetle (opis S1 to uwzględnia).
+        Nie pokazujemy prac przy elektryce – reklama nie powinna zachęcać do niebezpiecznych napraw bez uprawnień.</p>
+    </div>
+    <div class="warn">
+      <b>Nazwa i adres</b>
+      <p class="muted">Na końcu jest robocza nazwa „IcanHelpU app”. Gdy ustalisz ostateczną nazwę i adres strony, podmienię to w pliku spotu
+        i wygeneruję nowy <code>icanhelp-spot.mp4</code> jednym poleceniem.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const STYLE = 'Photorealistic cinematic TV commercial look, natural lighting, shallow depth of field, 35mm lens, modern Polish home, subtle humor, 16:9.';
+  const clips = [
+    { id: 'P1a', when: '0:00–0:02', use: '2 s', title: 'Kran w nocy – zbliżenie',
+      prompt: 'Extreme close-up of a chrome kitchen faucet at night in a dark apartment kitchen. A single drop of water slowly forms and falls into a steel sink, then another. Cold moonlight from the window, quiet atmosphere, slow motion.',
+      tip: 'Ujęcie otwierające – ma być ładne i ciche, żeby kapanie było słychać.' },
+    { id: 'P1b', when: '0:02–0:04', use: '2 s', title: 'Bohater nie może spać',
+      prompt: 'A man in his 30s lies in bed at night in a dark bedroom. His eyes suddenly open wide, he stares at the ceiling, then slowly turns his head toward the bedside alarm clock showing 3:12. Exhausted, annoyed expression, he exhales heavily. Dim blue moonlight.',
+      tip: 'Zrób zrzut jego twarzy – przyda się w S2 i S3a.' },
+    { id: 'P2', when: '0:04–0:07.6', use: '3,6 s', title: 'Młotek i palec',
+      prompt: 'A man in his 40s at home tries to hammer a nail into a red brick wall to hang a picture. The nail bends. He hits again and accidentally hits his own thumb, drops the hammer and shakes his hand with a comedic pained grimace. The picture frame still lies on the floor. Bright living room.',
+      tip: 'Jeśli generator pokaże coś zbyt drastycznego, dopisz na końcu: „lighthearted, no injury visible”.' },
+    { id: 'P3', when: '0:07.6–0:10.6', use: '3 s', title: 'Skrzypiące drzwi',
+      prompt: 'A woman in her 30s tries to close an interior wooden door that scrapes along the wooden floor, leaving visible scratch marks. She pushes harder, the door sticks, she rolls her eyes and sighs in frustration. Include a close-up of the bottom edge of the door scraping the floor.',
+      tip: 'Dobry jest też sam detal krawędzi drzwi na podłodze – wtedy wystarczą 2 s.' },
+    { id: 'P4', when: '0:10.6–0:14.6', use: '4 s', title: 'Zatkana rynna',
+      prompt: 'Heavy autumn rain. A roof gutter clogged with wet leaves overflows and water pours over its edge like a waterfall right next to the front door of a suburban house. The homeowner, a man in his 50s, steps out under the porch, looks up at the gutter, then at his empty hands, and shakes his head helplessly.',
+      tip: 'To ostatnia scena problemu przed zwrotem – bezradna mina na końcu jest najważniejsza.' },
+    { id: 'P5', when: '0:14.6–0:18', use: '3,4 s', title: 'Drukarka',
+      prompt: 'A young woman at a home office desk clicks print on her laptop. The printer next to her makes grinding movements, a red warning light blinks and paper jams halfway out. An error message appears on the laptop screen. She puts both hands on her head in disbelief.',
+      tip: 'Pokazuje, że aplikacja to nie tylko naprawy domowe.' },
+    { id: 'S1', when: '0:29.5–0:32.5', use: '3 s', title: 'Pomocnik w aucie dostaje powiadomienie',
+      prompt: 'A friendly handyman in his 40s in work clothes and a cap drives home after work in the late afternoon. His car is stopped at a red traffic light. His smartphone in a dashboard holder lights up with a notification, he glances at it, smiles and nods, then turns on the indicator. Warm golden-hour light.',
+      tip: 'Telefon tylko na czerwonym świetle – nie promujemy patrzenia w telefon podczas jazdy. Zrób zrzut jego twarzy do S2.' },
+    { id: 'S2', when: '0:42.5–0:48', use: '5,5 s', title: 'Naprawa i ulga',
+      prompt: 'The same friendly handyman with a toolbox in a modern apartment kitchen replaces the washer in a dripping kitchen faucet with a wrench while the apartment owner, a man in his 30s in a t-shirt, watches. The faucet stops dripping, a moment of silence, both smile with relief and shake hands.',
+      tip: 'Najlepiej jako Obraz na wideo ze zrzutem twarzy z P1b albo S1. W Clipchamp dodaj nad pomocnikiem napis „+35 zł”.' },
+    { id: 'S3a', when: '0:48–0:49.2', use: '1,2 s', title: 'Spokojny sen',
+      prompt: 'The same man from the night scene sleeps peacefully in bed at night with a calm smile. In the background the kitchen faucet is dry and silent. Soft blue moonlight, calm atmosphere.',
+      tip: 'Kontrast do pierwszej sceny – ten sam pokój, tylko spokój.' },
+    { id: 'S3b', when: '0:49.2–0:50.4', use: '1,2 s', title: 'Czysta rynna',
+      prompt: 'A clean roof gutter after rain, water flows properly down the downpipe. A handyman standing on a tall, secure ladder with a safety stabilizer gives a thumbs up. Fresh, bright light after the rain.',
+      tip: 'Wysoka, stabilna drabina – pokazujemy bezpieczną pracę na wysokości.' },
+    { id: 'S3c', when: '0:50.4–0:51.6', use: '1,2 s', title: 'Drukarka działa',
+      prompt: 'A young woman at a home office desk smiles with relief as her printer smoothly prints a document. Bright, cheerful daylight.',
+      tip: 'Może być ta sama kobieta co w P5 – użyj zrzutu z P5 jako obrazu startowego.' },
+  ];
+  const shouts = [
+    ['P1b', 'No nie… znowu?!', 'zmęczony, z westchnieniem'],
+    ['P2', 'Aaaa! No ja nie mogę!', 'ból i złość naraz'],
+    ['P3', 'Eeech…', 'długie westchnienie'],
+    ['P4', 'No pięknie…', 'ironicznie, z rezygnacją'],
+    ['P5', 'No przecież zaraz oszaleję!', 'szybko, z irytacją'],
+    ['S2', 'Ufff…', 'ulga, z uśmiechem'],
+  ];
+  const voice = [
+    ['L1', '0:18.3', 'Małe problemy potrafią zepsuć cały dzień. Ale nie musisz radzić sobie z nimi sam.'],
+    ['L2', '0:23.0', 'Dodaj zlecenie: zdjęcie, opis i twoja cena.'],
+    ['L3', '0:30.0', 'Znasz się na czymś? Masz narzędzia? Zarabiaj po drodze.'],
+    ['L4', '0:36.5', 'Ustalcie cenę i termin. I gotowe.'],
+    ['L5', '0:52.0', 'Masz coś do zrobienia? Zleć. Masz chwilę? Pomóż i zarób!'],
+    ['L6', '0:56.0', 'I can help U. Pomagaj. Zyskuj.'],
+  ];
+  const timeline = [
+    ['0:00–0:02', 'P1a – kran w nocy', 'kapanie + niski podkład', '—'],
+    ['0:02–0:04', 'P1b – bohater nie śpi', 'okrzyk „No nie… znowu?!”', 'napis „03:12” (opcjonalnie)'],
+    ['0:04–0:07.6', 'P2 – młotek i palec', 'uderzenie, okrzyk', '—'],
+    ['0:07.6–0:10.6', 'P3 – skrzypiące drzwi', 'skrzypienie, westchnienie', '—'],
+    ['0:10.6–0:14.6', 'P4 – zatkana rynna', 'deszcz, woda, okrzyk', '—'],
+    ['0:14.6–0:18', 'P5 – drukarka', 'zgrzyt drukarki, okrzyk', '—'],
+    ['0:18–0:22.5', '<span class="src">spot.mp4 0:18.0–0:22.5</span> plansza „Nie musisz radzić sobie sam” + logo', 'start pogodnej muzyki', 'L1', true],
+    ['0:22.5–0:29.5', '<span class="src">spot.mp4 0:22.5–0:29.5</span> Zlecam: dodawanie zlecenia w telefonie', 'muzyka', 'L2', true],
+    ['0:29.5–0:32.5', 'S1 – pomocnik w aucie, powiadomienie', 'muzyka, dźwięk powiadomienia', 'L3 (początek)'],
+    ['0:32.5–0:35.5', '<span class="src">spot.mp4 0:32.5–0:35.5</span> trasa i powiadomienie „po drodze”', 'muzyka', 'L3 (koniec)', true],
+    ['0:35.5–0:42.5', '<span class="src">spot.mp4 0:35.5–0:42.5</span> podzielony ekran: oferta 35 zł, „Umowa!”', 'muzyka', 'L4', true],
+    ['0:42.5–0:48', 'S2 – naprawa kranu, uścisk dłoni', 'okrzyk „Ufff…”', 'napis „+35 zł”'],
+    ['0:48–0:51.6', 'S3a, S3b, S3c – po 1,2 s', 'muzyka', 'napis „I po kłopocie.”'],
+    ['0:51.6–0:55.2', '<span class="src">spot.mp4 0:51.6–0:55.2</span> „Zleć. / Pomóż i zarób!”', 'muzyka', 'L5', true],
+    ['0:55.2–0:59.6', '<span class="src">spot.mp4 0:55.2–0:59.6</span> logo, „Pomagaj. Zyskuj.”, nazwa', 'muzyka – zakończenie', 'L6', true],
+  ];
+
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  document.getElementById('clips').innerHTML = clips.map((c) => `
+    <article class="card">
+      <header><h3><span class="id">${c.id}</span> ${c.title}</h3><span class="meta">w filmie ${c.when} · potrzebne ${c.use}</span></header>
+      <div class="copybox" data-copy>${esc(c.prompt + ' ' + STYLE)}</div>
+      <p class="tip"><b>Wskazówka:</b> ${c.tip}</p>
+    </article>`).join('');
+  document.getElementById('shouts').innerHTML = shouts.map(([id, line, how]) => `
+    <div class="card"><header><h3><span class="id">${id}</span> ${how}</h3></header><div class="copybox pl" data-copy>${esc(line)}</div></div>`).join('');
+  document.getElementById('voice').innerHTML = voice.map(([id, at, line]) => `
+    <div class="card"><header><h3><span class="id">${id}</span> od ${at}</h3></header><div class="copybox pl" data-copy>${esc(line)}</div></div>`).join('');
+  document.getElementById('timeline').innerHTML = timeline.map(([t, img, snd, txt, app]) =>
+    `<tr${app ? ' class="app"' : ''}><td class="t">${t}</td><td>${img}</td><td>${snd}</td><td>${txt}</td></tr>`).join('');
+
+  /* przyciski Kopiuj */
+  document.querySelectorAll('[data-copy]').forEach((box) => {
+    const text = box.textContent;
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'copy'; btn.textContent = 'Kopiuj';
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = 'Skopiowano'; btn.classList.add('done');
+        setTimeout(() => { btn.textContent = 'Kopiuj'; btn.classList.remove('done'); }, 1600);
+      } catch {
+        const range = document.createRange(); range.selectNodeContents(box);
+        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+        btn.textContent = 'Zaznaczono – Ctrl+C';
+      }
+    });
+    box.appendChild(btn);
+  });
+})();
+</script>

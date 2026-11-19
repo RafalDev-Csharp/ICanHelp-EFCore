@@ -23,6 +23,14 @@ h2 {
   }
 }
 
+/*
+ * Listy (kategoria, podkategoria): Ionic oznacza pole jako „dotknięte” już przy otwarciu listy, więc bez tego pole
+ * robiło się czerwone, zanim ktoś cokolwiek wybrał. Błąd pokazujemy dopiero po próbie publikacji (`submitted`).
+ */
+ion-select.quiet-errors {
+  --highlight-color-invalid: var(--ion-color-primary);
+}
+
 .error {
   margin: 0;
   font-size: 0.8125rem;

@@ -272,6 +272,8 @@ describe('AnnouncementDetailsPage', () => {
     await render();
 
     expect(element.querySelector('.contact')?.textContent).toContain('+48600100200');
+    // po akceptacji cena z przyjętej oferty (120 zł), nie budżet ogłoszenia
+    expect(element.querySelector('[data-testid="agreed-price"]')?.textContent?.replace(/\s/g, ' ')).toContain('120 zł');
     const footer = element.querySelector('ion-footer')?.textContent ?? '';
     expect(footer).toContain('Rozpocznij');
     expect(footer).toContain('Rozmowa');
